@@ -60,8 +60,8 @@ git commit -m "Crawler do site: xxxxxxxx"
 ```
 
 💡 **Dica:** Use mensagens de commit claras, como:
-- `Adiciona solução do exercício 1`
-- `Corrige lógica do exercício 3`
+- `Crawler do site do IQ`
+- `Crawler do site da POLI`
 
 ---
 
