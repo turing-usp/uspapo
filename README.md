@@ -46,9 +46,9 @@ git checkout -b joao-silva
 
 ---
 
-### 3. Resolva os exercícios ✍️
+### 3. Faça a sua parte ✍️
 
-Abra os arquivos listados no repositório e implemente suas soluções.
+Siga o exemplo da documentação do scrapy, e crie um arquivo diferente para cada site que for utilizar. CUIDADO para não mexer no do amiguinho e dar problema no nosso scraper geral. 
 
 ---
 
@@ -56,7 +56,7 @@ Abra os arquivos listados no repositório e implemente suas soluções.
 
 ```bash
 git add .
-git commit -m "Resolvendo exercícios X e Y"
+git commit -m "Crawler do site: xxxxxxxx"
 ```
 
 💡 **Dica:** Use mensagens de commit claras, como:
