@@ -124,3 +124,23 @@ git log --oneline
 Respeite o trabalho dos colegas e evite sobrescrever código de outras pessoas.
 
 ---
+
+## 🏃 Como rodar o scraper do IME
+
+Para extrair os dados de todas as páginas do site do IME, certifique-se de estar na raiz do projeto (onde está o arquivo `scrapy.cfg`) e execute o comando abaixo:
+
+```bash
+scrapy crawl ime -O ime_data.json
+```
+
+Os dados raspados serão salvos no arquivo `ime_data.json`.
+
+### Pausar e Continuar a Execução
+
+Se você precisar parar o scraper no meio do caminho (pressionando `Ctrl+C` **apenas uma vez**) e quiser continuar depois de onde parou sem perder o progresso, adicione o parâmetro `JOBDIR`:
+
+```bash
+scrapy crawl ime -O ime_data.json -s JOBDIR=crawls/ime_run
+```
+
+Execute exatamente o mesmo comando para retomar. O Scrapy vai ler os registros na pasta `crawls/ime_run` e continuar a varredura de onde parou.
