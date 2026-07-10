@@ -36,3 +36,14 @@ class IqNavbarSpider(scrapy.Spider):
         item['texto_limpo'] = dados['texto_limpo']
         
         yield item
+
+        # 3. Varre o corpo do texto buscando links para PDFs anexados
+        # Pega todos os links dentro do conteúdo principal
+        links_da_pagina = response.css('.field-items a::attr(href)').getall()
+        
+        for link in links_da_pagina:
+            if link and link.lower().endswith('.pdf'):
+                # Transforma links relativos em absolutos e envia para processar o PDF
+                url_absoluta = response.urljoin(link)
+                self.logger.info(f"PDF encontrado no corpo da página: {url_absoluta}")
+                yield scrapy.Request(url_absoluta, callback=self.parse_conteudo)

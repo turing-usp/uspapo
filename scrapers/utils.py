@@ -1,6 +1,6 @@
 import io
 import scrapy
-from pypdf import PdfReader  # ou a biblioteca que você está usando
+from pypdf import PdfReader  
 
 class ExtratorConteudo:
     
