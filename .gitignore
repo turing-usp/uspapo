@@ -9,8 +9,8 @@ scrapers/.scrapy/
 httpcache/
 
 # Arquivos de dados brutos (Podem passar de 100MB e travar o upload)
-*.json
-data/
+# *.json
+# data/
 
 # C extensions
 *.so
