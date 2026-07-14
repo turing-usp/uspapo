@@ -227,3 +227,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Banco de dados vetorial local do Chroma
+rag/chroma_data/
+chroma_data/
