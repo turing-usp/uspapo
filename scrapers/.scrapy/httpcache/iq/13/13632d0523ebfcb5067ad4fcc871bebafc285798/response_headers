@@ -1,0 +1,12 @@
+Content-Length: 8344
+Date: Sun, 05 Jul 2026 17:26:35 GMT
+Server: Apache/2.4.56 (Debian)
+Expires: Wed, 11 Jan 1984 05:00:00 GMT
+Cache-Control: no-cache, must-revalidate, max-age=0
+Pragma: no-cache
+Set-Cookie: _icl_current_language=pt-br; expires=Mon, 06-Jul-2026 17:26:35 GMT; Max-Age=86400; path=/
+Link: <https://lem.iq.usp.br/wp-json/>; rel="https://api.w.org/"
+Link: <https://lem.iq.usp.br/wp-json/wp/v2/categories/2>; rel="alternate"; type="application/json"
+Vary: Accept-Encoding
+Content-Encoding: gzip
+Content-Type: text/html; charset=UTF-8

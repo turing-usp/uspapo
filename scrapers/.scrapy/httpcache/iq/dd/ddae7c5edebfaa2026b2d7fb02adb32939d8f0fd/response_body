@@ -1,0 +1,35 @@
+<html>
+<head>
+<?php
+header ("http/1.1 301 Moved Permanently");
+header ("Location: https://www.iq.usp.br/portaliqusp/");
+?>
+<title>Instituto de Quí­mica- USP</title>
+<meta property="og:url" content="https://www.iq.usp.br/portaliqusp/" />
+<meta property="og:site_name" content="Instituto de Química - USP" />
+<meta property="og:description" content="Ensino, pesquisa e extensão nas áreas de Química Fundamental e Bioquímica. Graduação, pós-graduação, mestrado, mestrado profissional, doutorado, pós-doutorado, USP, São Paulo, Butantã." />
+<meta property="og:image" content="https://www.iq.usp.br/logotipo_fb.jpg" />
+<meta property="og:image:type" content="image/jpeg" />
+<meta property="og:image:width" content="236" />
+<meta property="og:image:height" content="236" />
+<meta name="viewport" content="width=device-width, user-scalable=no">
+</head>
+<body>
+<script language="javascript">
+<!--
+  document.location = "https://www.iq.usp.br/portaliqusp/";
+// -->
+</script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-53869293-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</body>
+</html>
+
