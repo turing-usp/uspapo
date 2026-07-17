@@ -27,7 +27,7 @@ class ExtratorConteudo:
 
     @staticmethod
     def extrair_html(response: scrapy.http.Response) -> dict:
-        """Remove ruídos (nav, footer, etc.) e extrai texto limpo de um HTML."""
+        """Remove ruídos e extrai texto limpo de um HTML respeitando parágrafos."""
         resultado = {"titulo": "", "texto_limpo": ""}
         
         # 1. Extrai Título
@@ -36,7 +36,7 @@ class ExtratorConteudo:
             titulo = response.css('title::text').get(default='Sem Título')
         resultado["titulo"] = titulo.strip()
         
-        # 2. Limpeza do Corpo
+        # 2. Limpeza do Corpo (Removemos o lixo estrutural)
         corpo = response.css('body')
         elementos_para_remover = [
             'nav', 'footer', 'header', 'button', 'script', 'style', 'form',
@@ -44,29 +44,29 @@ class ExtratorConteudo:
             '.redes-sociais', '.compartilhar', '.tags', '.subfooter-area', '#subfooter-inside'
         ]
         
-        # Cria uma cópia seletora para não corromper o response original global
         for seletor in elementos_para_remover:
             for elemento in corpo.css(seletor):
                 elemento.drop()
         
-        # 3. Coleta de Texto
-        # Primeiro, tenta pegar o bloco de conteúdo principal para evitar pegar as divs do layout inteiro
-        conteudo_principal = corpo.css('.field-items')
-
-        if conteudo_principal:
-            # Se existir a div do conteúdo principal, pega TODO texto que estiver lá dentro
-            textos_brutos = conteudo_principal.css('::text').getall()
-        else:
-            # Caso seja uma página com estrutura diferente, usa o fallback das tags comuns
-            tags_de_texto = 'p::text, p *::text, li::text, li *::text, h2::text, h3::text, h4::text, big::text, big *::text'
-            textos_brutos = corpo.css(tags_de_texto).getall()
-
-        # Limpeza rigorosa: remove espaços, quebras de linha (\n), abas (\t) e o caractere invisível \xa0 (&nbsp;)
+        # 3. Coleta de Texto Inteligente (Por Blocos)
+        # Em vez de pegar '::text' soltos, focamos nas tags que formam blocos reais
+        tags_de_bloco = corpo.css('p, li, h1, h2, h3, h4, h5, h6, .field-items div')
+        
         linhas_limpas = []
-        for texto in textos_brutos:
-            texto_limpo = texto.replace('\xa0', ' ').strip()
-            if texto_limpo: # Só adiciona se não for vazio
-                linhas_limpas.append(texto_limpo)
+        for tag in tags_de_bloco:
+            # Pega todo o texto DENTRO deste parágrafo específico (incluindo links e negritos)
+            # e junta com um espaço simples para não quebrar frases
+            textos_internos = tag.css('*::text, ::text').getall()
+            texto_do_paragrafo = "".join(textos_internos).replace('\xa0', ' ')
+            
+            # Limpa espaços duplos dentro do parágrafo
+            import re
+            texto_do_paragrafo = re.sub(r'\s+', ' ', texto_do_paragrafo).strip()
+            
+            # Só adiciona se sobrou algum texto útil no bloco
+            if texto_do_paragrafo:
+                linhas_limpas.append(texto_do_paragrafo)
 
-        resultado["texto_limpo"] = " ".join(linhas_limpas)
+        # Agora sim, separamos os parágrafos completos e perfeitos com \n\n
+        resultado["texto_limpo"] = "\n\n".join(linhas_limpas)
         return resultado
