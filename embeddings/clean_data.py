@@ -3,47 +3,45 @@ import os
 import re
 import glob
 
+def carregar_regras():
+    """Carrega o dicionário de regras de lixo do arquivo externo."""
+    diretorio_atual = os.path.dirname(os.path.abspath(__file__))
+    caminho_regras = os.path.join(diretorio_atual, "regras_ruido.json")
+    
+    try:
+        with open(caminho_regras, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print("[ALERTA] Arquivo 'regras_ruido.json' não encontrado. Usando apenas limpeza básica.")
+        return {}
+
 def limpeza_universal(texto: str) -> str:
-    """Aplica formatação básica sem destruir os parágrafos do Scrapy."""
+    """Aplica formatação básica de HTML e espaçamento."""
     if not texto:
         return ""
     
-    # Remove tags residuais que o Scrapy possa ter deixado
     texto = re.sub(r'<script.*?>.*?</script>', '', texto, flags=re.IGNORECASE | re.DOTALL)
     texto = re.sub(r'<style.*?>.*?</style>', '', texto, flags=re.IGNORECASE | re.DOTALL)
-    
-    # Reduz 3 ou mais quebras de linha para apenas 2 (mantém a lógica de fatiamento intacta)
     texto = re.sub(r'\n{3,}', '\n\n', texto)
-    
-    # Remove espaços duplos horizontais, preservando as quebras de linha
     texto = re.sub(r'[ \t]+', ' ', texto)
     
     return texto.strip()
 
-def limpeza_especifica_poli(texto: str) -> str:
-    """As suas regras blindadas contra o lixo do domínio poli.usp.br."""
-    padroes_ruido = [
-        r"Localização\s*Avenida Prof\. Luciano Gualberto.*?Formando Engenheiros e Líderes\s*© \d{4} Escola Politécnica da USP\s*Menu Acesso Rápido",
-        r"CEP – 05508-010 – São Paulo – SP",
-        r"Contato\s*Entre em contato conosco pelo e-mail comunicacao\.poli@usp\.br",
-        r"MENU AVISOS\s*Para divulgar, escreva para:\s*comunicacao\.poli@usp\.br",
-        r"Para divulgar, escreva para:\s*comunicacao\.poli@usp\.br",
-        r"Equipe de imprensa da Poli-USP.*?Dúvidas e sugestões, entre em contato\.",
-        r"Acesse a página com os vídeos produzidos na Poli-USP:\s*Clique aqui\.",
-        r"A Escola Politécnica é composta por mais de 8 mil pessoas.*?Acesse a página com os vídeos produzidos na Poli-USP: Clique aqui\.",
-        r"Acompanhe a Poli nas redes sociais!",
-        r"Acesse abaixo as redes sociais da Escola Politécnica da USP.*?Banco de imagens e fotos:.*?(?=\n|$)",
-        r"Retornar à página principal\.",
-        r"Clique para acessar\.",
-        r"Acesse no link\s*\.",
-        r"VEJA TAMBÉM",
-        r"\bMENU\b",
-        r"Acesso Rápido",
-        r"Última atualização em \d{2}/\d{2}/\d{4}"
-    ]
-    
+def aplicar_regras_regex(texto: str, url: str, regras: dict) -> str:
+    """Aplica as regras do JSON dependendo do domínio da página."""
     texto_limpo = texto
-    for padrao in padroes_ruido:
+    
+    # 1. Aplica as regras universais (que valem para todos os sites)
+    padroes_aplicar = regras.get("universal", []).copy()
+    
+    # 2. Descobre de qual instituto é a URL e adiciona as regras específicas
+    for dominio, padroes_dominio in regras.items():
+        if dominio != "universal" and dominio in url:
+            padroes_aplicar.extend(padroes_dominio)
+            break # Achou o domínio, não precisa testar os outros
+            
+    # 3. Executa a faxina com as regras combinadas
+    for padrao in padroes_aplicar:
         texto_limpo = re.sub(padrao, "", texto_limpo, flags=re.IGNORECASE | re.DOTALL)
         
     return texto_limpo
@@ -53,15 +51,15 @@ def executar():
     pasta_raw = os.path.join(diretorio_atual, "..", "data", "raw")
     pasta_processed = os.path.join(diretorio_atual, "..", "data", "processed")
     
-    # Garante que a pasta processed exista antes de checarmos os arquivos nela
     os.makedirs(pasta_processed, exist_ok=True)
-    
-    # Pega todos os arquivos .json na pasta raw
     arquivos_raw = glob.glob(os.path.join(pasta_raw, "**", "*.json"), recursive=True)
     
     if not arquivos_raw:
         print(f"[AVISO] Nenhum arquivo JSON encontrado em {pasta_raw}.")
         return
+
+    # Carrega as regras na memória uma única vez
+    regras_ruido = carregar_regras()
 
     print(f"-> Analisando {len(arquivos_raw)} arquivos raw para limpeza...")
 
@@ -70,22 +68,14 @@ def executar():
         nome_base = os.path.splitext(nome_arquivo)[0] 
         nome_saida = f"{nome_base}_limpo.json"
         
-        # 2. A MÁGICA DO ESPELHAMENTO DE PASTAS
-        # Descobre o caminho relativo (Ex: "Poli\poliscrap.json")
         caminho_relativo = os.path.relpath(caminho_raw, pasta_raw)
-        # Pega só o nome da pasta (Ex: "Poli")
         pasta_relativa = os.path.dirname(caminho_relativo)
         
-        # Cria o caminho de destino exato (Ex: "../data/processed/Poli")
         pasta_destino = os.path.join(pasta_processed, pasta_relativa)
-        os.makedirs(pasta_destino, exist_ok=True) # Garante que a pasta exista!
+        os.makedirs(pasta_destino, exist_ok=True) 
         
-        # Monta o caminho final do arquivo
         caminho_saida = os.path.join(pasta_destino, nome_saida)
         
-        # Lógica inteligente de Update:
-        # 1. Se o arquivo limpo não existe OR
-        # 2. Se o arquivo raw foi modificado DEPOIS do arquivo limpo
         precisa_limpar = False
         if not os.path.exists(caminho_saida):
             precisa_limpar = True
@@ -96,7 +86,6 @@ def executar():
             print(f"   [PULADO] '{nome_arquivo}' já está limpo e atualizado.")
             continue
             
-        # Se chegou aqui, precisa processar!
         print(f"   [LIMPANDO] Processando '{nome_arquivo}' -> '{nome_saida}'...")
         
         try:
@@ -108,19 +97,20 @@ def executar():
             
             for doc in dados_brutos:
                 url_documento = doc.get("url", "")
-                texto_original = doc.get("texto_limpo", "")
                 
+                # A CORREÇÃO DO BUG: tenta "texto_limpo", se não achar tenta "clean_text"
+                texto_original = doc.get("texto_limpo", doc.get("clean_text", ""))
+                
+                # Passa pela esteira de limpeza
                 texto_tratado = limpeza_universal(texto_original)
-                
-                if "poli.usp.br" in url_documento:
-                    texto_tratado = limpeza_especifica_poli(texto_tratado)
-                    
-                texto_tratado = limpeza_universal(texto_tratado)
+                texto_tratado = aplicar_regras_regex(texto_tratado, url_documento, regras_ruido)
+                texto_tratado = limpeza_universal(texto_tratado) # Passa de novo para tirar quebras de linha que sobraram
                 
                 if len(texto_tratado) > 50:
                     dados_limpos.append({
                         "url": url_documento,
-                        "titulo": doc.get("titulo", "").strip(),
+                        # Também previne o bug com o título
+                        "titulo": doc.get("titulo", doc.get("title", "")).strip(),
                         "texto_limpo": texto_tratado
                     })
                 else:
