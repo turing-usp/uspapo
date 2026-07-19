@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+:root {
+  background-color: #03042c; 
+  background-image: 
+    /* Brilho Superior Direito (Mais forte e expandido) */
+    radial-gradient(circle at 90% 10%, rgba(29, 44, 135, 0.85) 0%, rgba(29, 44, 135, 0) 65%),
+    
+    /* Brilho Inferior Esquerdo */
+    radial-gradient(circle at 10% 90%, rgba(20, 31, 98, 0.7) 0%, rgba(20, 31, 98, 0) 55%),
+    
+    /* Fundo Escuro Base */
+    linear-gradient(135deg, #050833 0%, #010214 100%);
+    
+  --foreground: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
