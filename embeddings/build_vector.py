@@ -77,7 +77,7 @@ def construir_banco():
     cliente = chromadb.PersistentClient(path=caminho_db)
     
     funcao_embedding = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+        model_name="intfloat/multilingual-e5-base"
     )
 
     colecao = cliente.get_or_create_collection(
@@ -88,7 +88,7 @@ def construir_banco():
     print("-> Sincronizando dados de forma incremental (Upserting)...")
     if documentos:
         # Define um lote seguro, abaixo do limite de 5461 do ChromaDB
-        tamanho_lote = 5000 
+        tamanho_lote = 256
         
         # O tqdm vai criar aquela barra de progresso visual no terminal
         for i in tqdm(range(0, len(documentos), tamanho_lote), desc="Enviando lotes ao ChromaDB"):

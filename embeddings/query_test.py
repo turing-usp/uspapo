@@ -10,7 +10,7 @@ def testar_sistema_busca():
     
     # 2. Inicializar a mesma função de embedding usada na criação do banco
     funcao_embedding = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+        model_name="intfloat/multilingual-e5-base"
     )
     
     # 3. Conectar ao ChromaDB e carregar a coleção existente
