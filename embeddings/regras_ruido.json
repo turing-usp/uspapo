@@ -1,0 +1,28 @@
+{
+    "universal": [
+        "Retornar à página principal\\.",
+        "Clique para acessar\\.",
+        "Acesse no link\\s*\\.",
+        "VEJA TAMBÉM",
+        "\\bMENU\\b",
+        "Acesso Rápido",
+        "Última atualização em \\d{2}/\\d{2}/\\d{4}"
+    ],
+    "poli.usp.br": [
+        "Localização\\s*Avenida Prof\\. Luciano Gualberto.*?Formando Engenheiros e Líderes\\s*© \\d{4} Escola Politécnica da USP\\s*Menu Acesso Rápido",
+        "CEP – 05508-010 – São Paulo – SP",
+        "Contato\\s*Entre em contato conosco pelo e-mail comunicacao\\.poli@usp\\.br",
+        "MENU AVISOS\\s*Para divulgar, escreva para:\\s*comunicacao\\.poli@usp\\.br",
+        "Para divulgar, escreva para:\\s*comunicacao\\.poli@usp\\.br",
+        "Equipe de imprensa da Poli-USP.*?Dúvidas e sugestões, entre em contato\\.",
+        "Acesse a página com os vídeos produzidos na Poli-USP:\\s*Clique aqui\\.",
+        "A Escola Politécnica é composta por mais de 8 mil pessoas.*?Acesse a página com os vídeos produzidos na Poli-USP: Clique aqui\\.",
+        "Acompanhe a Poli nas redes sociais!",
+        "Acesse abaixo as redes sociais da Escola Politécnica da USP.*?Banco de imagens e fotos:.*?(?=\\n|$)"
+    ],
+    "ime.usp.br": [
+        "Anterior 1 ….*?Próximo",
+        "Previous 1 ….*?Next",
+        "Compartilhe"
+    ]
+}
