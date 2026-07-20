@@ -11,6 +11,8 @@
     
     /* Fundo Escuro Base */
     linear-gradient(135deg, #050833 0%, #010214 100%);
+  background-attachment: fixed;
+  background-size: cover;
     
   --foreground: #ffffff;
 }
