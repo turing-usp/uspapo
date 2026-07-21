@@ -16,14 +16,14 @@ export default function Home() {
     const jaProcessouInicial = useRef(false);
 
     useEffect(() => {
-        if (!jaProcessouInicial.current) {
-            jaProcessouInicial.current = true;
-            const perguntaInicial = sessionStorage.getItem(`pergunta-inicial-${id}`);
-            if (perguntaInicial) {
-            setHistorico([{ user: perguntaInicial, bot: "resposta mock..." }]);
-            sessionStorage.removeItem(`pergunta-inicial-${id}`); // limpa depois de usar
-            }
+    if (!jaProcessouInicial.current) {
+        jaProcessouInicial.current = true;
+        const perguntaInicial = sessionStorage.getItem(`pergunta-inicial-${id}`);
+        if (perguntaInicial) {
+            sessionStorage.removeItem(`pergunta-inicial-${id}`);
+            enviarPergunta(perguntaInicial);   
         }
+    }
     }, [id]);
 
     const enviarPergunta = async (texto: string) => {
