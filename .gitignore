@@ -176,7 +176,11 @@ venv.bak/
 .ropeproject
 
 # mkdocs documentation
-/site
+# /site
+/site/node_modules/
+/site/.next/
+.next/
+
 
 # mypy
 .mypy_cache/
