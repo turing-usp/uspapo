@@ -26,10 +26,35 @@ export default function Home() {
         }
     }, [id]);
 
-    const enviarPergunta = (texto: string) => {
+    const enviarPergunta = async (texto: string) => {
         if (!texto.trim()) return;
-        setHistorico((prev) => [...prev, { user: texto, bot: "resposta mock..." }]);
+
+        // mostra a pergunta do usuário na tela imediatamente
+        setHistorico((prev) => [...prev, { user: texto, bot: "..." }]);
         setPergunta("");
+
+        try {
+            const res = await fetch("http://localhost:5000/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pergunta: texto }),
+            });
+
+            const dados = await res.json();
+
+            // troca o "..." pela resposta real, assim que ela chega
+            setHistorico((prev) => {
+            const copia = [...prev];
+            copia[copia.length - 1] = { user: texto, bot: dados.resposta };
+            return copia;
+            });
+        } catch (err) {
+            setHistorico((prev) => {
+            const copia = [...prev];
+            copia[copia.length - 1] = { user: texto, bot: "Erro ao buscar resposta. O servidor Python está rodando?" };
+            return copia;
+            });
+        }
     };
 
     const lidarComEnvio = (e: React.SyntheticEvent) => {
