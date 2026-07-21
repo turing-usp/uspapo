@@ -7,9 +7,11 @@ export default function LeftMenu() {
 
       <div className="relative flex items-center group">
         <button className="hover:text-[#f1863d] hover:cursor-pointer transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-          </svg>
+          <a href="/">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+          </a>
         </button>
         <span className="absolute left-10 scale-0 transition-all rounded rounded-[2rem] bg-transparent border border-[1px] border-[#f1863d] p-2 text-xs text-[#f1863d] group-hover:scale-100 whitespace-nowrap shadow-lg">
           Novo Chat
