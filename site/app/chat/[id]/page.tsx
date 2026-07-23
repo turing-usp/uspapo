@@ -29,7 +29,6 @@ export default function Home() {
     const enviarPergunta = async (texto: string) => {
         if (!texto.trim()) return;
 
-        // mostra a pergunta do usuário na tela imediatamente
         setHistorico((prev) => [...prev, { user: texto, bot: "..." }]);
         setPergunta("");
 
