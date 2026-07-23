@@ -8,12 +8,51 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 
-export default function Home() {
+export default function ChatPage() {
 
     const { id } = useParams();
     const [pergunta, setPergunta] = useState("");
     const [historico, setHistorico] = useState<{ user: string; bot: string }[]>([]);
     const jaProcessouInicial = useRef(false);
+
+    const enviarParaAPI = async (texto: string) => {
+    try {
+        const res = await fetch("http://localhost:5000/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pergunta: texto }),
+        });
+
+        if (!res.ok) throw new Error("Erro na comunicação com o back-end");
+
+        const dados = await res.json();
+
+        let respostaCompleta = dados.resposta;
+        if (dados.fontes && dados.fontes.length > 0) {
+            respostaCompleta += "\n\nFontes consultadas:\n" + dados.fontes.map((url: string) => `- ${url}`).join("\n");
+        }
+
+        return respostaCompleta;
+        } catch (erro) {
+            console.error(erro);
+            return "Desculpe, ocorreu um erro ao conectar com o servidor do USPapo.";
+        }
+    };
+
+    const enviarPergunta = async (texto: string) => {
+        if (!texto.trim()) return;
+
+        setHistorico((prev) => [...prev, { user: texto, bot: "..." }]);
+        setPergunta("");
+
+        const respostaFormatada = await enviarParaAPI(texto);
+
+        setHistorico((prev) => {
+            const copia = [...prev];
+            copia[copia.length - 1] = { user: texto, bot: respostaFormatada };
+            return copia;
+        });
+    };
 
     useEffect(() => {
     if (!jaProcessouInicial.current) {
@@ -26,36 +65,6 @@ export default function Home() {
     }
     }, [id]);
 
-    const enviarPergunta = async (texto: string) => {
-        if (!texto.trim()) return;
-
-        setHistorico((prev) => [...prev, { user: texto, bot: "..." }]);
-        setPergunta("");
-
-        try {
-            const res = await fetch("http://localhost:5000/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pergunta: texto }),
-            });
-
-            const dados = await res.json();
-
-            // troca o "..." pela resposta real, assim que ela chega
-            setHistorico((prev) => {
-            const copia = [...prev];
-            copia[copia.length - 1] = { user: texto, bot: dados.resposta };
-            return copia;
-            });
-        } catch (err) {
-            setHistorico((prev) => {
-            const copia = [...prev];
-            copia[copia.length - 1] = { user: texto, bot: "Erro ao buscar resposta. O servidor Python está rodando?" };
-            return copia;
-            });
-        }
-    };
-
     const lidarComEnvio = (e: React.SyntheticEvent) => {
         e.preventDefault();
         enviarPergunta(pergunta);
@@ -67,7 +76,7 @@ export default function Home() {
         </Navbar>
         <Leftmenu>
         </Leftmenu>
-        <div>
+        <div className="pb-32">
         {historico.map((item, index) => (
         <div key={index}>
             <div className="flex flex-col h-[20%] mt-[1%] mr-[20%] ml-[55%]">
@@ -83,7 +92,7 @@ export default function Home() {
                 />
             </div>
             <div className="flex flex-col pb-[12%]">
-            <ChatResponse text={item.bot} />
+                <ChatResponse text={item.bot} />
             </div>
         </div>
         ))}
