@@ -16,7 +16,17 @@ if not PINECONE_API_KEY or not GROQ_API_KEY:
     raise RuntimeError("As chaves PINECONE_API_KEY e/gsk GROQ_API_KEY não foram encontradas no arquivo .env!")
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})  # em produção, troque "*" pela URL do front-end
+
+# Liberamos o acesso tanto para o domínio oficial do Turing quanto para os seus testes locais!
+CORS(app, resources={
+    r"/*": {
+        "origins": [
+            "https://turingusp.com",       # Para o site público do seu amigo
+            "https://www.turingusp.com",   # Garantia caso alguém digite www
+            "http://localhost:3000"        # Para você continuar testando na sua máquina
+        ]
+    }
+})
 
 # ─────────────────────────────────────────────
 # Inicialização ÚNICA (Conecta à nuvem ao subir o servidor)
@@ -128,4 +138,6 @@ def chat():
         return jsonify({"erro": "Erro interno ao processar a pergunta no servidor."}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # Render atribui a porta via variável de ambiente 'PORT'
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
