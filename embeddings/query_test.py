@@ -1,80 +1,110 @@
-import json
 import os
-import chromadb
-from chromadb.utils import embedding_functions
+from dotenv import load_dotenv
+from pinecone import Pinecone
+from groq import Groq
 
-def testar_sistema_busca():
-    # 1. Configurar caminhos absolutos locais
-    diretorio_atual = os.path.dirname(os.path.abspath(__file__))
-    caminho_db = os.path.join(diretorio_atual, "chroma_data")
+# ─────────────────────────────────────────────
+# 1. Configurações Iniciais
+# ─────────────────────────────────────────────
+load_dotenv()
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+if not PINECONE_API_KEY or not GROQ_API_KEY:
+    raise RuntimeError("Chaves da API faltando no arquivo .env!")
+
+print("-> Conectando aos serviços na nuvem (Pinecone & Groq)...")
+pc = Pinecone(api_key=PINECONE_API_KEY)
+index = pc.Index("uspapo-embeddings")
+groq_client = Groq(api_key=GROQ_API_KEY)
+
+
+def buscar_contexto_no_pinecone(pergunta: str, top_k: int = 3):
+    """Busca os textos na nuvem e retorna os blocos crus e as fontes."""
+    texto_busca = f"query: {pergunta}"
     
-    # 2. Inicializar a mesma função de embedding usada na criação do banco
-    funcao_embedding = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="intfloat/multilingual-e5-base"
+    embed_result = pc.inference.embed(
+        model="multilingual-e5-large",
+        inputs=[texto_busca],
+        parameters={"input_type": "query"}
     )
     
-    # 3. Conectar ao ChromaDB e carregar a coleção existente
-    cliente = chromadb.PersistentClient(path=caminho_db)
+    vetor_pergunta = embed_result[0].values
     
-    try:
-        colecao = cliente.get_collection(
-            name="poli_chatbot", 
-            embedding_function=funcao_embedding
-        )
-    except Exception as e:
-        print("\n[ERRO AO CARREGAR COLEÇÃO]")
-        print("Verifique se o nome 'poli_chatbot' está idêntico ao build_vector.py")
-        print(f"Detalhes do erro: {e}")
-        return
+    resultados = index.query(
+        namespace="uspapo",
+        vector=vetor_pergunta,
+        top_k=top_k,
+        include_metadata=True
+    )
+    
+    textos_recuperados = []
+    fontes = []
+    
+    for match in resultados.matches:
+        metadado = match.metadata
+        textos_recuperados.append(metadado.get("text", ""))
+        # Formata a fonte para exibição
+        fontes.append(f"- {metadado.get('titulo', 'Sem título')} ({metadado.get('url', 'Sem URL')})")
+        
+    return textos_recuperados, fontes
 
-    print("\n=========================================")
-    print("=== SISTEMA DE BUSCA SEMÂNTICA PRONTO ===")
-    print("=========================================")
-    print("Digite sua dúvida sobre a Poli USP para testar o banco.")
-    print("Para encerrar o programa, digite: sair")
+
+def montar_prompt(pergunta: str, textos_contexto: list) -> str:
+    contexto_unido = "\n\n---\n\n".join(textos_contexto)
+    return f"""Você é o chatbot veterano da USP. Responda à pergunta do aluno de forma clara, amigável e direta, usando APENAS as informações do contexto fornecido abaixo.
+Se a informação não estiver no contexto, diga que não tem certeza e recomende procurar a secretaria.
+
+Contexto da Base de Dados:
+{contexto_unido}
+
+Pergunta do Aluno:
+{pergunta}
+"""
+
+
+# ─────────────────────────────────────────────
+# 2. O Loop Interativo do Terminal
+# ─────────────────────────────────────────────
+if __name__ == "__main__":
+    print("\n" + "="*60)
+    print("🔬 LABORATÓRIO DE TESTES RAG (PINECONE + GROQ)")
+    print("="*60)
     
     while True:
-        pergunta = input("\nSua pergunta: ")
+        print("\n" + "-"*60)
+        pergunta_usuario = input("👤 VOCÊ: ")
         
-        if pergunta.strip().lower() == 'sair':
-            print("\nEncerrando testes de embedding. Próximo passo: Pipeline RAG!")
+        if pergunta_usuario.lower().strip() in ['sair', 'exit', 'quit', 'fechar']:
+            print("\nEncerrando o laboratório. Até logo!")
             break
             
-        if not pergunta.strip():
+        if not pergunta_usuario.strip():
             continue
             
-        # 4. Executar a consulta vetorial no banco
-        # O ChromaDB vai converter a pergunta em vetor e calcular a distância
-        resultados = colecao.query(
-            query_texts=[pergunta],
-            n_results=2, # Traz os 2 blocos de texto matematicamente mais próximos
-            include=["documents", "metadatas", "distances"]
+        # ETAPA 1: O Retriever (Pinecone)
+        print("\n🔍 PESQUISANDO NO PINECONE...")
+        textos, fontes = buscar_contexto_no_pinecone(pergunta_usuario)
+        
+        print("\n[BLOCOS DE TEXTO RECUPERADOS (CRUS)]")
+        for i, texto in enumerate(textos, 1):
+            # Imprime o texto gigante inteiro
+            print(f"  Bloco {i}: {texto}\n")
+            
+        # ETAPA 2: O Generator (Groq)
+        print("\n🧠 PROCESSANDO RESPOSTA NO GROQ...")
+        prompt = montar_prompt(pergunta_usuario, textos)
+        
+        resposta = groq_client.chat.completions.create(
+            model="openai/gpt-oss-120b", 
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2
         )
         
-        # 5. Exibir os resultados encontrados e as pontuações de distância
-        print("\n" + "="*30)
-        print("--- BLOCOS VETORIAIS RECUPERADOS ---")
-        print("="*30)
+        print("\n🤖 USPAPO:")
+        print(resposta.choices[0].message.content)
         
-        documentos = resultados.get("documents", [[]])[0]
-        metadados = resultados.get("metadatas", [[]])[0]
-        distancias = resultados.get("distances", [[]])[0]
-        
-        if not documentos:
-            print("Nenhum bloco de texto relevante foi encontrado para esta consulta.")
-            continue
-            
-        for i in range(len(documentos)):
-            texto = documentos[i]
-            meta = metadados[i]
-            # No ChromaDB com essa métrica, quanto MENOR a distância, MAIS parecido é o texto
-            score_distancia = distancias[i]
-            
-            print(f"\n[Resultado #{i+1}] | Distância Matemática: {score_distancia:.4f}")
-            print(f"Título da Página: {meta['titulo']}")
-            print(f"URL de Origem: {meta['url']}")
-            print(f"Trecho do Bloco:\n{texto}")
-            print("-" * 50)
-
-if __name__ == "__main__":
-    testar_sistema_busca()
+        print("\n📚 FONTES:")
+        # Remove URLs duplicadas usando set()
+        for fonte in set(fontes):
+            print(fonte)
