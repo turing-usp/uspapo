@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 
+
 export default function ChatPage() {
 
     const { id } = useParams();
@@ -15,69 +16,55 @@ export default function ChatPage() {
     const [historico, setHistorico] = useState<{ user: string; bot: string }[]>([]);
     const jaProcessouInicial = useRef(false);
 
-    // Função que faz a requisição real para o seu Flask (porta 5000)
     const enviarParaAPI = async (texto: string) => {
-        try {
-            const res = await fetch("http://localhost:5000/chat", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ pergunta: texto }),
-            });
+    try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pergunta: texto }),
+        });
 
-            if (!res.ok) throw new Error("Erro na comunicação com o back-end");
+        if (!res.ok) throw new Error("Erro na comunicação com o back-end");
 
-            const dados = await res.json();
-            
-            // Junta a resposta do Groq com as fontes oficiais da USP
-            let respostaCompleta = dados.resposta;
-            if (dados.fontes && dados.fontes.length > 0) {
-                respostaCompleta += "\n\nFontes consultadas:\n" + dados.fontes.map((url: string) => `- ${url}`).join("\n");
-            }
+        const dados = await res.json();
 
-            return respostaCompleta;
+        let respostaCompleta = dados.resposta;
+        if (dados.fontes && dados.fontes.length > 0) {
+            respostaCompleta += "\n\nFontes consultadas:\n" + dados.fontes.map((url: string) => `- ${url}`).join("\n");
+        }
+
+        return respostaCompleta;
         } catch (erro) {
             console.error(erro);
             return "Desculpe, ocorreu um erro ao conectar com o servidor do USPapo.";
         }
     };
 
-    useEffect(() => {
-        if (!jaProcessouInicial.current) {
-            jaProcessouInicial.current = true;
-            const perguntaInicial = sessionStorage.getItem(`pergunta-inicial-${id}`);
-            if (perguntaInicial) {
-                sessionStorage.removeItem(`pergunta-inicial-${id}`); // limpa depois de usar
-                
-                // Exibe a pergunta inicial com status de carregamento
-                setHistorico([{ user: perguntaInicial, bot: "Pensando..." }]);
-                
-                // Busca a resposta real na API
-                enviarParaAPI(perguntaInicial).then((respostaReal) => {
-                    setHistorico([{ user: perguntaInicial, bot: respostaReal }]);
-                });
-            }
-        }
-    }, [id]);
-
     const enviarPergunta = async (texto: string) => {
         if (!texto.trim()) return;
-        
-        // Adiciona a nova mensagem ao histórico mostrando "Pensando..."
-        setHistorico((prev) => [...prev, { user: texto, bot: "Pensando..." }]);
+
+        setHistorico((prev) => [...prev, { user: texto, bot: "..." }]);
         setPergunta("");
 
-        // Pega a resposta real do Groq via API
-        const respostaReal = await enviarParaAPI(texto);
+        const respostaFormatada = await enviarParaAPI(texto);
 
-        // Atualiza o último balão com a resposta processada
         setHistorico((prev) => {
-            const novoHistorico = [...prev];
-            novoHistorico[novoHistorico.length - 1].bot = respostaReal;
-            return novoHistorico;
+            const copia = [...prev];
+            copia[copia.length - 1] = { user: texto, bot: respostaFormatada };
+            return copia;
         });
     };
+
+    useEffect(() => {
+    if (!jaProcessouInicial.current) {
+        jaProcessouInicial.current = true;
+        const perguntaInicial = sessionStorage.getItem(`pergunta-inicial-${id}`);
+        if (perguntaInicial) {
+            sessionStorage.removeItem(`pergunta-inicial-${id}`);
+            enviarPergunta(perguntaInicial);   
+        }
+    }
+    }, [id]);
 
     const lidarComEnvio = (e: React.SyntheticEvent) => {
         e.preventDefault();
