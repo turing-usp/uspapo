@@ -24,7 +24,7 @@ CORS(app, resources={
             "https://turingusp.com",       # Para o site público do seu amigo
             "https://www.turingusp.com",   # Garantia caso alguém digite www
             "http://localhost:3000",       # Para você continuar testando na sua máquina
-            "uspapo.vercel.app"            # Site teste
+            "https://uspapo.vercel.app"            # Site teste
         ]
     }
 })
