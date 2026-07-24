@@ -3,6 +3,7 @@ import Navbar from "@/components/navbar";
 import Leftmenu from "@/components/leftmenu";
 import ChatResponse from "@/components/chatResponse";
 import PromptInput from "@/components/propmptInput";
+import TypingIndicator from "@/components/TypingIndicator";
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useEffect, useRef } from "react";
@@ -91,8 +92,8 @@ export default function ChatPage() {
                 }}
                 />
             </div>
-            <div className="flex flex-col pb-[12%]">
-                <ChatResponse text={item.bot} />
+            <div className="flex flex-col pb-[3%]">
+                {item.bot === "..." ? <TypingIndicator /> : <ChatResponse text={item.bot} />}
             </div>
         </div>
         ))}
