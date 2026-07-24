@@ -38,21 +38,21 @@ export default function Home() {
       <Leftmenu>
       </Leftmenu>
       <div className="flex flex-col items-center h-[20%] mt-[3%] mx-[5%]">
-        <div className="flex flex-row justify-center items-center">
+        <div className="flex flex-col md:flex-row justify-center items-center">
           <Image
             src="/uspapo.png"
             alt=""
             width={60}
             height={60}
           />
-          <p className="font-geom text-[3rem] text-[#f1863d] ml-[2%]">USPapo</p>
+          <p className="font-geom text-[2.5rem] md:text-[3rem] text-[#f1863d] ml-[2%]">USPapo</p>
         </div>
-        <p className="font-geom text-[1.25rem] text-[#FFFFFF] mt-[2%]">Seu <span className="font-geom text-[1.25rem] text-[#f1863d]">assistente inteligente</span> para navegar pela USP</p>
+        <p className="font-geom text-[1rem] md:text-[1.25rem] text-[#FFFFFF] mt-[2%]">Seu <span className="font-geom text-[1rem] md:text-[1.25rem] text-[#f1863d]">assistente inteligente</span> para navegar pela USP</p>
       </div>
       <PromptInput value={pergunta} onChange={setPergunta} onSubmit={lidarComEnvio} />
-      <div className="flex flex-col items-center mt-[3%] mx-[5%]">
+      <div className="flex flex-col items-center my-[6%] md:my-[0%] md:mt-[3%] mx-[5%]">
         <p className="font-geom text-[1rem] text-[#ffffff]">Perguntas Frequentes</p>
-        <div className="flex flex-row justify-center items-center gap-[2rem] mt-[2%]">
+        <div className="flex flex-col md:flex-row justify-center items-center gap-[2rem] mt-[2%]">
           {perguntasFrequentes.map((pergunta, index) => (
             <button
               key={index}

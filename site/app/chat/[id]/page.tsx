@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import Navbar from "@/components/navbar";
 import Leftmenu from "@/components/leftmenu";
 import ChatResponse from "@/components/chatResponse";

@@ -3,8 +3,7 @@ import React from 'react';
 export default function LeftMenu() {
   return (
     // fixed garante que ele flutue na tela sem empurrar o chat
-    <div className="fixed left-[5.5%] top-[12%] flex flex-col items-center gap-6 text-[#AEB8CF] z-50">
-
+    <div className="fixed left-[7%] py-[2%] md:py-[0%] md:left-[5.5%] top-[8%] md:top-[12%] flex flex-col items-center gap-4 md:gap-6 text-[#AEB8CF] z-50">
       <div className="relative flex items-center group">
         <button className="hover:text-[#f1863d] hover:cursor-pointer transition-colors">
           <a href="/">

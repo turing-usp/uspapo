@@ -2,8 +2,8 @@ import Image from "next/image";
 
 export default function PromptInput({ value, onChange, onSubmit }: { value: string; onChange: (value: string) => void; onSubmit: (e: React.SyntheticEvent) => void;}) {
     return (
-        <form onSubmit={onSubmit} className="relative flex justify-center items-center mt-[3%] mx-[5%]">
-                    <div className="relative w-[60%]">
+        <form onSubmit={onSubmit} className="relative flex justify-center items-center my-[6%] md:my-[0%] md:mt-[3%] mx-[5%]">
+                    <div className="relative md:w-[60%]">
                       <button type="button" className="absolute left-4 top-1/2 -translate-y-1/2 text-[#f1863d] text-[2.5rem] hover:cursor-pointer">
                         ＋
                       </button>
