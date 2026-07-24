@@ -19,7 +19,7 @@ export default function ChatResponse({ text }: { text: string }) {
                     em: ({ children }) => <em className="italic text-[#AEB8CF] font-[family:var(--font-roboto)]">{children}</em>,
                     ul: ({ children }) => <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>,
                     ol: ({ children }) => <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>,
-                    li: ({ children }) => <li className="ml-2">{children}</li>,
+                    li: ({ children }) => <li className="ml-2 break-words">{children}</li>,
                     code: ({ children }) => (
                         <code className="bg-white/10 px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>
                     ),
