@@ -15,6 +15,7 @@ export default function ChatPage() {
     const [pergunta, setPergunta] = useState("");
     const [historico, setHistorico] = useState<{ user: string; bot: string }[]>([]);
     const jaProcessouInicial = useRef(false);
+    const fimDasMensagensRef = useRef<HTMLDivElement>(null);
 
     const enviarParaAPI = async (texto: string) => {
     try {
@@ -71,6 +72,13 @@ export default function ChatPage() {
         enviarPergunta(pergunta);
     };
 
+    // UseEffect para rolar para o fim das mensagens quando a página é carregada ou quando o histórico muda
+    useEffect(() => {
+        if (fimDasMensagensRef.current) {
+            fimDasMensagensRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [historico]);
+
   return (
     <>
         <Navbar>
@@ -97,6 +105,7 @@ export default function ChatPage() {
             </div>
         </div>
         ))}
+        <div ref={fimDasMensagensRef} />
         <div className="fixed bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-[#03042c] via-[#03042c]/95 to-transparent pt-8 pb-4">
             <PromptInput value={pergunta} onChange={setPergunta} onSubmit={lidarComEnvio} />
             <p className="mt-[1%] text-center text-[0.875rem] text-[#AEB8CF]">
