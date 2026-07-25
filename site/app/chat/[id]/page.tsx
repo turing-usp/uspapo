@@ -82,12 +82,13 @@ export default function ChatPage() {
         <div className="pb-32">
         {historico.map((item, index) => (
         <div key={index}>
-            <div className="flex flex-col h-[20%] mt-[1%] mr-[20%] ml-[55%]">
-                <input 
-                type="text" 
+            <div className="relative flex flex-col h-[20%] mt-[1%] mr-[20%] ml-[55%] rounded-[2rem]">
+                <div aria-hidden className="pointer-events-none absolute inset-0 z-0 rounded-[2rem] glass-radial-blur" />
+                <input
+                type="text"
                 value={item.user}
                 readOnly
-                className="bg-[#F5F5F5]/20 text-[#AEB8CF] text-[1.2rem] text-[#FFFFFF] px-[5%] w-[100%] h-[3.5rem] rounded-[2rem]  placeholder:text-[#AEB8CF] focus:outline-none" 
+                className="relative z-10 bg-[#F5F5F5]/20 text-[#AEB8CF] text-[1.2rem] text-[#FFFFFF] px-[5%] w-[100%] h-[3.5rem] rounded-[2rem]  placeholder:text-[#AEB8CF] focus:outline-none"
                 disabled
                 style={{
                 boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.4), inset 0 -1px 1px rgba(255,255,255,0.05)'
