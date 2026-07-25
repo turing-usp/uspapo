@@ -23,7 +23,9 @@ CORS(app, resources={
         "origins": [
             "https://turingusp.com",       # Para o site público do seu amigo
             "https://www.turingusp.com",   # Garantia caso alguém digite www
-            "http://localhost:3000"        # Para você continuar testando na sua máquina
+            "http://localhost:3000", # Para você continuar testando na sua máquina
+            "https://uspapo.turingusp.com",    
+            "https://www.uspapo.turingusp.com" 
         ]
     }
 })
