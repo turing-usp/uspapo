@@ -24,6 +24,37 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Efeito de glass blur radial */
+@utility glass-radial-blur {
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+
+  /* Tudo */
+  &::before {
+    -webkit-backdrop-filter: blur(6px) saturate(1.2);
+    backdrop-filter: blur(6px) saturate(1.2);
+    -webkit-mask-image: radial-gradient(ellipse 75% 120% at 50% 50%,
+      #000 0%, rgba(0, 0, 0, 0.8) 55%, rgba(0, 0, 0, 0.5) 100%);
+    mask-image: radial-gradient(ellipse 75% 120% at 50% 50%,
+      #000 0%, rgba(0, 0, 0, 0.8) 55%, rgba(0, 0, 0, 0.5) 100%);
+  }
+
+  /* Apenas o centro */
+  &::after {
+    -webkit-backdrop-filter: blur(20px) saturate(1.75) brightness(1.14);
+    backdrop-filter: blur(20px) saturate(1.75) brightness(1.14);
+    -webkit-mask-image: radial-gradient(ellipse 42% 75% at 50% 50%,
+      #000 0%, rgba(0, 0, 0, 0.55) 55%, rgba(0, 0, 0, 0.12) 85%, transparent 100%);
+    mask-image: radial-gradient(ellipse 42% 75% at 50% 50%,
+      #000 0%, rgba(0, 0, 0, 0.55) 55%, rgba(0, 0, 0, 0.12) 85%, transparent 100%);
+  }
+}
+
 
 
 body {

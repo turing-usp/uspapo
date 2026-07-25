@@ -56,10 +56,11 @@ export default function Home() {
           {perguntasFrequentes.map((pergunta, index) => (
             <button
               key={index}
-              className="flex flex-col justify-center items-center bg-[#FFFFFF]/20 w-[15rem] h-[3rem] rounded-[2rem] border border-[#ffffff] border-[0.05rem] hover:cursor-pointer"
+              className="relative flex flex-col justify-center items-center bg-[#FFFFFF]/20 w-[15rem] h-[3rem] rounded-[2rem] border border-[#ffffff] border-[0.05rem] hover:cursor-pointer"
               onClick={() => enviarPergunta(pergunta)}
             >
-              {pergunta}
+              <div aria-hidden className="pointer-events-none absolute inset-0 z-0 rounded-[2rem] glass-radial-blur" />
+              <span className="relative z-10">{pergunta}</span>
             </button>
           ))}
         </div>
