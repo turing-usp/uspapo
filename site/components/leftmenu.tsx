@@ -1,17 +1,10 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState} from "react";
 import Link from "next/link";
 import Image from "next/image";
 
 export default function LeftMenu() {
   const [isOpen, setIsOpen] = useState(false);
-
-  useEffect(() => {
-    // Abrir por padrão em telas desktop (>= 768px) e manter fechado no celular
-    if (window.innerWidth >= 768) {
-      setIsOpen(true);
-    }
-  }, []);
 
   return (
     <>

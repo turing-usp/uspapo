@@ -1,6 +1,4 @@
 "use client";
-import Navbar from "@/components/navbar";
-import Leftmenu from "@/components/leftmenu";
 import ChatResponse from "@/components/chatResponse";
 import PromptInput from "@/components/propmptInput";
 import TypingIndicator from "@/components/TypingIndicator";
@@ -81,10 +79,6 @@ export default function ChatPage() {
 
   return (
     <>
-        <Navbar>
-        </Navbar>
-        <Leftmenu>
-        </Leftmenu>
         <div className="pb-32">
         {historico.map((item, index) => (
         <div key={index}>

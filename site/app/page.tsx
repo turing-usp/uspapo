@@ -1,8 +1,5 @@
 "use client";
 import Image from "next/image";
-import Navbar from "../components/navbar";
-import Leftmenu from "../components/leftmenu";
-import ChatResponse from "../components/chatResponse";
 import PromptInput from "../components/propmptInput";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -33,10 +30,6 @@ export default function Home() {
 
   return (
     <>
-      <Navbar>
-      </Navbar>
-      <Leftmenu>
-      </Leftmenu>
       <div className="flex flex-col items-center h-[20%] mt-[3%] mx-[5%]">
         <div className="flex flex-col md:flex-row justify-center items-center">
           <Image

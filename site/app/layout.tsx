@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Orbitron, Geom, Roboto} from "next/font/google";
 import "./globals.css";
+import Navbar from "../components/navbar";
+import Leftmenu from "../components/leftmenu";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -45,7 +47,11 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable} ${geom.variable} ${roboto.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <Navbar />
+        <Leftmenu />
+        {children}
+      </body>
     </html>
   );
 }
