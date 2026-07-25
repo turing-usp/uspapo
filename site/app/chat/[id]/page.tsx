@@ -2,6 +2,7 @@
 import ChatResponse from "@/components/chatResponse";
 import PromptInput from "@/components/propmptInput";
 import TypingIndicator from "@/components/TypingIndicator";
+import { UserBubble } from "@/components/UserBubble";
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useEffect, useRef } from "react";
@@ -83,17 +84,7 @@ export default function ChatPage() {
         {historico.map((item, index) => (
         <div key={index}>
             <div className="relative flex flex-col h-[20%] mt-[1%] mr-[20%] ml-[55%] rounded-[2rem]">
-                <div aria-hidden className="pointer-events-none absolute inset-0 z-0 rounded-[2rem] glass-radial-blur" />
-                <input
-                type="text"
-                value={item.user}
-                readOnly
-                className="relative z-10 bg-[#F5F5F5]/20 text-[#AEB8CF] text-[1.2rem] text-[#FFFFFF] px-[5%] w-[100%] h-[3.5rem] rounded-[2rem]  placeholder:text-[#AEB8CF] focus:outline-none"
-                disabled
-                style={{
-                boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.4), inset 0 -1px 1px rgba(255,255,255,0.05)'
-                }}
-                />
+                <UserBubble text={item.user} />
             </div>
             <div className="flex flex-col pb-[3%]">
                 {item.bot === "..." ? <TypingIndicator /> : <ChatResponse text={item.bot} />}
