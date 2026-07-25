@@ -1,20 +1,44 @@
 @import "tailwindcss";
 
 :root {
-  background-color: #03042c; 
-  background-image: 
+  --page-backdrop:
     /* Brilho Superior Direito (Mais forte e expandido) */
     radial-gradient(circle at 90% 10%, rgba(29, 44, 135, 0.85) 0%, rgba(29, 44, 135, 0) 65%),
-    
+
     /* Brilho Inferior Esquerdo */
     radial-gradient(circle at 10% 90%, rgba(20, 31, 98, 0.7) 0%, rgba(20, 31, 98, 0) 55%),
-    
+
     /* Fundo Escuro Base */
     linear-gradient(135deg, #050833 0%, #010214 100%);
+
+  background-color: #03042c;
+  background-image: var(--page-backdrop);
   background-attachment: fixed;
   background-size: cover;
-    
+
   --foreground: #ffffff;
+}
+
+/* Camadas de blur que copiam o background */
+
+/* Navbar */
+@utility page-fade-b {
+  background-color: #03042c;
+  background-image: var(--page-backdrop);
+  background-attachment: fixed;
+  background-size: cover;
+  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+}
+
+/* Rodapé */
+@utility page-fade-t {
+  background-color: #03042c;
+  background-image: var(--page-backdrop);
+  background-attachment: fixed;
+  background-size: cover;
+  -webkit-mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, 0.95) 50%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, 0.95) 50%, transparent 100%);
 }
 
 @theme inline {

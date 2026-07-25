@@ -4,6 +4,10 @@ import Link from "next/link";
 export default function Navbar() {
   return (
     <nav className="flex flex-row justify-between items-center bg-transparent sticky top-0 left-0 w-full z-40">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[150%] -z-10 page-fade-b"
+      />
       <div className="flex px-[4%] py-[3%] md:py-[1%] justify-between w-full items-center">
         <div className="flex items-center gap-3 ml-12 md:ml-14 transition-all">
           <Link href="/" className="flex items-center gap-2">

@@ -106,7 +106,11 @@ export default function ChatPage() {
         </div>
         ))}
         <div ref={fimDasMensagensRef} />
-        <div className="fixed bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-[#03042c] via-[#03042c]/95 to-transparent pt-8 pb-4">
+        <div className="fixed bottom-0 left-0 right-0 z-20 pt-8 pb-4">
+            <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 -z-10 page-fade-t"
+            />
             <PromptInput value={pergunta} onChange={setPergunta} onSubmit={lidarComEnvio} />
             <p className="mt-[1%] text-center text-[0.875rem] text-[#AEB8CF]">
                 O uspapo é uma IA e pode cometer erros. Sempre confirme as informações com fontes oficiais.
