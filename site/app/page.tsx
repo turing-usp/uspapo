@@ -33,10 +33,10 @@ export default function Home() {
       <div className="flex flex-col items-center h-[20%] mt-[3%] mx-[5%]">
         <div className="flex flex-col md:flex-row justify-center items-center">
           <Image
-            src="/uspapo.png"
+            src="/uspapo.svg"
             alt=""
             width={60}
-            height={60}
+            height={109}
           />
           <p className="font-geom text-[2.5rem] md:text-[3rem] text-[#f1863d] ml-[2%]">USPapo</p>
         </div>
