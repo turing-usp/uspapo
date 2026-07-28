@@ -3,7 +3,7 @@ from scrapers.utils import ExtratorConteudo
 from scrapers.items import ChatbotContentItem  
 
 class IqNavbarSpider(scrapy.Spider):
-    name = "iqnavbar"
+    name = "teste"
     
     # Domínios permitidos para o robô não sair da USP se houver links externos no menu
     allowed_domains = ["iq.usp.br", "www.iq.usp.br", "labiq.iq.usp.br", "lem.iq.usp.br", "memoria.iq.usp.br", "ca.iq.usp.br"]

@@ -2,25 +2,25 @@ import scrapy
 from scrapers.utils import ExtratorConteudo
 from scrapers.items import ChatbotContentItem  
 
-class IqNavbarSpider(scrapy.Spider):
-    name = "politudo"
+class UspSpiderGenerica(scrapy.Spider):
+    name = "usp_spider"
     
-    # Domínios permitidos para o robô não sair da USP se houver links externos no menu
-    allowed_domains = ["poli.usp.br"]
-    
-
-    start_urls = ["https://www.poli.usp.br/en/"]
+    # O __init__ recebe os parâmetros mágicos do nosso configurador
+    def __init__(self, start_url='', allowed_domain='', seletor_menu='', *args, **kwargs):
+        super(UspSpiderGenerica, self).__init__(*args, **kwargs)
+        
+        self.start_urls = [start_url]
+        self.allowed_domains = [allowed_domain]
+        self.seletor_menu = seletor_menu
 
     def parse(self, response):
-        # 1. Mapeia todos os links contidos na navbar que você inspecionou
-        links_menu = response.css('ul#menu-1-7a1b5c55 a::attr(href)').getall()
+        # Usa o seletor dinâmico injetado
+        links_menu = response.css(self.seletor_menu).getall()
         
-        # Filtra links vazios ou âncoras comuns (#)
         links_validos = [link for link in links_menu if link and not link.startswith('#')]
         
-        self.logger.info(f"Navbar mapeada com sucesso! {len(links_validos)} links encontrados.")
+        self.logger.info(f"Navbar mapeada! {len(links_validos)} links encontrados usando o seletor: {self.seletor_menu}")
         
-        # 2. Segue cada um dos links encontrados no menu e joga para o processador de conteúdo
         for link in links_validos:
             yield response.follow(link, callback=self.parse_conteudo)
 
