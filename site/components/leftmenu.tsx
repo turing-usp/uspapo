@@ -6,6 +6,11 @@ import Image from "next/image";
 export default function LeftMenu() {
   const [isOpen, setIsOpen] = useState(false);
 
+  // Espelha o breakpoint md do Tailwind (48rem) em vez de repetir 768px em px.
+  const fecharSeMobile = () => {
+    if (!window.matchMedia("(min-width: 48rem)").matches) setIsOpen(false);
+  };
+
   return (
     <>
       {/* Botão para abrir o menu (exibido no canto superior esquerdo quando a barra lateral está fechada) */}
@@ -87,9 +92,7 @@ export default function LeftMenu() {
         <nav className="flex flex-col gap-2 mt-4">
           <Link
             href="/"
-            onClick={() => {
-              if (window.innerWidth < 768) setIsOpen(false);
-            }}
+            onClick={fecharSeMobile}
             className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-[#AEB8CF] hover:text-white hover:bg-[#f1863d]/15 border border-transparent hover:border-[#f1863d]/30 transition-all cursor-pointer group"
           >
             <svg
@@ -110,9 +113,7 @@ export default function LeftMenu() {
           </Link>
 
           <button
-            onClick={() => {
-              if (window.innerWidth < 768) setIsOpen(false);
-            }}
+            onClick={fecharSeMobile}
             className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-[#AEB8CF] hover:text-white hover:bg-[#f1863d]/15 border border-transparent hover:border-[#f1863d]/30 transition-all cursor-pointer group text-left w-full"
           >
             <svg
@@ -135,9 +136,7 @@ export default function LeftMenu() {
           </button>
 
           <button
-            onClick={() => {
-              if (window.innerWidth < 768) setIsOpen(false);
-            }}
+            onClick={fecharSeMobile}
             className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-[#AEB8CF] hover:text-white hover:bg-[#f1863d]/15 border border-transparent hover:border-[#f1863d]/30 transition-all cursor-pointer group text-left w-full"
           >
             <svg
