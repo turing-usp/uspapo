@@ -80,27 +80,31 @@ export default function ChatPage() {
 
   return (
     <>
-        <div className="pb-32">
-        {historico.map((item, index) => (
-        <div key={index}>
-            <div className="relative flex flex-col h-[20%] mt-[1%] mr-[20%] ml-[55%] rounded-[2rem]">
-                <UserBubble text={item.user} />
+        <div className="flex flex-1 flex-col">
+        <div className="flex-1">
+            {historico.map((item, index) => (
+            <div key={index}>
+                <div className="app-container-chat flex justify-end mt-6">
+                    <UserBubble text={item.user} />
+                </div>
+                <div className="app-container-chat mt-4 pb-6">
+                    {item.bot === "..." ? <TypingIndicator /> : <ChatResponse text={item.bot} />}
+                </div>
             </div>
-            <div className="flex flex-col pb-[3%]">
-                {item.bot === "..." ? <TypingIndicator /> : <ChatResponse text={item.bot} />}
-            </div>
+            ))}
+            <div ref={fimDasMensagensRef} />
         </div>
-        ))}
-        <div ref={fimDasMensagensRef} />
-        <div className="fixed bottom-0 left-0 right-0 z-20 pt-8 pb-4">
+        <div className="sticky bottom-0 z-20 pt-8 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <div
                 aria-hidden
                 className="pointer-events-none absolute inset-0 -z-10 page-fade-t"
             />
-            <PromptInput value={pergunta} onChange={setPergunta} onSubmit={lidarComEnvio} />
-            <p className="mt-[1%] text-center text-[0.875rem] text-[#AEB8CF]">
-                O uspapo é uma IA e pode cometer erros. Sempre confirme as informações com fontes oficiais.
-            </p>
+            <div className="app-container-chat">
+                <PromptInput value={pergunta} onChange={setPergunta} onSubmit={lidarComEnvio} />
+                <p className="mt-2 text-center text-sm text-[#AEB8CF] text-balance">
+                    O uspapo é uma IA e pode cometer erros. Sempre confirme as informações com fontes oficiais.
+                </p>
+            </div>
         </div>
         </div>
     </>

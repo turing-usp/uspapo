@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Orbitron, Geom, Roboto} from "next/font/google";
 import "./globals.css";
 import Navbar from "../components/navbar";
@@ -15,18 +15,18 @@ const geistMono = Geist_Mono({
 });
 
 const orbitron  = Orbitron({
-  variable: "--font-orbitron",
+  variable: "--font-orbitron-src",
   subsets: ["latin"],
   weight: ["400","700"]
 });
 
 const geom = Geom({
-  variable: "--font-geom",
+  variable: "--font-geom-src",
   subsets: ["latin"]
 });
 
 const roboto = Roboto({
-  variable: "--font-roboto",
+  variable: "--font-roboto-src",
   subsets: ["latin"],
   weight: ["400","700"]
 });
@@ -34,6 +34,11 @@ const roboto = Roboto({
 export const metadata: Metadata = {
   title: "USPapo",
   description: "USPapo - Seu assistente inteligente para navegar pela USP",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#03042c",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
