@@ -34,7 +34,7 @@ export default function Home() {
         <div className="app-container flex flex-col items-center">
           <div className="flex flex-col md:flex-row justify-center items-center gap-2">
             <Image
-              src="/uspapo.png"
+              src="/uspapo.svg"
               alt=""
               width={60}
               height={60}
