@@ -42,10 +42,40 @@
 }
 
 @theme inline {
-  --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-geom: var(--font-geom-src);
+  --font-orbitron: var(--font-orbitron-src);
+  --font-roboto: var(--font-roboto-src);
+}
+
+/* Escala tipográfica fluida */
+@theme {
+  --text-sm:   clamp(0.8125rem, 0.79rem + 0.11vw, 0.875rem);
+  --text-base: clamp(0.9375rem, 0.90rem + 0.19vw, 1rem);
+  --text-lg:   clamp(1rem,      0.95rem + 0.23vw, 1.125rem);
+  --text-xl:   clamp(1.0625rem, 0.98rem + 0.39vw, 1.25rem);
+  --text-2xl:  clamp(1.25rem,   1.13rem + 0.59vw, 1.5rem);
+  --text-3xl:  clamp(1.4rem,    1.22rem + 0.90vw, 1.875rem);
+  --text-4xl:  clamp(1.65rem,   1.40rem + 1.25vw, 2.25rem);
+  --text-5xl:  clamp(2rem,      1.60rem + 2.00vw, 3rem);
+}
+
+/* Container de conteúdo */
+@utility app-container {
+  width: 100%;
+  max-width: 64rem;
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 10vw, 4rem);
+}
+
+/* Container de conteúdo estreito (para a coluna de leitura do chat) */
+@utility app-container-chat {
+  width: 100%;
+  max-width: 48rem;
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 10vw, 4rem);
 }
 
 /* Efeito de glass blur radial */
@@ -82,7 +112,7 @@
 
 
 body {
-  background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-roboto-src), Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
 }

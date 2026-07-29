@@ -29,47 +29,51 @@ export default function Home() {
   ];
 
   return (
-    <>
-      <div className="flex flex-col items-center h-[20%] mt-[3%] mx-[5%]">
-        <div className="flex flex-col md:flex-row justify-center items-center">
-          <Image
-            src="/uspapo.svg"
-            alt=""
-            width={60}
-            height={109}
-          />
-          <p className="font-geom text-[2.5rem] md:text-[3rem] text-[#f1863d] ml-[2%]">USPapo</p>
+    <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col justify-center py-8">
+        <div className="app-container flex flex-col items-center">
+          <div className="flex flex-col md:flex-row justify-center items-center gap-2">
+            <Image
+              src="/uspapo.png"
+              alt=""
+              width={60}
+              height={60}
+            />
+            <p className="font-geom text-4xl md:text-5xl text-[#f1863d]">USPapo</p>
+          </div>
+          <p className="font-geom text-base md:text-xl text-[#FFFFFF] mt-3 text-center text-balance">Seu <span className="text-[#f1863d]">assistente inteligente</span> para navegar pela USP</p>
         </div>
-        <p className="font-geom text-[1rem] md:text-[1.25rem] text-[#FFFFFF] mt-[2%]">Seu <span className="font-geom text-[1rem] md:text-[1.25rem] text-[#f1863d]">assistente inteligente</span> para navegar pela USP</p>
-      </div>
-      <PromptInput value={pergunta} onChange={setPergunta} onSubmit={lidarComEnvio} />
-      <div className="flex flex-col items-center my-[6%] md:my-[0%] md:mt-[3%] mx-[5%]">
-        <p className="font-geom text-[1rem] text-[#ffffff]">Perguntas Frequentes</p>
-        <div className="flex flex-col md:flex-row justify-center items-center gap-[2rem] mt-[2%]">
-          {perguntasFrequentes.map((pergunta, index) => (
-            <button
-              key={index}
-              className="relative flex flex-col justify-center items-center bg-[#FFFFFF]/20 w-[15rem] h-[3rem] rounded-[2rem] border border-[#ffffff] border-[0.05rem] hover:cursor-pointer"
-              onClick={() => enviarPergunta(pergunta)}
-            >
-              <div aria-hidden className="pointer-events-none absolute inset-0 z-0 rounded-[2rem] glass-radial-blur" />
-              <span className="relative z-10">{pergunta}</span>
-            </button>
-          ))}
+        <div className="app-container mt-8 md:mt-10">
+          <PromptInput value={pergunta} onChange={setPergunta} onSubmit={lidarComEnvio} />
+        </div>
+        <div className="app-container flex flex-col items-center mt-10 md:mt-12">
+          <p className="font-geom text-base text-[#ffffff]">Perguntas Frequentes</p>
+          <div className="flex flex-col md:flex-row md:flex-wrap justify-center items-stretch gap-4 md:gap-6 mt-6 w-full">
+            {perguntasFrequentes.map((pergunta, index) => (
+              <button
+                key={index}
+                className="relative flex flex-col justify-center items-center text-center bg-[#FFFFFF]/20 w-full md:w-auto md:flex-1 md:basis-0 md:min-w-[11rem] max-w-[18rem] mx-auto min-h-[3rem] px-4 py-2 rounded-[2rem] border border-[#ffffff] border-[0.05rem] hover:cursor-pointer"
+                onClick={() => enviarPergunta(pergunta)}
+              >
+                <div aria-hidden className="pointer-events-none absolute inset-0 z-0 rounded-[2rem] glass-radial-blur" />
+                <span className="relative z-10 text-balance">{pergunta}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-      <div className="flex flex-row justify-center items-center mt-[4%] mx-[5%]">
-          <p className="font-geom text-[1rem] text-[#f1863d]">Desenvolvido por</p>
-          <div className="flex flex-row justify-center items-center ml-[0.5%]">
+      <div className="app-container flex flex-row flex-wrap justify-center items-center gap-x-2 py-6">
+          <p className="font-geom text-base text-[#f1863d]">Desenvolvido por</p>
+          <div className="flex flex-row justify-center items-center gap-1">
             <Image
               src="/logo.svg"
               alt=""
               width={30}
               height={30}
             />
-            <p className="font-orbitron text-[1rem] text-[#f1863d]">turing.usp</p>
+            <p className="font-orbitron text-base text-[#f1863d]">turing.usp</p>
           </div>
       </div>
-    </>
+    </div>
   );
 }
