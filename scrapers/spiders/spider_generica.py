@@ -5,23 +5,30 @@ from scrapers.items import ChatbotContentItem
 class UspSpiderGenerica(scrapy.Spider):
     name = "usp_spider"
     
-    # O __init__ recebe os parâmetros mágicos do nosso configurador
-    def __init__(self, start_url='', allowed_domain='', seletor_menu='', *args, **kwargs):
+    def __init__(self, start_url='', allowed_domain='', seletores_alvo='', *args, **kwargs):
         super(UspSpiderGenerica, self).__init__(*args, **kwargs)
         
         self.start_urls = [start_url]
         self.allowed_domains = [allowed_domain]
-        self.seletor_menu = seletor_menu
+        # Transforma a string unida "seletor1|||seletor2" de volta em uma lista iterável
+        self.seletores = seletores_alvo.split('|||')
 
     def parse(self, response):
-        # Usa o seletor dinâmico injetado
-        links_menu = response.css(self.seletor_menu).getall()
+        todos_links_encontrados = []
         
-        links_validos = [link for link in links_menu if link and not link.startswith('#')]
+        # 1. Varre todos os pontos de interesse que você mapeou para este site
+        for seletor in self.seletores:
+            links_neste_seletor = response.css(seletor).getall()
+            todos_links_encontrados.extend(links_neste_seletor)
         
-        self.logger.info(f"Navbar mapeada! {len(links_validos)} links encontrados usando o seletor: {self.seletor_menu}")
+        # 2. Limpeza bruta e Deduplicação Instantânea
+        links_limpos = [link for link in todos_links_encontrados if link and not link.startswith('#')]
+        links_unicos = list(set(links_limpos)) # O set() mata qualquer duplicata
         
-        for link in links_validos:
+        self.logger.info(f"Mapeamento concluído! {len(links_unicos)} links únicos encontrados nos alvos.")
+        
+        # 3. Segue cada link único mapeado
+        for link in links_unicos:
             yield response.follow(link, callback=self.parse_conteudo)
 
     def parse_conteudo(self, response):

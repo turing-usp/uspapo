@@ -11,14 +11,13 @@ def rodar_tudo():
     with open(ARQUIVO_CONFIG, 'r', encoding='utf-8') as f:
         sites = json.load(f)
 
-    # A Mágica da Organização: 
-    # Ordena primeiro pela 'prioridade' (crescente: 1, 2, 3...) 
-    # e em caso de empate, ordena alfabeticamente pelo 'id_site'
-    sites.sort(key=lambda x: (x["prioridade"], x["id_site"]))
+    # Ordena primeiro pela 'prioridade' e em caso de empate, alfabeticamente pelo 'id_site'
+    # Usa get("prioridade", 99) para jogar pro final da fila caso não haja prioridade definida
+    sites.sort(key=lambda x: (x.get("prioridade", 99), x["id_site"]))
 
     print(f"Fila de execução organizada para {len(sites)} sites:")
     for s in sites:
-        print(f" - [{s['prioridade']}] {s['id_site']} ({s['frequencia']})")
+        print(f" - [{s.get('prioridade', '-')}] {s['id_site']} ({s.get('frequencia', '-')})")
 
     for site in sites:
         id_site = site["id_site"]
@@ -27,13 +26,16 @@ def rodar_tudo():
         if os.path.exists(caminho_saida):
             os.remove(caminho_saida)
 
-        print(f"\n---> Raspando: {site['start_url']} (Prioridade {site['prioridade']})")
+        print(f"\n---> Raspando: {site['start_url']}")
+        
+        # A Mágica de Empacotamento: Transforma a lista ["alvo1", "alvo2"] do JSON em "alvo1|||alvo2"
+        seletores_unidos = "|||".join(site['seletores_alvo'])
         
         comando = [
             "scrapy", "runspider", "spider_generica.py",
             "-a", f"start_url={site['start_url']}",
             "-a", f"allowed_domain={site['allowed_domain']}",
-            "-a", f"seletor_menu={site['seletor_menu']}",
+            "-a", f"seletores_alvo={seletores_unidos}",
             "-o", caminho_saida
         ]
         
