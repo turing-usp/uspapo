@@ -74,7 +74,7 @@ export default function Historico() {
   };
 
   return (
-    <div className="app-container-chat pt-8 pb-16">
+    <div className="app-container-chat flex flex-1 flex-col pt-8 pb-[max(4rem,env(safe-area-inset-bottom))]">
       <div className="flex items-center mb-2">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-7 h-7 text-[#ffffff]">
             <circle cx="12" cy="12" r="10" strokeWidth="2" fill="none" />
@@ -83,13 +83,15 @@ export default function Historico() {
         <p className="font-geom text-2xl sm:text-3xl ml-3">Histórico de conversas</p>
       </div>
       <p className="text-[#AEB8CF] ml-3 mb-4">Retome suas perguntas anteriores e continue de onde parou</p>
-      <input
-        type="text"
-        value={busca}
-        onChange={(e) => setBusca(e.target.value)}
-        placeholder="Buscar nas conversas"
-        className="w-full h-12 px-5 mb-8 rounded-2xl bg-[#FFFFFF]/10 text-white text-base placeholder:text-[#AEB8CF] border border-white/10 focus:border-[#f1863d]/50 focus:outline-none transition-colors"
-      />
+      <div className="glass w-full rounded-[2rem] mb-8">
+        <input
+          type="text"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          placeholder="Buscar nas conversas"
+          className="relative w-full h-14 px-5 rounded-[2rem] bg-transparent text-white text-base placeholder:text-[#AEB8CF] border-[0.15rem] border-white/25 focus:border-[#f1863d] focus:outline-none transition-colors"
+        />
+      </div>
 
       {carregando ? null : filtradas.length === 0 ? (
         <div className="text-center py-16">
@@ -113,11 +115,17 @@ export default function Historico() {
               <ul className="flex flex-col gap-3">
                 {grupo.conversas.map((conversa) => {
                   return (
-                    <li key={conversa.id} className="relative">
-                      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 rounded-2xl glass-radial-blur" />
+                    <li key={conversa.id}>
                       <Link
                         href={`/chat/${conversa.id}`}
-                        className="group relative z-10 flex items-start justify-between gap-4 p-4 rounded-2xl border-l-4 border-l-transparent hover:border-l-[#f1863d] transition-colors">
+                        className="group flex items-start justify-between gap-4 p-4 pl-5 rounded-2xl overflow-hidden glass hover:bg-[#F5F5F5]/40 transition-colors">
+                      {/* Acento como elemento opaco recortado pelo overflow-hidden do Link,
+                          NÃO como border-l-4: um border de 4px num raio de 16px afina até
+                          virar um fio nos cantos, e o antialiasing desse taper lê como blur. */}
+                      <span
+                        aria-hidden
+                        className="absolute inset-y-0 left-0 w-1 bg-transparent group-hover:bg-[#f1863d] transition-colors"
+                      />
                       <div className="min-w-0">
                         <p className="text-white text-base sm:text-lg truncate">{conversa.titulo}</p>
                         <p className="text-[#AEB8CF] text-sm mt-1">

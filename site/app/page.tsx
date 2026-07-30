@@ -58,11 +58,10 @@ export default function Home() {
             {perguntasFrequentes.map((pergunta, index) => (
               <button
                 key={index}
-                className="relative flex flex-col justify-center items-center text-center bg-[#FFFFFF]/20 w-full md:w-auto md:flex-1 md:basis-0 md:min-w-[11rem] max-w-[18rem] mx-auto min-h-[3rem] px-4 py-2 rounded-[2rem] border border-[#ffffff] border-[0.05rem] hover:cursor-pointer"
+                className="glass flex flex-col justify-center items-center text-center w-full md:w-auto md:flex-1 md:basis-0 md:min-w-[11rem] max-w-[18rem] mx-auto min-h-[3rem] px-4 py-2 rounded-[2rem] border-[0.05rem] border-[#ffffff] hover:cursor-pointer"
                 onClick={() => enviarPergunta(pergunta)}
               >
-                <div aria-hidden className="pointer-events-none absolute inset-0 z-0 rounded-[2rem] glass-radial-blur" />
-                <span className="relative z-10 text-balance">{pergunta}</span>
+                <span className="text-balance">{pergunta}</span>
               </button>
             ))}
           </div>
