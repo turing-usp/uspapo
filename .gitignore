@@ -235,3 +235,6 @@ __marimo__/
 # Banco de dados vetorial local do Chroma
 rag/chroma_data/
 chroma_data/
+
+#Exceção do lib do site!
+!/site/lib/
