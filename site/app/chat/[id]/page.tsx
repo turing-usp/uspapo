@@ -2,6 +2,7 @@
 import ChatResponse from "@/components/chatResponse";
 import PromptInput from "@/components/propmptInput";
 import TypingIndicator from "@/components/TypingIndicator";
+import { obterConversa, salvarConversa, gerarTitulo } from "@/lib/conversas";
 import { UserBubble } from "@/components/UserBubble";
 import { useState } from "react";
 import { useParams } from "next/navigation";
@@ -40,14 +41,9 @@ export default function ChatPage() {
         }
     };
 
-    const enviarPergunta = async (texto: string) => {
-        if (!texto.trim()) return;
-
-        setHistorico((prev) => [...prev, { user: texto, bot: "..." }]);
-        setPergunta("");
-
+    // substitui a última mensagem (que está com bot: "...") pela resposta real
+    const completarResposta = async (texto: string) => {
         const respostaFormatada = await enviarParaAPI(texto);
-
         setHistorico((prev) => {
             const copia = [...prev];
             copia[copia.length - 1] = { user: texto, bot: respostaFormatada };
@@ -55,27 +51,50 @@ export default function ChatPage() {
         });
     };
 
-    useEffect(() => {
-    if (!jaProcessouInicial.current) {
-        jaProcessouInicial.current = true;
-        const perguntaInicial = sessionStorage.getItem(`pergunta-inicial-${id}`);
-        if (perguntaInicial) {
-            sessionStorage.removeItem(`pergunta-inicial-${id}`);
-            enviarPergunta(perguntaInicial);   
-        }
-    }
-    }, [id]);
+    const enviarPergunta = async (texto: string) => {
+        if (!texto.trim()) return;
+        setHistorico((prev) => [...prev, { user: texto, bot: "..." }]);
+        setPergunta("");
+        await completarResposta(texto);
+    };
 
     const lidarComEnvio = (e: React.SyntheticEvent) => {
         e.preventDefault();
         enviarPergunta(pergunta);
     };
 
-    // UseEffect para rolar para o fim das mensagens quando a página é carregada ou quando o histórico muda
+    // 1. carrega a conversa salva e, se houver resposta pendente, completa
     useEffect(() => {
-        if (fimDasMensagensRef.current) {
-            fimDasMensagensRef.current.scrollIntoView({ behavior: "smooth" });
+        if (jaProcessouInicial.current) return;
+        jaProcessouInicial.current = true;
+
+        const conversa = obterConversa(id as string);
+        if (!conversa) return;
+
+        setHistorico(conversa.mensagens);
+
+        const ultima = conversa.mensagens[conversa.mensagens.length - 1];
+        if (ultima && ultima.bot === "...") {
+            completarResposta(ultima.user);
         }
+    }, [id]);
+
+    // 2. salva sempre que o histórico muda
+    useEffect(() => {
+        if (historico.length === 0) return;
+
+        const existente = obterConversa(id as string);
+        salvarConversa({
+            id: id as string,
+            titulo: existente?.titulo ?? gerarTitulo(historico[0].user),
+            criadoEm: existente?.criadoEm ?? Date.now(),
+            mensagens: historico,
+        });
+    }, [historico, id]);
+
+    // 3. rola até o fim
+    useEffect(() => {
+        fimDasMensagensRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [historico]);
 
   return (

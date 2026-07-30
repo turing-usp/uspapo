@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import PromptInput from "../components/propmptInput";
+import { salvarConversa, gerarTitulo } from "@/lib/conversas";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -9,12 +10,17 @@ export default function Home() {
   const[pergunta, setPergunta] = useState("");
 
   const enviarPergunta = (texto: string) => {
-      if (!texto.trim()) return;
-      const novoId = crypto.randomUUID();
-      sessionStorage.setItem(`pergunta-inicial-${novoId}`, texto);
-      router.push(`/chat/${novoId}`);
+    if (!texto.trim()) return;
+    const novoId = crypto.randomUUID();
+    salvarConversa({
+      id: novoId,
+      titulo: gerarTitulo(texto),
+      criadoEm: Date.now(),
+      mensagens: [{ user: texto, bot: "..." }],
+    });
+    router.push(`/chat/${novoId}`);
   };
-
+  
   // 2. Função que simula o envio do formulário
   const lidarComEnvio = (e: React.SyntheticEvent) => {
   e.preventDefault();

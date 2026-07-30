@@ -112,28 +112,29 @@ export default function LeftMenu() {
             <span className="font-geom text-sm font-medium">Novo Chat</span>
           </Link>
 
-          <button
+          <Link
+            href="/historico"
             onClick={fecharSeMobile}
             className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-[#AEB8CF] hover:text-white hover:bg-[#f1863d]/15 border border-transparent hover:border-[#f1863d]/30 transition-all cursor-pointer group text-left w-full"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="w-5 h-5 text-[#f1863d] group-hover:scale-110 transition-transform"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.602 10.602Z"
-              />
-            </svg>
-            <span className="font-geom text-sm font-medium">
-              Pesquisar histórico
-            </span>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className="w-5 h-5 text-[#f1863d] group-hover:scale-110 transition-transform"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.602 10.602Z"
+                />
+              </svg>
+              <span className="font-geom text-sm font-medium">
+                Pesquisar histórico
+              </span>
+          </Link>
 
           <button
             onClick={fecharSeMobile}
