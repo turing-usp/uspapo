@@ -53,8 +53,10 @@ EMBED_MODEL = "multilingual-e5-large"
 TOP_K_PADRAO = 2
 TOP_K_MAX = 3
 
-# Quantas vezes o modelo pode usar ferramentas
-MAX_RODADAS_FERRAMENTA = 2
+# O laço de ferramentas roda até o modelo parar de pedir ferramenta. Isto aqui
+# é só a trava contra um modelo que entra em loop, não um orçamento: bater neste
+# teto é sintoma de defeito, e a pergunta cai para o próximo provedor.
+TETO_RODADAS_FERRAMENTA = 5
 
 TEMPERATURA_PADRAO = 0.1
 TIMEOUT_PADRAO = 60
@@ -815,11 +817,7 @@ def conversar_com_provedor(
     """Roda o laço de ferramentas num provedor. Levanta se a API falhar."""
     mensagens, inicio_turno = montar_mensagens(pergunta, historico)
 
-    for rodada in range(MAX_RODADAS_FERRAMENTA + 1):
-        # Na última rodada tiramos as ferramentas da mesa: o modelo é obrigado
-        # a fechar a resposta com o que já recuperou.
-        ultima = rodada == MAX_RODADAS_FERRAMENTA
-
+    for rodada in range(TETO_RODADAS_FERRAMENTA):
         # Os resultados das ferramentas entraram na lista desde a última volta e
         # podem ter estourado o orçamento; quem paga são os turnos mais velhos.
         inicio_turno = podar_mensagens(mensagens, inicio_turno)
@@ -827,11 +825,10 @@ def conversar_com_provedor(
         parametros = {
             "model": cfg["model"],
             "messages": mensagens,
+            "tools": FERRAMENTAS,
             "temperature": float(cfg.get("temperature", TEMPERATURA_PADRAO)),
             "stream": True,
         }
-        if not ultima:
-            parametros["tools"] = FERRAMENTAS
         if cfg.get("max_tokens"):
             parametros["max_tokens"] = int(cfg["max_tokens"])
         if cfg.get("extra_body"):
@@ -897,14 +894,10 @@ def conversar_com_provedor(
 
         yield from despachar(separador.finalizar())
 
-        # Sem texto e sem ferramenta não há resposta nenhuma: costuma ser tool
-        # call em formato que nenhum parser reconheceu, ou o provedor cortando
-        # a geração. Levantar aqui joga para o próximo da cadeia, em vez de
-        # devolver uma bolha vazia ao aluno.
-        if not pendentes and not texto_final.strip():
-            raise RuntimeError("o provedor terminou o stream sem texto nem tool call")
-
-        if ultima or not pendentes:
+        # Nenhuma ferramenta pedida: esta rodada é a resposta ao aluno.
+        if not pendentes:
+            if not texto_final.strip():
+                raise RuntimeError("o provedor terminou o stream sem resposta utilizável")
             return
 
         chamadas = []
@@ -948,6 +941,10 @@ def conversar_com_provedor(
                 "content": resultado,
             })
 
+    raise RuntimeError(
+        f"o modelo pediu ferramenta em todas as {TETO_RODADAS_FERRAMENTA} rodadas"
+    )
+
 
 def executar_conversa(pergunta: str, historico: list[dict]) -> Iterator[dict]:
     """Percorre a cadeia de provedores até um deles responder."""
@@ -977,7 +974,7 @@ def executar_conversa(pergunta: str, historico: list[dict]) -> Iterator[dict]:
             # Depois que o cliente já começou a receber a resposta não dá para
             # reescrever o que ele viu: aí a falha é terminal.
             if emitiu_texto:
-                yield {"tipo": "erro", "mensagem": "A conexão com o modelo caiu no meio da resposta."}
+                yield {"tipo": "erro", "mensagem": "Não consegui terminar a resposta. Pode perguntar de novo?"}
                 yield {"tipo": "fim"}
                 return
             continue

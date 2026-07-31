@@ -87,6 +87,8 @@ export default function ChatPage() {
 
         if (!acc.corpo) {
             acc.corpo = acc.erro || "Desculpe, ocorreu um erro ao conectar com o servidor do USPapo.";
+        } else if (acc.erro) {
+            acc.corpo += `\n\n_${acc.erro}_`;
         }
 
         aplicar(true);
