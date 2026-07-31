@@ -1,9 +1,146 @@
+"use client";
 import ReactMarkdown from 'react-markdown';
+import { memo, useEffect, useRef, useState } from 'react';
+import type { Root, Element, Text, ElementContent } from 'hast';
 
-export default function ChatResponse({ text }: { text: string }) {
+/* Largura do rastro de gradiente atrás da frente de revelação, em caracteres. */
+const RASTRO = 120;
+
+/* Atraso que a revelação persegue em relação ao stream, em segundos. */
+const ATRASO_ALVO = 0.25;
+const VELOCIDADE_MINIMA = 30;      // caracteres por segundo
+const DRENO = RASTRO / 0.4;        // velocidade para apagar o rastro no fim
+const INTERVALO_RENDER = 33;       // ms entre re-renders (o markdown é reparseado)
+
+function useRevelacao(texto: string, streaming: boolean) {
+    const [contador, setContador] = useState(() => (streaming ? 0 : texto.length + RASTRO));
+    const posicao = useRef(contador);
+    const alvo = useRef(texto);
+    const ativo = useRef(streaming);
+
+    useEffect(() => {
+        alvo.current = texto;
+        ativo.current = streaming;
+
+        const destino = () => alvo.current.length + RASTRO;
+
+        /* Mensagem que já nasce pronta (veio do localStorage) não tem o que
+           revelar: animar seria repetir uma resposta que o aluno já leu. */
+        if (!streaming && posicao.current >= destino()) return;
+
+        let quadro = 0;
+        let ultimoInstante = performance.now();
+        let ultimoRender = 0;
+
+        const passo = (agora: number) => {
+            const decorrido = (agora - ultimoInstante) / 1000;
+            ultimoInstante = agora;
+
+            const restante = alvo.current.length - posicao.current;
+            const atraso = ativo.current ? ATRASO_ALVO : ATRASO_ALVO / 3;
+            const velocidade = restante > 0
+                ? Math.max(VELOCIDADE_MINIMA, restante / atraso)
+                : DRENO;
+
+            posicao.current = Math.min(destino(), posicao.current + velocidade * decorrido);
+
+            if (agora - ultimoRender >= INTERVALO_RENDER) {
+                ultimoRender = agora;
+                setContador(posicao.current);
+            }
+
+            if (ativo.current || posicao.current < destino()) {
+                quadro = requestAnimationFrame(passo);
+            } else {
+                setContador(destino());
+            }
+        };
+
+        quadro = requestAnimationFrame(passo);
+        return () => cancelAnimationFrame(quadro);
+    }, [texto, streaming]);
+
+    const revelado = Math.min(Math.floor(contador), texto.length);
+
+    return {
+        visivel: texto.slice(0, revelado),
+        sobra: Math.max(0, contador - texto.length),
+        /* Enquanto houver gradiente na tela, os spans precisam existir. */
+        revelando: streaming || contador < texto.length + RASTRO,
+    };
+}
+
+function palavrasReveladas(sobra: number) {
+    return (arvore: Root) => {
+        let total = 0;
+        const contar = (nos: ElementContent[]) => {
+            for (const no of nos) {
+                if (no.type === 'text') total += no.value.length;
+                else if (no.type === 'element') contar(no.children);
+            }
+        };
+        contar(arvore.children as ElementContent[]);
+
+        const frente = total + sobra;
+        let percorrido = 0;
+
+        const marcar = (pai: Root | Element) => {
+            const saida: ElementContent[] = [];
+
+            for (const no of pai.children as ElementContent[]) {
+                if (no.type === 'element') {
+                    marcar(no);
+                    saida.push(no);
+                    continue;
+                }
+                if (no.type !== 'text') {
+                    saida.push(no);
+                    continue;
+                }
+
+                for (const pedaco of no.value.split(/(\s+)/)) {
+                    if (!pedaco) continue;
+
+                    percorrido += pedaco.length;
+                    const parte = (frente - percorrido) / RASTRO;
+
+                    if (parte >= 1 || /^\s+$/.test(pedaco)) {
+                        saida.push({ type: 'text', value: pedaco } as Text);
+                        continue;
+                    }
+
+                    const t = Math.max(parte, 0);
+                    const suave = t * t * (3 - 2 * t);   // borda macia dos dois lados
+                    const desloc = ((1 - suave) * 100).toFixed(1);
+
+                    saida.push({
+                        type: 'element',
+                        tagName: 'span',
+                        properties: {
+                            className: ['palavra'],
+                            style: `opacity:${suave.toFixed(3)};`
+                                + `-webkit-mask-position:${desloc}% 0;`
+                                + `mask-position:${desloc}% 0`,
+                        },
+                        children: [{ type: 'text', value: pedaco } as Text],
+                    });
+                }
+            }
+
+            pai.children = saida as typeof pai.children;
+        };
+
+        marcar(arvore);
+    };
+}
+
+function ChatResponse({ text, streaming = false }: { text: string; streaming?: boolean }) {
+    const { visivel, sobra, revelando } = useRevelacao(text, streaming);
+
     return (
         <div className="flex flex-col text-[#FFFFFF] text-lg leading-relaxed">
             <ReactMarkdown
+                rehypePlugins={revelando ? [[palavrasReveladas, sobra]] : []}
                 components={{
                     h1: ({ children }) => (
                         <h1 className="text-3xl font-roboto font-bold text-white mt-6 mb-3 text-balance">{children}</h1>
@@ -50,8 +187,11 @@ export default function ChatResponse({ text }: { text: string }) {
                     ),
                 }}
             >
-                {text}
+                {visivel}
             </ReactMarkdown>
         </div>
     );
 }
+
+/* Só a última mensagem muda durante o stream. */
+export default memo(ChatResponse);

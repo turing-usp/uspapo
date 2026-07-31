@@ -1,4 +1,5 @@
 // lib/stream.ts
+import type { Mensagem } from "@/lib/conversas";
 
 export type EventoChat =
   | { tipo: "modo"; streaming: boolean }
@@ -59,23 +60,58 @@ export function statusVisivel(estado: StatusStream, semTexto: boolean): boolean 
   return semTexto || !estado.escrevendo;
 }
 
+// ─────────────────────────────────────────────
+// Identidade do aparelho
+// ─────────────────────────────────────────────
+const CHAVE_DISPOSITIVO = "uspapo:dispositivo";
+
+/* ID gerado uma vez por navegador, usado pelo back-end como chave do rate limit */
+let idDispositivo = "";
+
+export function obterIdDispositivo(): string {
+  if (idDispositivo) return idDispositivo;
+
+  try {
+    idDispositivo = localStorage.getItem(CHAVE_DISPOSITIVO) ?? "";
+    if (!idDispositivo) {
+      idDispositivo = crypto.randomUUID();
+      localStorage.setItem(CHAVE_DISPOSITIVO, idDispositivo);
+    }
+  } catch {
+    /* Navegação privada pode bloquear o storage... */
+    idDispositivo = idDispositivo || crypto.randomUUID();
+  }
+
+  return idDispositivo;
+}
+
 /**
  * Envia a pergunta e chama `aoEvento` para cada evento recebido.
- *
- * Se o back-end responder JSON em vez de SSE (deploy antigo, sem suporte a
- * stream), a resposta inteira é convertida em um único evento de texto. A página não precisa saber a diferença.
  */
 export async function perguntar(
   pergunta: string,
+  anteriores: Mensagem[],
   aoEvento: (evento: EventoChat) => void
 ): Promise<void> {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pergunta, stream: true }),
+    headers: {
+      "Content-Type": "application/json",
+      "X-Device-Id": obterIdDispositivo(),
+    },
+    body: JSON.stringify({
+      pergunta,
+      stream: true,
+      historico: anteriores.map((m) => ({ pergunta: m.user, resposta: m.bot })),
+    }),
   });
 
-  if (!res.ok) throw new Error("Erro na comunicação com o back-end");
+  if (!res.ok) {
+    /* O 429 do rate limit traz uma explicação pronta para o aluno ler; sem
+       isto ela viraria "erro ao conectar com o servidor". */
+    const corpo = await res.json().catch(() => null);
+    throw new Error(corpo?.erro ?? "Erro na comunicação com o back-end");
+  }
 
   const tipoConteudo = res.headers.get("content-type") ?? "";
   const ehStream = tipoConteudo.includes("text/event-stream") && res.body !== null;

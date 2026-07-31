@@ -12,14 +12,27 @@ quando a pergunta exige um fato sobre a USP.
     POST /chat  {"pergunta": "...", "stream": true}  -> text/event-stream
     GET  /health
 
+O corpo do /chat aceita ainda "historico": [{"pergunta", "resposta"}, ...] com os
+turnos anteriores da conversa (o frontend guarda tudo no localStorage). O que não
+couber no orçamento de tokens é descartado, do turno mais antigo para o mais novo.
+
+Cada cliente identifica seu aparelho no header X-Device-Id e tem um limite de
+perguntas por janela de tempo; estourar devolve 429.
+
 No modo stream, cada evento é uma linha `data: {json}` com um campo "tipo":
 provedor, pensando, ferramenta, texto, fontes, erro, fim.
 """
 
 import json
 import os
+import re
+import threading
+import time
+from collections import deque
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Iterator
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, request, stream_with_context
@@ -45,6 +58,22 @@ MAX_RODADAS_FERRAMENTA = 2
 
 TEMPERATURA_PADRAO = 0.1
 TIMEOUT_PADRAO = 60
+
+# Quantas perguntas cada aparelho pode fazer por janela de tempo.
+LIMITES_TAXA = [
+    ("minuto",     60,    int(os.getenv("RATE_LIMIT_MINUTO", "8"))),
+    ("10 minutos", 600,   int(os.getenv("RATE_LIMIT_10MIN",  "30"))),
+    ("hora",       3600,  int(os.getenv("RATE_LIMIT_HORA",   "100"))),
+    ("dia",        86400, int(os.getenv("RATE_LIMIT_DIA",    "400"))),
+]
+
+# Teto do que vai para o modelo, não importa o tamanho da conversa no frontend.
+MAX_TOKENS_CONTEXTO = int(os.getenv("MAX_TOKENS_CONTEXTO", "16000"))
+# Espaço guardado para o que as ferramentas ainda vão devolver nesta pergunta.
+RESERVA_FERRAMENTAS = int(os.getenv("RESERVA_FERRAMENTAS", "4000"))
+# Corte grosso antes de qualquer contagem, para não estimar tokens à toa.
+MAX_MENSAGENS_HISTORICO = 40
+CHARS_POR_TOKEN = 3.5
 
 
 def carregar_provedores() -> list[tuple[dict, OpenAI]]:
@@ -118,7 +147,8 @@ CORS(app, resources={
             "http://localhost:3000", # Para você continuar testando na sua máquina
             "https://uspapo.turingusp.com",
             "https://www.uspapo.turingusp.com"
-        ]
+        ],
+        "allow_headers": ["Content-Type", "X-Device-Id"]
     }
 })
 
@@ -305,10 +335,25 @@ def rodar_ferramenta(chamada: dict, memo: dict) -> tuple[str, list[str], dict]:
 # ─────────────────────────────────────────────
 # 5. O prompt
 # ─────────────────────────────────────────────
-PROMPT_SISTEMA = """Você é o USPapo, assistente virtual que ajuda em assuntos sobre a Universidade de São Paulo.
-Responde a alunos e candidatos em português do Brasil, em Markdown, de forma direta e amigável.
+try:
+    FUSO_BR = ZoneInfo("America/Sao_Paulo")
+except Exception:
+    FUSO_BR = timezone(timedelta(hours=-3))
+
+DIAS_SEMANA = (
+    "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira",
+    "sexta-feira", "sábado", "domingo",
+)
+MESES = (
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+)
+
+MODELO_PROMPT_SISTEMA = """Você é o USPapo, assistente virtual desenvolvido pelo grupo Turing USP que ajuda em assuntos sobre a Universidade de São Paulo.
+Responde a alunos e candidatos em português do Brasil, em Markdown, de forma direta, amigável e em linguagem descontraída.
 
 COMO TRABALHAR:
+- Hoje é {data}. Use essa data para entender perguntas relativas ("este ano", "semana que vem", "ainda dá tempo?"), mas nunca deduza prazos ou datas que as ferramentas não devolveram.
 - Antes de afirmar QUALQUER fato sobre a USP, use as ferramentas disponíveis. Você não sabe nada sobre a USP por conta própria: tudo o que afirmar precisa vir do que elas devolverem.
 - Se o resultado não responder à pergunta, pode chamar a ferramenta de novo com outros argumentos, antes de desistir.
 - NÃO chame ferramenta para saudações, agradecimentos, despedidas ou perguntas sobre você mesmo. Nesses casos responda direto.
@@ -320,8 +365,199 @@ COMO RESPONDER:
 """
 
 
+def montar_prompt_sistema() -> str:
+    """Preenche o prompt com a data de hoje.
+
+    Feito por pergunta, e não no import: o servidor fica dias no ar, e uma data
+    congelada na hora do deploy é pior do que data nenhuma.
+    """
+    agora = datetime.now(FUSO_BR)
+    data = (
+        f"{DIAS_SEMANA[agora.weekday()]}, {agora.day} de "
+        f"{MESES[agora.month - 1]} de {agora.year}"
+    )
+    return MODELO_PROMPT_SISTEMA.format(data=data)
+
+
 # ─────────────────────────────────────────────
-# 6. Limpeza do content: raciocínio e tool calls inline
+# 6. Portaria: limite de uso e orçamento de contexto
+# ─────────────────────────────────────────────
+# Duas defesas para o mesmo problema, o custo por pergunta: o rate limit cuida
+# de quantas perguntas cada um faz, o orçamento cuida do tamanho de cada uma.
+
+_batidas: dict[str, deque[float]] = {}
+_tranca = threading.Lock()
+
+JANELA_MAXIMA = max(segundos for _, segundos, _ in LIMITES_TAXA)
+FORMATO_ID = re.compile(r"^[A-Za-z0-9-]{8,64}$")
+
+
+def identificar_cliente() -> str:
+    """Chave do rate limit: o aparelho, não o IP.
+
+    A rede da USP é toda NAT, então um laboratório inteiro sai pelo mesmo
+    endereço; limitar por IP puniria a turma por causa de um usuário. O ID vem
+    do navegador e é falsificável, mas o alvo aqui é uso acidental e abuso
+    casual, não um atacante dedicado. Sem o header a chave cai para o IP, senão
+    bastava omiti-lo para escapar do limite.
+    """
+    dispositivo = (request.headers.get("X-Device-Id") or "").strip()
+    if FORMATO_ID.match(dispositivo):
+        return f"disp:{dispositivo}"
+
+    # O proxy do Render termina o TLS, então remote_addr é o proxy, não o aluno.
+    encaminhado = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+    return f"ip:{encaminhado or request.remote_addr or 'desconhecido'}"
+
+
+def verificar_limite(chave: str) -> tuple[str, int] | None:
+    """Registra a pergunta, ou devolve (janela estourada, segundos de espera)."""
+    agora = time.monotonic()
+
+    with _tranca:
+        # Sem esta limpeza o dicionário cresce para sempre, um registro por
+        # aparelho que passou pelo site.
+        for antiga in [
+            outra for outra, marcas in _batidas.items()
+            if not marcas or agora - marcas[-1] > JANELA_MAXIMA
+        ]:
+            del _batidas[antiga]
+
+        marcas = _batidas.setdefault(chave, deque())
+        while marcas and agora - marcas[0] > JANELA_MAXIMA:
+            marcas.popleft()
+
+        for nome, segundos, maximo in LIMITES_TAXA:
+            if maximo <= 0:
+                continue  # janela desligada
+
+            dentro = [marca for marca in marcas if agora - marca <= segundos]
+            if len(dentro) >= maximo:
+                # A vaga abre quando a batida mais antiga da janela sair dela.
+                return nome, max(int(segundos - (agora - dentro[0])) + 1, 1)
+
+        marcas.append(agora)
+
+    return None
+
+
+def estimar_tokens(texto: str) -> int:
+    """Estimativa por caracteres.
+
+    Não há tokenizer instalado e a cadeia de provedores é heterogênea (Qwen,
+    gpt-oss, DeepSeek), então nenhuma contagem exata valeria para todos. A razão
+    é conservadora de propósito: sobrar contexto é bem melhor do que a API
+    recusar a requisição inteira.
+    """
+    return int(len(texto) / CHARS_POR_TOKEN) + 1
+
+
+def custo_mensagem(mensagem: dict) -> int:
+    """Tokens de uma mensagem, contando o enquadramento de role e formato."""
+    custo = 4 + estimar_tokens(str(mensagem.get("content") or ""))
+
+    for chamada in mensagem.get("tool_calls") or []:
+        funcao = chamada.get("function", {})
+        custo += estimar_tokens(funcao.get("name", "") + funcao.get("arguments", ""))
+
+    return custo
+
+
+CUSTO_FERRAMENTAS = estimar_tokens(json.dumps(FERRAMENTAS, ensure_ascii=False))
+
+
+def normalizar_historico(bruto: object) -> list[dict]:
+    """Filtra os turnos anteriores que vieram do frontend.
+
+    Item torto é descartado calado: localStorage estragado não pode impedir o
+    aluno de fazer a pergunta de agora.
+    """
+    if not isinstance(bruto, list):
+        return []
+
+    limpo = []
+    for item in bruto[-MAX_MENSAGENS_HISTORICO:]:
+        if not isinstance(item, dict):
+            continue
+
+        pergunta = str(item.get("pergunta") or "").strip()
+        resposta = str(item.get("resposta") or "").strip()
+        if pergunta and resposta:
+            limpo.append({"pergunta": pergunta, "resposta": resposta})
+
+    return limpo
+
+
+def montar_mensagens(pergunta: str, historico: list[dict]) -> tuple[list[dict], int]:
+    """Monta as messages cabendo em MAX_TOKENS_CONTEXTO.
+
+    Devolve também o índice onde o turno de agora começa: dali para a frente as
+    mensagens são intocáveis (a pergunta e o par assistant/tool das ferramentas),
+    e só o prefixo de histórico pode ser podado mais tarde.
+    """
+    sistema = {"role": "system", "content": montar_prompt_sistema()}
+    atual = {"role": "user", "content": pergunta}
+
+    disponivel = (
+        MAX_TOKENS_CONTEXTO
+        - custo_mensagem(sistema)
+        - CUSTO_FERRAMENTAS
+        - RESERVA_FERRAMENTAS
+    )
+
+    # A pergunta de agora entra sempre. Se ela sozinha estourar o orçamento, é
+    # ela que encolhe: sem pergunta não há o que responder.
+    if custo_mensagem(atual) > disponivel:
+        atual["content"] = pergunta[:max(int(disponivel * CHARS_POR_TOKEN), 500)]
+
+    sobra = disponivel - custo_mensagem(atual)
+    anteriores: list[dict] = []
+
+    # Do turno mais recente para o mais antigo: o fim da conversa é o que
+    # importa para entender a pergunta atual.
+    for turno in reversed(historico):
+        par = [
+            {"role": "user", "content": turno["pergunta"]},
+            {"role": "assistant", "content": turno["resposta"]},
+        ]
+        custo = sum(custo_mensagem(mensagem) for mensagem in par)
+
+        # Para no primeiro que não cabe em vez de continuar procurando um menor:
+        # buraco no meio da conversa confunde mais do que ajuda.
+        if custo > sobra:
+            break
+
+        sobra -= custo
+        anteriores[:0] = par
+
+    mensagens = [sistema] + anteriores + [atual]
+    return mensagens, len(mensagens) - 1
+
+
+def podar_mensagens(mensagens: list[dict], inicio_turno: int) -> int:
+    """Descarta turnos antigos até o total caber de novo no orçamento.
+
+    Roda entre as rodadas de ferramenta, quando os resultados já entraram na
+    lista. Mexe só no prefixo de histórico: tirar uma mensagem 'tool' ou o
+    'assistant' que a chamou deixa um tool_call_id órfão, e aí o provedor recusa
+    a requisição inteira.
+    """
+    total = CUSTO_FERRAMENTAS + sum(custo_mensagem(mensagem) for mensagem in mensagens)
+
+    # O índice 0 é o prompt de sistema; o histórico vai dali até inicio_turno.
+    while total > MAX_TOKENS_CONTEXTO and inicio_turno > 1:
+        # Os pares saem juntos, para a conversa nunca começar por uma resposta
+        # sem a pergunta que a gerou.
+        removidas = mensagens[1:3]
+        del mensagens[1:3]
+        inicio_turno -= len(removidas)
+        total -= sum(custo_mensagem(mensagem) for mensagem in removidas)
+
+    return inicio_turno
+
+
+# ─────────────────────────────────────────────
+# 7. Limpeza do content: raciocínio e tool calls inline
 # ─────────────────────────────────────────────
 # Não existe campo padronizado: a DeepSeek manda "reasoning_content", a Groq e
 # a OpenRouter mandam "reasoning", e vários modelos abertos simplesmente
@@ -480,25 +716,27 @@ class SeparadorConteudo:
 
 
 # ─────────────────────────────────────────────
-# 7. O núcleo: um gerador de eventos
+# 8. O núcleo: um gerador de eventos
 # ─────────────────────────────────────────────
 def conversar_com_provedor(
     cfg: dict,
     cliente: OpenAI,
     pergunta: str,
+    historico: list[dict],
     urls_turno: set[str],
     memo: dict,
 ) -> Iterator[dict]:
     """Roda o laço de ferramentas num provedor. Levanta se a API falhar."""
-    mensagens: list[dict] = [
-        {"role": "system", "content": PROMPT_SISTEMA},
-        {"role": "user", "content": pergunta},
-    ]
+    mensagens, inicio_turno = montar_mensagens(pergunta, historico)
 
     for rodada in range(MAX_RODADAS_FERRAMENTA + 1):
         # Na última rodada tiramos as ferramentas da mesa: o modelo é obrigado
         # a fechar a resposta com o que já recuperou.
         ultima = rodada == MAX_RODADAS_FERRAMENTA
+
+        # Os resultados das ferramentas entraram na lista desde a última volta e
+        # podem ter estourado o orçamento; quem paga são os turnos mais velhos.
+        inicio_turno = podar_mensagens(mensagens, inicio_turno)
 
         parametros = {
             "model": cfg["model"],
@@ -613,7 +851,7 @@ def conversar_com_provedor(
             })
 
 
-def executar_conversa(pergunta: str) -> Iterator[dict]:
+def executar_conversa(pergunta: str, historico: list[dict]) -> Iterator[dict]:
     """Percorre a cadeia de provedores até um deles responder."""
     memo: dict = {}  # buscas já feitas neste turno, para não repagar embed+query
     emitiu_texto = False
@@ -627,7 +865,10 @@ def executar_conversa(pergunta: str) -> Iterator[dict]:
         urls_turno: set[str] = set()
 
         try:
-            for evento in conversar_com_provedor(cfg, cliente, pergunta, urls_turno, memo):
+            eventos = conversar_com_provedor(
+                cfg, cliente, pergunta, historico, urls_turno, memo
+            )
+            for evento in eventos:
                 if evento["tipo"] == "texto":
                     emitiu_texto = True
                 yield evento
@@ -653,7 +894,7 @@ def executar_conversa(pergunta: str) -> Iterator[dict]:
 
 
 # ─────────────────────────────────────────────
-# 8. Os dois adaptadores de saída
+# 9. Os dois adaptadores de saída
 # ─────────────────────────────────────────────
 def gerar_sse(eventos: Iterator[dict]) -> Iterator[str]:
     """Serializa os eventos como Server-Sent Events."""
@@ -690,10 +931,25 @@ def agregar(eventos: Iterator[dict]) -> tuple[dict, int]:
 
 
 # ─────────────────────────────────────────────
-# 9. Endpoints (a ponte com o Next.js)
+# 10. Endpoints (a ponte com o Next.js)
 # ─────────────────────────────────────────────
 @app.route("/chat", methods=["POST"])
 def chat():
+    # Antes de qualquer trabalho: quem estourou o limite não custa nada.
+    excedeu = verificar_limite(identificar_cliente())
+    if excedeu:
+        janela, espera = excedeu
+        resposta = jsonify({
+            "erro": f"Você fez muitas perguntas em pouco tempo (limite por {janela}). "
+                    "Espere um pouquinho e tente de novo.",
+            "limite": janela,
+            "retry_after": espera,
+        })
+        # O Retry-After vai também no corpo: sem expose_headers no CORS, o
+        # navegador não consegue ler headers customizados da resposta.
+        resposta.headers["Retry-After"] = str(espera)
+        return resposta, 429
+
     dados = request.get_json(silent=True)
 
     if not dados or "pergunta" not in dados:
@@ -704,9 +960,11 @@ def chat():
     if not pergunta:
         return jsonify({"erro": "Pergunta vazia"}), 400
 
+    historico = normalizar_historico(dados.get("historico"))
+
     if dados.get("stream"):
         resposta = Response(
-            stream_with_context(gerar_sse(executar_conversa(pergunta))),
+            stream_with_context(gerar_sse(executar_conversa(pergunta, historico))),
             mimetype="text/event-stream",
         )
         resposta.headers["Cache-Control"] = "no-cache"
@@ -716,7 +974,7 @@ def chat():
         return resposta
 
     try:
-        corpo, status = agregar(executar_conversa(pergunta))
+        corpo, status = agregar(executar_conversa(pergunta, historico))
     except Exception as erro:
         print(f"Erro ao processar pergunta: {erro}")
         return jsonify({"erro": "Erro interno ao processar a pergunta no servidor."}), 500

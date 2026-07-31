@@ -31,7 +31,7 @@ export default function ChatPage() {
     const jaProcessouInicial = useRef(false);
     const fimDasMensagensRef = useRef<HTMLDivElement>(null);
 
-    const completarResposta = async (texto: string) => {
+    const completarResposta = async (texto: string, anteriores: Mensagem[]) => {
         setRespondendo(true);
         setStreaming(false);
         setStatus(STATUS_INICIAL);
@@ -58,7 +58,7 @@ export default function ChatPage() {
         };
 
         try {
-            await perguntar(texto, (evento) => {
+            await perguntar(texto, anteriores, (evento) => {
                 setStatus((atual) => reduzirStatus(atual, evento));
 
                 switch (evento.tipo) {
@@ -79,7 +79,10 @@ export default function ChatPage() {
             });
         } catch (erro) {
             console.error(erro);
-            acc.erro = "Desculpe, ocorreu um erro ao conectar com o servidor do USPapo.";
+            /* O back-end explica o 429 do rate limit na própria mensagem. */
+            acc.erro = erro instanceof Error && erro.message
+                ? erro.message
+                : "Desculpe, ocorreu um erro ao conectar com o servidor do USPapo.";
         }
 
         if (!acc.corpo) {
@@ -93,9 +96,10 @@ export default function ChatPage() {
 
     const enviarPergunta = async (texto: string) => {
         if (!texto.trim() || respondendo) return;
+        const anteriores = historico;
         setHistorico((prev) => [...prev, { user: texto, bot: PENDENTE }]);
         setPergunta("");
-        await completarResposta(texto);
+        await completarResposta(texto, anteriores);
     };
 
     const lidarComEnvio = (e: React.SyntheticEvent) => {
@@ -115,7 +119,9 @@ export default function ChatPage() {
 
         const ultima = conversa.mensagens[conversa.mensagens.length - 1];
         if (ultima && ultima.bot === PENDENTE) {
-            completarResposta(ultima.user);
+            /* A última é justamente a que está sem resposta: ela é a pergunta
+               de agora, não um turno anterior. */
+            completarResposta(ultima.user, conversa.mensagens.slice(0, -1));
         }
     }, [id]);
 
@@ -158,7 +164,7 @@ export default function ChatPage() {
                 </div>
                 <div className="app-container-chat mt-4 pb-6">
                     {semTexto && !mostrarStatus && <TypingIndicator />}
-                    {!semTexto && <ChatResponse text={item.bot} />}
+                    {!semTexto && <ChatResponse text={item.bot} streaming={streamando} />}
                     {item.fontes && <Fontes urls={item.fontes} />}
                     {mostrarStatus && <StatusBlock ferramentas={ferramentasAtivas} />}
                 </div>
