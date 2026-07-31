@@ -572,7 +572,11 @@ CAMPOS_RACIOCINIO = ("reasoning_content", "reasoning", "reasoning_text")
 TAGS_CONTEUDO = {
     "pensando": ("<think>", "</think>", True),
     "ferramenta_inline": ("<tool_call>", "</tool_call>", False),
+    "ferramenta_xml": ("<function=", "</function>", False),
 }
+
+# Rótulos que viram tool call em vez de texto no chat.
+ROTULOS_FERRAMENTA = {"ferramenta_inline": "", "ferramenta_xml": "<function="}
 
 
 def extrair_raciocinio(delta) -> str:
@@ -585,34 +589,113 @@ def extrair_raciocinio(delta) -> str:
     return ""
 
 
+FUNCAO_XML = re.compile(r"<function=([^>\s]+)\s*>(.*?)(?:</function>|\Z)", re.S)
+PARAMETRO_XML = re.compile(r"<parameter=([^>\s]+)\s*>(.*?)(?:</parameter>|\Z)", re.S)
+
+
+def converter_por_schema(nome: str, args: dict[str, str]) -> dict:
+    """Tipa os argumentos do formato XML, onde tudo chega como string.
+
+    O JSON Schema da ferramenta diz o tipo esperado de cada campo; o que não
+    converter continua string e a ferramenta decide o que fazer com ele.
+    """
+    ferr = REGISTRO.get(nome)
+    propriedades = (ferr.parametros.get("properties") if ferr else None) or {}
+    convertidos: dict[str, object] = {}
+
+    for chave, valor in args.items():
+        tipo = (propriedades.get(chave) or {}).get("type")
+        try:
+            if tipo == "integer":
+                convertidos[chave] = int(valor)
+            elif tipo == "number":
+                convertidos[chave] = float(valor)
+            elif tipo == "boolean":
+                convertidos[chave] = valor.lower() in ("true", "1", "sim", "yes")
+            elif tipo in ("object", "array"):
+                convertidos[chave] = json.loads(valor)
+            else:
+                convertidos[chave] = valor
+        except (TypeError, ValueError, json.JSONDecodeError):
+            convertidos[chave] = valor
+
+    return convertidos
+
+
+def ler_tool_calls(bruto: str) -> list[tuple[str, str]]:
+    """Lê um bloco de tool call inline nos formatos que os modelos usam.
+
+    Devolve pares (nome, argumentos como string JSON), lista vazia se o bloco
+    não for reconhecível. Nunca levanta: formato estranho é caso esperado aqui.
+    """
+    texto = bruto.strip()
+    if not texto:
+        return []
+
+    # Formato Hermes (Qwen, Mistral): um objeto JSON solto, ou uma lista deles
+    # quando o modelo pede duas coisas de uma vez. "name"/"arguments" é o mais
+    # comum; "parameters" aparece em alguns Llama. Os argumentos podem vir como
+    # objeto ou já como string JSON.
+    try:
+        dados = json.loads(texto)
+    except json.JSONDecodeError:
+        dados = None
+
+    chamadas = []
+    for item in dados if isinstance(dados, list) else [dados]:
+        if not isinstance(item, dict):
+            continue
+
+        nome = str(item.get("name") or item.get("nome") or "")
+        if not nome:
+            continue
+
+        args = item.get("arguments", item.get("parameters", {}))
+        chamadas.append(
+            (nome, args if isinstance(args, str) else json.dumps(args, ensure_ascii=False))
+        )
+
+    if chamadas:
+        return chamadas
+
+    # Formato XML. Pode trazer mais de uma função no mesmo bloco.
+    for achado in FUNCAO_XML.finditer(texto):
+        nome = achado.group(1).strip()
+        crus = {
+            chave.strip(): valor.strip()
+            for chave, valor in PARAMETRO_XML.findall(achado.group(2))
+        }
+        args = converter_por_schema(nome, crus)
+        chamadas.append((nome, json.dumps(args, ensure_ascii=False)))
+
+    if not chamadas:
+        print(f"[ferramenta] tool call inline em formato desconhecido, ignorada: {texto[:200]}")
+
+    return chamadas
+
+
 def recuperar_tool_call(bruto: str, pendentes: dict, anunciadas: set) -> list[dict]:
-    """Converte um <tool_call> que veio no texto numa chamada estruturada.
+    """Converte tool calls que vieram no texto em chamadas estruturadas.
 
     Runtimes sem parser de tool call são endereçados aqui.
     """
-    try:
-        dados = json.loads(bruto.strip())
-    except json.JSONDecodeError:
-        print(f"[ferramenta] <tool_call> não é JSON válido, ignorado: {bruto[:120]}")
-        return []
+    eventos = []
 
-    if not isinstance(dados, dict):
-        print(f"[ferramenta] <tool_call> não é um objeto, ignorado: {bruto[:120]}")
-        return []
+    for nome, args_str in ler_tool_calls(bruto):
+        if not nome:
+            continue
 
-    # "name"/"arguments" é o formato Hermes (Qwen); "parameters" aparece em
-    # alguns Llama. Os argumentos podem vir como objeto ou como string JSON.
-    nome = str(dados.get("name") or dados.get("nome") or "")
-    args = dados.get("arguments", dados.get("parameters", {}))
-    args_str = args if isinstance(args, str) else json.dumps(args, ensure_ascii=False)
+        indice = (max(pendentes) + 1) if pendentes else 0
+        pendentes[indice] = {"id": "", "nome": nome, "args": args_str}
 
-    indice = (max(pendentes) + 1) if pendentes else 0
-    pendentes[indice] = {"id": "", "nome": nome, "args": args_str}
+        if indice in anunciadas:
+            continue
+        anunciadas.add(indice)
+        eventos.append(
+            {"tipo": "ferramenta", "estado": "inicio", "indice": indice, "nome": nome}
+        )
 
-    if indice in anunciadas:
-        return []
-    anunciadas.add(indice)
-    return [{"tipo": "ferramenta", "estado": "inicio", "indice": indice, "nome": nome}]
+    return eventos
 
 
 class SeparadorConteudo:
@@ -707,12 +790,15 @@ class SeparadorConteudo:
         if TAGS_CONTEUDO[self._rotulo][2]:
             return [(self._rotulo, resto)] if resto else []
 
-        # Bloco bufferizado que nunca fechou: JSON pela metade não serve para
-        # nada, e mostrar no chat seria o bug que estamos consertando.
-        incompleto = self._acumulado + resto
-        if incompleto.strip():
-            print(f"[conteudo] bloco '{self._rotulo}' não fechou; descartado: {incompleto[:120]}")
-        return []
+        # Bloco bufferizado que nunca fechou: entregamos assim mesmo, porque
+        # uma tool call cortada no fim ainda costuma ter nome e argumentos
+        # legíveis. Quem recebe é o parser, nunca o chat.
+        incompleto, self._acumulado = self._acumulado + resto, ""
+        if not incompleto.strip():
+            return []
+
+        print(f"[conteudo] bloco '{self._rotulo}' não fechou: {incompleto[:120]}")
+        return [(self._rotulo, incompleto)]
 
 
 # ─────────────────────────────────────────────
@@ -756,6 +842,22 @@ def conversar_com_provedor(
         anunciadas: set[int] = set()
         texto_final = ""
 
+        def despachar(blocos: list[tuple[str, str]]) -> Iterator[dict]:
+            """Traduz os blocos que saem do separador em eventos do stream."""
+            nonlocal texto_final
+
+            for rotulo, trecho in blocos:
+                # Tool call que veio como texto vira chamada de verdade em vez
+                # de aparecer crua no chat.
+                if rotulo in ROTULOS_FERRAMENTA:
+                    inteiro = ROTULOS_FERRAMENTA[rotulo] + trecho
+                    yield from recuperar_tool_call(inteiro, pendentes, anunciadas)
+                    continue
+
+                if rotulo == "texto":
+                    texto_final += trecho
+                yield {"tipo": rotulo, "delta": trecho}
+
         for chunk in cliente.chat.completions.create(**parametros):
             if not chunk.choices:
                 continue  # chunk só de usage, no fim do stream
@@ -769,15 +871,7 @@ def conversar_com_provedor(
                 yield {"tipo": "pensando", "delta": raciocinio}
 
             if delta.content:
-                for rotulo, trecho in separador.processar(delta.content):
-                    # Tool call que veio como texto vira chamada de verdade em
-                    # vez de aparecer crua no chat.
-                    if rotulo == "ferramenta_inline":
-                        yield from recuperar_tool_call(trecho, pendentes, anunciadas)
-                        continue
-                    if rotulo == "texto":
-                        texto_final += trecho
-                    yield {"tipo": rotulo, "delta": trecho}
+                yield from despachar(separador.processar(delta.content))
 
             for tc in (delta.tool_calls or []):
                 slot = pendentes.setdefault(tc.index, {"id": "", "nome": "", "args": ""})
@@ -801,10 +895,14 @@ def conversar_com_provedor(
                         "nome": slot["nome"],
                     }
 
-        for rotulo, trecho in separador.finalizar():
-            if rotulo == "texto":
-                texto_final += trecho
-            yield {"tipo": rotulo, "delta": trecho}
+        yield from despachar(separador.finalizar())
+
+        # Sem texto e sem ferramenta não há resposta nenhuma: costuma ser tool
+        # call em formato que nenhum parser reconheceu, ou o provedor cortando
+        # a geração. Levantar aqui joga para o próximo da cadeia, em vez de
+        # devolver uma bolha vazia ao aluno.
+        if not pendentes and not texto_final.strip():
+            raise RuntimeError("o provedor terminou o stream sem texto nem tool call")
 
         if ultima or not pendentes:
             return
