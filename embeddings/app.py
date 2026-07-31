@@ -1,9 +1,12 @@
 import os
+import subprocess
+import atexit
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pinecone import Pinecone
 from groq import Groq
+from apscheduler.schedulers.background import BackgroundScheduler
 
 # ─────────────────────────────────────────────
 # 1. Configurações Iniciais e Chaves (Segurança)
@@ -41,6 +44,29 @@ index = pc.Index("uspapo-embeddings")
 cliente_llm = Groq(api_key=GROQ_API_KEY)
 
 print("-> Servidor USPapo ativado e super leve! 🚀")
+
+# ─────────────────────────────────────────────
+# 1.5. Agendador de Tarefas em Segundo Plano (Rotina Noturna)
+# ─────────────────────────────────────────────
+def executar_rotina_noturna():
+    """Função executada na thread de segundo plano"""
+    print("\n[AGENDADOR 02:00] Disparando esteira de scraping e vetorização...")
+    try:
+        # Chama o orquestrador em um processo separado para não travar a API
+        subprocess.run(["python", "rodar_scrapers.py"], check=True)
+        print("[AGENDADOR] Esteira concluída com sucesso!")
+    except Exception as e:
+        print(f"[AGENDADOR ERRO] Falha ao executar rodar_scrapers.py: {e}")
+
+# Inicializa o agendador em background
+scheduler = BackgroundScheduler()
+# Configura para rodar todos os dias às 02:00 da manhã
+scheduler.add_job(executar_rotina_noturna, 'cron', hour=2, minute=0)
+scheduler.start()
+
+# Garante que a thread do agendador não fique 'órfã' no sistema operacional se o servidor cair
+atexit.register(lambda: scheduler.shutdown())
+print("-> Agendador noturno ativado (Ronda diária às 02:00).")
 
 # ─────────────────────────────────────────────
 # 2. Funções do RAG (Agora rodando 100% na Nuvem)

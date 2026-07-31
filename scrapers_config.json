@@ -1,0 +1,19 @@
+[
+  {
+    "id_site": "poli",
+    "start_url": "https://www.poli.usp.br/",
+    "allowed_domain": "poli.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": "ul#menu-1-7a1b5c55 a::attr(href)"
+      },
+      {
+        "type": "posts",
+        "selector": ".elementor-posts-container article a::attr(href)"
+      }
+    ],
+    "last_update": "2026-01-01",
+    "frequency": "7d"
+  }
+]
