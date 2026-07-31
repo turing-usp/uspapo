@@ -1,59 +1,99 @@
 "use client";
 import ChatResponse from "@/components/chatResponse";
+import Fontes from "@/components/Fontes";
 import PromptInput from "@/components/propmptInput";
+import StatusBlock from "@/components/StatusBlock";
 import TypingIndicator from "@/components/TypingIndicator";
-import { obterConversa, salvarConversa, gerarTitulo } from "@/lib/conversas";
+import { obterConversa, salvarConversa, gerarTitulo, type Mensagem } from "@/lib/conversas";
+import {
+    perguntar,
+    reduzirStatus,
+    statusVisivel,
+    STATUS_INICIAL,
+    type StatusStream,
+} from "@/lib/stream";
 import { UserBubble } from "@/components/UserBubble";
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 
+const PENDENTE = "...";
 
 export default function ChatPage() {
 
     const { id } = useParams();
     const [pergunta, setPergunta] = useState("");
-    const [historico, setHistorico] = useState<{ user: string; bot: string }[]>([]);
+    const [historico, setHistorico] = useState<Mensagem[]>([]);
+    const [respondendo, setRespondendo] = useState(false);
+    const [streaming, setStreaming] = useState(false);
+    /* O que o modelo está fazendo agora */
+    const [status, setStatus] = useState<StatusStream>(STATUS_INICIAL);
     const jaProcessouInicial = useRef(false);
     const fimDasMensagensRef = useRef<HTMLDivElement>(null);
 
-    const enviarParaAPI = async (texto: string) => {
-    try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pergunta: texto }),
-        });
+    const completarResposta = async (texto: string) => {
+        setRespondendo(true);
+        setStreaming(false);
+        setStatus(STATUS_INICIAL);
 
-        if (!res.ok) throw new Error("Erro na comunicação com o back-end");
+        const acc = { corpo: "", fontes: [] as string[], erro: "" };
 
-        const dados = await res.json();
+        /* Parser mais lento para não exigir muita performance do React */
+        let ultimoRender = 0;
 
-        let respostaCompleta = dados.resposta;
-        if (dados.fontes && dados.fontes.length > 0) {
-            respostaCompleta += "\n\nFontes consultadas:\n" + dados.fontes.map((url: string) => `- ${url}`).join("\n");
-        }
+        const aplicar = (forcar = false) => {
+            const agora = performance.now();
+            if (!forcar && agora - ultimoRender < 50) return;
+            ultimoRender = agora;
 
-        return respostaCompleta;
+            setHistorico((prev) => {
+                const copia = [...prev];
+                copia[copia.length - 1] = {
+                    user: texto,
+                    bot: acc.corpo || PENDENTE,
+                    ...(acc.fontes.length > 0 ? { fontes: acc.fontes } : {}),
+                };
+                return copia;
+            });
+        };
+
+        try {
+            await perguntar(texto, (evento) => {
+                setStatus((atual) => reduzirStatus(atual, evento));
+
+                switch (evento.tipo) {
+                    case "modo":
+                        setStreaming(evento.streaming);
+                        break;
+                    case "texto":
+                        acc.corpo += evento.delta;
+                        aplicar();
+                        break;
+                    case "fontes":
+                        acc.fontes = evento.urls;
+                        break;
+                    case "erro":
+                        acc.erro = evento.mensagem;
+                        break;
+                }
+            });
         } catch (erro) {
             console.error(erro);
-            return "Desculpe, ocorreu um erro ao conectar com o servidor do USPapo.";
+            acc.erro = "Desculpe, ocorreu um erro ao conectar com o servidor do USPapo.";
         }
-    };
 
-    // substitui a última mensagem (que está com bot: "...") pela resposta real
-    const completarResposta = async (texto: string) => {
-        const respostaFormatada = await enviarParaAPI(texto);
-        setHistorico((prev) => {
-            const copia = [...prev];
-            copia[copia.length - 1] = { user: texto, bot: respostaFormatada };
-            return copia;
-        });
+        if (!acc.corpo) {
+            acc.corpo = acc.erro || "Desculpe, ocorreu um erro ao conectar com o servidor do USPapo.";
+        }
+
+        aplicar(true);
+        setStatus(STATUS_INICIAL);
+        setRespondendo(false);
     };
 
     const enviarPergunta = async (texto: string) => {
-        if (!texto.trim()) return;
-        setHistorico((prev) => [...prev, { user: texto, bot: "..." }]);
+        if (!texto.trim() || respondendo) return;
+        setHistorico((prev) => [...prev, { user: texto, bot: PENDENTE }]);
         setPergunta("");
         await completarResposta(texto);
     };
@@ -74,14 +114,14 @@ export default function ChatPage() {
         setHistorico(conversa.mensagens);
 
         const ultima = conversa.mensagens[conversa.mensagens.length - 1];
-        if (ultima && ultima.bot === "...") {
+        if (ultima && ultima.bot === PENDENTE) {
             completarResposta(ultima.user);
         }
     }, [id]);
 
-    // 2. salva sempre que o histórico muda
+    // 2. salva quando o histórico muda, depois do stream
     useEffect(() => {
-        if (historico.length === 0) return;
+        if (historico.length === 0 || respondendo) return;
 
         const existente = obterConversa(id as string);
         salvarConversa({
@@ -91,27 +131,40 @@ export default function ChatPage() {
             favorita: existente?.favorita,
             mensagens: historico,
         });
-    }, [historico, id]);
+    }, [historico, id, respondendo]);
 
     // 3. rola até o fim
     useEffect(() => {
-        fimDasMensagensRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [historico]);
+        fimDasMensagensRef.current?.scrollIntoView({
+            behavior: respondendo ? "auto" : "smooth",
+        });
+    }, [historico, respondendo]);
+
+    const ferramentasAtivas = Object.values(status.ferramentas);
 
   return (
     <>
         <div className="flex flex-1 flex-col">
         <div className="flex-1">
-            {historico.map((item, index) => (
+            {historico.map((item, index) => {
+            const streamando = respondendo && streaming && index === historico.length - 1;
+            const semTexto = item.bot === PENDENTE;
+            const mostrarStatus = streamando && statusVisivel(status, semTexto);
+
+            return (
             <div key={index}>
                 <div className="app-container-chat flex justify-end mt-6">
                     <UserBubble text={item.user} />
                 </div>
                 <div className="app-container-chat mt-4 pb-6">
-                    {item.bot === "..." ? <TypingIndicator /> : <ChatResponse text={item.bot} />}
+                    {semTexto && !mostrarStatus && <TypingIndicator />}
+                    {!semTexto && <ChatResponse text={item.bot} />}
+                    {item.fontes && <Fontes urls={item.fontes} />}
+                    {mostrarStatus && <StatusBlock ferramentas={ferramentasAtivas} />}
                 </div>
             </div>
-            ))}
+            );
+            })}
             <div ref={fimDasMensagensRef} />
         </div>
         <div className="sticky bottom-0 z-20 pt-8 pb-[max(1rem,env(safe-area-inset-bottom))]">
