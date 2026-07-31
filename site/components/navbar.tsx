@@ -20,7 +20,7 @@ export default function Navbar() {
           </Link>
         </div>
         <div className="flex gap-3 md:gap-2">
-          <a href="/entrar">
+          <a href="/login">
             <button className="text-sm md:text-base text-[#f1863d] px-4 md:px-8 py-1.5 rounded-[2rem] whitespace-nowrap hover:scale-103 transition-transform duration-500 cursor-pointer">
               Entrar
             </button>
