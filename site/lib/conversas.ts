@@ -5,6 +5,7 @@ export type Conversa = {
   id: string;
   titulo: string;
   criadoEm: number;
+  favorita?: boolean;
   mensagens: Mensagem[];
 };
 
@@ -51,4 +52,22 @@ export function apagarConversa(id: string): void {
 export function gerarTitulo(primeiraPergunta: string): string {
   const limpo = primeiraPergunta.trim();
   return limpo.length > 50 ? limpo.slice(0, 50) + "..." : limpo;
+}
+
+export function alternarFavorita(id: string): void {
+  const conversas = ler();
+  const alvo = conversas.find((c) => c.id === id);
+  if (!alvo) return;
+  alvo.favorita = !alvo.favorita;
+  escrever(conversas);
+}
+
+export function renomearConversa(id: string, novoTitulo: string): void {
+  const titulo = novoTitulo.trim();
+  if (!titulo) return;
+  const conversas = ler();
+  const alvo = conversas.find((c) => c.id === id);
+  if (!alvo) return;
+  alvo.titulo = titulo;
+  escrever(conversas);
 }

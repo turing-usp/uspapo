@@ -123,6 +123,11 @@
   }
 }
 
+@keyframes encolher {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
 body {
   color: var(--foreground);
   font-family: var(--font-roboto-src), Arial, Helvetica, sans-serif;

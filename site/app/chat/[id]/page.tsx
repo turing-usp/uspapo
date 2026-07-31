@@ -88,6 +88,7 @@ export default function ChatPage() {
             id: id as string,
             titulo: existente?.titulo ?? gerarTitulo(historico[0].user),
             criadoEm: existente?.criadoEm ?? Date.now(),
+            favorita: existente?.favorita,
             mensagens: historico,
         });
     }, [historico, id]);
