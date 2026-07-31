@@ -133,3 +133,9 @@ body {
   font-family: var(--font-roboto-src), Arial, Helvetica, sans-serif;
   overflow-x: hidden;
 }
+
+.bg {
+    background-color: hsla(244, 100%, 50%, 1);
+    background-image: radial-gradient(circle at 50% 0%, hsla(319, 0%, 0%, 1) 49.15975941515135%, transparent 102.23193813062571%);
+    background-blend-mode: normal;
+}
