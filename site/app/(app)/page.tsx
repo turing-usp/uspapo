@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import PromptInput from "../components/propmptInput";
+import PromptInput from "../../components/propmptInput";
 import { salvarConversa, gerarTitulo } from "@/lib/conversas";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -38,16 +38,16 @@ export default function Home() {
     <div className="flex flex-1 flex-col">
       <div className="flex flex-1 flex-col justify-center py-8">
         <div className="app-container flex flex-col items-center">
-          <div className="flex flex-col md:flex-row justify-center items-center gap-2">
+          <div className="flex flex-col md:flex-row mb-3 justify-center items-center gap-2">
             <Image
               src="/uspapo.svg"
               alt=""
-              width={60}
-              height={60}
+              width={40}
+              height={40}
             />
-            <p className="font-geom text-4xl md:text-5xl text-[#f1863d]">USPapo</p>
+            <p className="font-geom text-4xl md:text-5xl text-[#f1863d] ml-1">USPapo</p>
           </div>
-          <p className="font-geom text-base md:text-xl text-[#FFFFFF] mt-3 text-center text-balance">Seu <span className="text-[#f1863d]">assistente inteligente</span> para navegar pela USP</p>
+          <p className="font-geom text-base md:text-xl text-[#FFFFFF] mt-3 mb-6 text-center text-balance">Seu <span className="text-[#f1863d]">assistente inteligente</span> para navegar pela USP</p>
         </div>
         <div className="app-container mt-8 md:mt-10">
           <PromptInput value={pergunta} onChange={setPergunta} onSubmit={lidarComEnvio} />
@@ -58,7 +58,7 @@ export default function Home() {
             {perguntasFrequentes.map((pergunta, index) => (
               <button
                 key={index}
-                className="glass flex flex-col justify-center items-center text-center w-full md:w-auto md:flex-1 md:basis-0 md:min-w-[11rem] max-w-[18rem] mx-auto min-h-[3rem] px-4 py-2 rounded-[2rem] border-[0.05rem] border-[#ffffff] hover:cursor-pointer"
+                className="glass flex flex-col justify-center items-center text-center w-full h-14 md:w-auto md:flex-1 md:basis-0 md:min-w-[11rem] max-w-[18rem] mx-auto min-h-[3rem] px-4 py-2 rounded-[2rem] border-[0.05rem] border-[#ffffff] hover:cursor-pointer"
                 onClick={() => enviarPergunta(pergunta)}
               >
                 <span className="text-balance">{pergunta}</span>
