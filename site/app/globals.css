@@ -128,6 +128,23 @@
   to   { width: 0%; }
 }
 
+/* Animação de streaming */
+.palavra {
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 40%, transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0%, #000 40%, transparent 100%);
+  -webkit-mask-size: 300% 100%;
+  mask-size: 300% 100%;
+}
+
+/* Sem o fade */
+@media (prefers-reduced-motion: reduce) {
+  .palavra {
+    opacity: 1 !important;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
+
 body {
   color: var(--foreground);
   font-family: var(--font-roboto-src), Arial, Helvetica, sans-serif;

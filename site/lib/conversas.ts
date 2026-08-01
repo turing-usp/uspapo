@@ -1,5 +1,5 @@
 // lib/conversas.ts
-export type Mensagem = { user: string; bot: string };
+export type Mensagem = { user: string; bot: string; fontes?: string[] };
 
 export type Conversa = {
   id: string;
