@@ -19,13 +19,13 @@ export default function Navbar() {
             />
           </Link>
         </div>
-        <div className="flex gap-3 md:gap-4">
-          <a href="/entrar">
+        <div className="flex gap-3 md:gap-2">
+          <a href="/login">
             <button className="text-sm md:text-base text-[#f1863d] px-4 md:px-8 py-1.5 rounded-[2rem] whitespace-nowrap hover:scale-103 transition-transform duration-500 cursor-pointer">
               Entrar
             </button>
           </a>
-          <a href="/cadastre-se">
+          <a href="/cadastro">
             <button className="text-sm md:text-base text-[#f1863d] border border-[#f1863d] px-4 md:px-8 py-1.5 rounded-[2rem] whitespace-nowrap hover:scale-103 transition-transform duration-300 cursor-pointer">
               Cadastrar
             </button>
