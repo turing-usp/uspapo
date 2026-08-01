@@ -8,7 +8,7 @@ from tqdm import tqdm
 from pinecone import Pinecone
 
 # 1. Trava de segurança para execução sem API Key
-DRY_RUN = True
+DRY_RUN = False
 
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
@@ -41,6 +41,18 @@ def salvar_ledger(ledger: dict):
         json.dump(ledger, f, indent=4, ensure_ascii=False)
 
 
+# NOVO: Função para fatiar textos gigantes (ex: PDFs sem quebra de linha)
+def fatiar_texto_gigante(texto: str, max_size=1100, overlap=200) -> list:
+    """Fatia na marra blocos de texto gigantes que não possuem quebra de parágrafo."""
+    fatias = []
+    i = 0
+    passo = max_size - overlap
+    while i < len(texto):
+        fatias.append(texto[i : i + max_size])
+        i += passo
+    return fatias
+
+
 def agrupar_lista_de_paragrafos(lista_textos_paragrafos: list, target_size=800, max_size=1100) -> list:
     chunks_formados = []
     chunk_atual_textos = []
@@ -58,11 +70,15 @@ def agrupar_lista_de_paragrafos(lista_textos_paragrafos: list, target_size=800, 
                 })
                 chunk_atual_textos = []
                 tamanho_atual = 0
-            chunks_formados.append({
-                "texto": p,
-                "hash_chunk": gerar_hash(p),
-                "paragrafos": [{"texto": p, "hash_p": gerar_hash(p)}]
-            })
+            
+            # --- CORREÇÃO: Fatiar o texto gigante forçadamente ---
+            fatias = fatiar_texto_gigante(p, max_size, overlap=200)
+            for fatia in fatias:
+                chunks_formados.append({
+                    "texto": fatia,
+                    "hash_chunk": gerar_hash(fatia),
+                    "paragrafos": [{"texto": fatia, "hash_p": gerar_hash(fatia)}]
+                })
             continue
 
         tamanho_projetado = tamanho_atual + tam_p + (2 if chunk_atual_textos else 0)
@@ -88,7 +104,7 @@ def agrupar_lista_de_paragrafos(lista_textos_paragrafos: list, target_size=800, 
                     "hash_chunk": gerar_hash(texto_junto),
                     "paragrafos": [{"texto": txt, "hash_p": gerar_hash(txt)} for txt in chunk_atual_textos]
                 })
-            chunk_atual_textos = [p_texto if 'p_texto' in locals() else p]
+            chunk_atual_textos = [p]
             tamanho_atual = tam_p
 
     if chunk_atual_textos:
@@ -174,11 +190,14 @@ def rechunking_ancorado(old_chunks, novos_paragrafos_puros, target_size=800, max
                 chunk_atual_textos = []
                 tamanho_atual = 0
 
-            chunks_finais.append({
-                "texto": p_texto,
-                "hash_chunk": p_hash,
-                "paragrafos": [{"texto": p_texto, "hash_p": p_hash}]
-            })
+            # --- CORREÇÃO: Fatiar o texto gigante forçadamente ---
+            fatias = fatiar_texto_gigante(p_texto, max_size, overlap=200)
+            for fatia in fatias:
+                chunks_finais.append({
+                    "texto": fatia,
+                    "hash_chunk": gerar_hash(fatia),
+                    "paragrafos": [{"texto": fatia, "hash_p": gerar_hash(fatia)}]
+                })
             idx += 1
             continue
 

@@ -15,5 +15,310 @@
     ],
     "last_update": "2026-07-31",
     "frequency": "7d"
+  },
+  {
+    "id_site": "sanfran",
+    "start_url": "https://direito.usp.br/",
+    "allowed_domain": "direito.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": ".mob_caixa a::attr(href)"
+      },
+      {
+        "type": "posts",
+        "selector": ".noticia_caixa a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "fmusp",
+    "start_url": "https://fm.usp.br/fmusp/portal/",
+    "allowed_domain": "fm.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": "nav.nav-main ul#topMain a::attr(href)"
+      },
+      {
+        "type": "noticias",
+        "selector": "#noticias_home a::attr(href)"
+      },
+      {
+        "type": "eventos",
+        "selector": "#Eventos_home a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "ime",
+    "start_url": "https://www.ime.usp.br/",
+    "allowed_domain": "ime.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": ".hfe-nav-menu a::attr(href)"
+      },
+      {
+        "type": "posts_e_eventos",
+        "selector": ".ultp-post-grid-block .ultp-block-title a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "fau",
+    "start_url": "https://www.fau.usp.br/",
+    "allowed_domain": "fau.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": ".menu-coluna a::attr(href)"
+      },
+      {
+        "type": "posts_e_eventos",
+        "selector": ".card a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "iq",
+    "start_url": "https://www.iq.usp.br/portaliqusp/?q=pt-br/bem-vindo",
+    "allowed_domain": "iq.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": "ul#superfish-1 a::attr(href)"
+      },
+      {
+        "type": "posts_e_destaques",
+        "selector": ".card-content a::attr(href), .project a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "if",
+    "start_url": "https://portal.if.usp.br/ifusp/",
+    "allowed_domain": "if.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": "ul#superfish-1 a::attr(href)"
+      },
+      {
+        "type": "acesso_rapido",
+        "selector": ".project .project-details a::attr(href)"
+      },
+      {
+        "type": "noticias_e_eventos",
+        "selector": ".view-content .renatinha-titulo a::attr(href), .carousel-inner #text button a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "fflch",
+    "start_url": "https://www.fflch.usp.br/",
+    "allowed_domain": "www.fflch.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": "#block-fflch-main-menu a::attr(href)"
+      },
+      {
+        "type": "posts_e_eventos",
+        "selector": ".view-content a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "hu",
+    "start_url": "https://www.hu.usp.br/",
+    "allowed_domain": "hu.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": "ul#menu-menu-1 a::attr(href)"
+      },
+      {
+        "type": "acesso_rapido",
+        "selector": ".sow-image-container a::attr(href)"
+      },
+      {
+        "type": "slider",
+        "selector": ".sow-slider-image a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "geografia",
+    "start_url": "http://geografia.fflch.usp.br/",
+    "allowed_domain": "geografia.fflch.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": "#block-fflch-main-menu a::attr(href)"
+      },
+      {
+        "type": "destaques",
+        "selector": ".carousel-inner a::attr(href), .node__content a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "eca",
+    "start_url": "https://www.eca.usp.br/",
+    "allowed_domain": "eca.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": "ul#superfish-main a::attr(href)"
+      },
+      {
+        "type": "posts_e_eventos",
+        "selector": ".hero-slide-content .field--name-field-link a::attr(href), .mosaic-lis-item a::attr(href), .agenda-list .title a::attr(href), .home-news-list-item .title a::attr(href), .home-comunicados-list .title a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "ib",
+    "start_url": "https://www.ib.usp.br/",
+    "allowed_domain": "ib.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": "ul#primary-menu a::attr(href)"
+      },
+      {
+        "type": "acesso_rapido",
+        "selector": "#features a::attr(href)"
+      },
+      {
+        "type": "slider",
+        "selector": "#camera_wrap_371 div::attr(data-link)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "fea",
+    "start_url": "https://www.fea.usp.br/",
+    "allowed_domain": "fea.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": ".menu-principal a::attr(href), #nice-menu-1 a::attr(href)"
+      },
+      {
+        "type": "posts_e_eventos",
+        "selector": ".view-content a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "cepeusp",
+    "start_url": "https://cepe.usp.br/",
+    "allowed_domain": "cepe.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": "ul#menu-menu-de-navegacao a::attr(href), a.fp-btn::attr(href)"
+      },
+      {
+        "type": "posts_e_eventos",
+        "selector": "article.slide a::attr(href), main article a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "icb",
+    "start_url": "https://ww3.icb.usp.br/",
+    "allowed_domain": "icb.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": "ul#menu-principal a::attr(href)"
+      },
+      {
+        "type": "posts_e_eventos",
+        "selector": ".cont-noticias a::attr(href), .ecs-event a::attr(href), .even-dest-cont-01 a::attr(href), .div-planetary a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "feusp",
+    "start_url": "https://www4.fe.usp.br/",
+    "allowed_domain": "www4.fe.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": "#nice-menu-1 a::attr(href), ul#menu-feusp-menu-principal a::attr(href)"
+      },
+      {
+        "type": "posts_e_eventos",
+        "selector": "#destaques_slider .item a::attr(href), .bloco-div a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "fsp",
+    "start_url": "https://www.fsp.usp.br/site/",
+    "allowed_domain": "fsp.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": "ul#menu-menu-principal a::attr(href)"
+      },
+      {
+        "type": "destaques",
+        "selector": ".swiper-slide a::attr(href), .fsp-noticias-titulo a::attr(href), .fsp-eventos-detalhe a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
+  },
+  {
+    "id_site": "ee",
+    "start_url": "https://www.ee.usp.br/",
+    "allowed_domain": "ee.usp.br",
+    "sources": [
+      {
+        "type": "menu",
+        "selector": "nav.elementor-nav-menu--main a::attr(href)"
+      },
+      {
+        "type": "posts_e_destaques",
+        "selector": ".jet-slider__item a::attr(href), .jet-listing-grid__item a::attr(href), .elementor-widget-image a::attr(href), .elementor-widget-heading a::attr(href)"
+      }
+    ],
+    "last_update": "2026-07-31",
+    "frequency": "7d"
   }
 ]

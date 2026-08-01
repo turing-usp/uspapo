@@ -8,21 +8,90 @@
         "Acesso Rápido",
         "Última atualização em \\d{2}/\\d{2}/\\d{4}"
     ],
-    "poli.usp.br": [
-        "Localização\\s*Avenida Prof\\. Luciano Gualberto.*?Formando Engenheiros e Líderes\\s*© \\d{4} Escola Politécnica da USP\\s*Menu Acesso Rápido",
-        "CEP – 05508-010 – São Paulo – SP",
-        "Contato\\s*Entre em contato conosco pelo e-mail comunicacao\\.poli@usp\\.br",
-        "MENU AVISOS\\s*Para divulgar, escreva para:\\s*comunicacao\\.poli@usp\\.br",
-        "Para divulgar, escreva para:\\s*comunicacao\\.poli@usp\\.br",
-        "Equipe de imprensa da Poli-USP.*?Dúvidas e sugestões, entre em contato\\.",
-        "Acesse a página com os vídeos produzidos na Poli-USP:\\s*Clique aqui\\.",
-        "A Escola Politécnica é composta por mais de 8 mil pessoas.*?Acesse a página com os vídeos produzidos na Poli-USP: Clique aqui\\.",
-        "Acompanhe a Poli nas redes sociais!",
-        "Acesse abaixo as redes sociais da Escola Politécnica da USP.*?Banco de imagens e fotos:.*?(?=\\n|$)"
+    "cepe.usp.br": [
+        "Centro de Práticas Esportivas da Universidade de São Paulo\\s*Praça 02, Prof\\. Rubião Meira, 61 – Cidade UniversitáriaSão Paulo, SP – CEP 05508 110\\s*cepeusp@usp\\.br",
+        "Siga nossas redes sociais!",
+        "Intranet",
+        "Infraestrutura\\s*1 - Portarias I & II\\s*2 - Conjunto Aquático\\s*3 - Estádio\\s*4 - Campos de Futebol\\s*5 - Campo de Futebol Areia\\s*6 - Espaço Multiúso/Nuri\\s*7 - Vestiários, Lanchonete\\s*8 - Pista de Atletismo\\s*9 - Velódromo\\s*10 - Quadras Externas\\s*11 - Quadras Cobertas\\s*12 - Quadras de Tênis\\s*13 - Raia Olímpica",
+        "Ouvidoria:Prof\\. Dr\\. Pascoal Tambucci – ouvicepe@usp\\.brO serviço de ouvidoria é somente para os casos não resolvidosno âmbito do setor competente\\."
+    ],
+    "eca.usp.br": [
+        "Assistência estudantil\\s*Sistema Júpiter USP\\s*Pró-Reitoria de Graduação",
+        "Serviço de Pós-graduação\\s*Grupos de pesquisa\\s*Auxílio ao Pesquisador",
+        "Av\\. Prof\\. Lúcio Martins Rodrigues, 443, Cidade Universitária.*?CEP:\\s*05508-020",
+        "Prédio Central \\(Prédio 1\\), 1º andar.*?São Paulo \\| SP \\| Brasil",
+        "Horário de atendimento:.*?E-mail:.*?(?=\\n|$)"
+    ],
+    "ee.usp.br": [
+        "Estamos usando cookies para oferecer a você a melhor experiência em nosso site\\..*?Manter esse cookie ativado nos ajuda a melhorar nosso site\\.",
+        "PresidenteProf\\..*?Manter esse cookie ativado nos ajuda a melhorar nosso site\\.",
+        "Escola de\\s*ENFERMAGEM\\s*Universidade de São Paulo\\s*Av\\. Dr\\. Enéas de Carvalho Aguiar, 419.*?(?=\\n|$)"
+    ],
+    "fau.usp.br": [
+        "Faculdade de Arquitetura e Urbanismo e de Design da USP",
+        "Edifício Vilanova Artigas",
+        "Rua do Lago, 876 – Cidade Universitária.*?(?=\\n|$)"
+    ],
+    "fea.usp.br": [
+        "Faculdade de Economia, Administração, Contabilidade e Atuária da USP"
+    ],
+    "fe.usp.br": [
+        "Av\\. da Universidade, 308 – São Paulo – SP CEP 05508-040.*?(?=\\n|$)",
+        "Faculdade de Educação Programa de Pós-Graduação em Educação"
+    ],
+    "fflch.usp.br": [
+        "Faculdade de Filosofia, Letras e Ciências Humanas",
+        "Comissão Unificada de Segurança e Qualidade de Vida",
+        "Direção da FFLCH Comissão de Graduação da FFLCH"
+    ],
+    "fm.usp.br": [
+        "Faculdade de Medicina da Universidade de São Paulo",
+        "(Facebook\\s*){2,}(Twitter\\s*){2,}(Instagram\\s*){2,}(YouTube\\s*){2,}(LinkedIn\\s*){2,}",
+        "Hospital das Clínicas \\(HCFMUSP\\)"
+    ],
+    "fsp.usp.br": [
+        "Faculdade de Saúde Pública da Universidade de São Paulo",
+        "Avenida Doutor Arnaldo, 715 - 01246-904 São Paulo SP Brasil.*?\\+55 11 3061-7760"
+    ],
+    "geografia.fflch.usp.br": [
+        "Endereço 2\\s*Departamento de Geografia Avenida Professor Lineu Prestes, 338 Cidade Universitária São Paulo - SP CEP 05508-000.*?Últimas visitas:"
     ],
     "ime.usp.br": [
-        "Anterior 1 ….*?Próximo",
-        "Previous 1 ….*?Next",
-        "Compartilhe"
-    ]
+    "Instituto de Matemática, Estatística e Ciência da Computação da Universidade de São Paulo",
+    "Compartilhe",
+    "Anterior\\s*\\d+\\s*…\\s*\\d+\\s*Próximo"
+    ],
+    "iq.usp.br": [
+        "Instituto de Química da Universidade de São Paulo – IQ-USP",
+        "Avenida Prof\\. Lineu Prestes, 748.*?(?=\\n|$)",
+        "Compartilhe",
+        "Seção Técnica de Informática.*?(?=\\n|$)"
+    ],
+    "poli.usp.br": [
+        "Escola Politécnica da Universidade de São Paulo",
+        "Avenida Prof\\. Luciano Gualberto.*?São Paulo \\| SP",
+        "Acompanhe a Poli nas redes sociais!"
+    ],
+    "direito.usp.br": [
+        "Faculdade de Direito - Universidade de São Paulo",
+        "Largo São Francisco.*?(?=\\n|$)",
+        "Programa de Pós-Graduação em Direito \\(PPGD\\)"
+    ],
+    "hu.usp.br": [
+        "Hospital Universitário da Universidade de São Paulo",
+        "Pesquisar\\s*Últimos textos.*?(?=\\n|$)"
+    ],
+    "ib.usp.br": [
+        "Instituto de Biociências – USP",
+        "Rua do Matão.*?(?=\\n|$)",
+        "CNPJ: 63\\.025\\.530/0004-57"
+    ],
+    "icb.usp.br": [
+        "Instituto de Ciências Biomédicas da Universidade de São Paulo",
+        "Av\\. Prof\\. Lineu Prestes, nº 2415 – Butantã – São Paulo/SP"
+    ],
+    "if.usp.br": [
+        "Instituto de Física da Universidade de São Paulo",
+        "Acesso Rápido: Docentes \\| Alunos \\| Funcionários \\| Visitantes \\| Notícias Destaque"
+  ]
 }

@@ -80,6 +80,14 @@ def rodar_pipeline():
             json.dump(configs, f, indent=2, ensure_ascii=False)
         print("\n[OK] scrapers_config.json atualizado com as novas datas.")
 
+        '''
+        # --- MODO LABORATÓRIO ATIVADO ---
+        print("\n" + "="*50)
+        print(" [MODO LABORATÓRIO] HIGIENIZAÇÃO E VETORIZAÇÃO PAUSADAS")
+        print(" Os arquivos brutos estão prontos na pasta data/raw/ para inspeção.")
+        print("="*50)
+        '''
+        
         print("\n" + "="*50)
         print(" INICIANDO HIGIENIZAÇÃO (Clean Data)")
         print("="*50)
@@ -104,6 +112,7 @@ def rodar_pipeline():
                 print(f"[ERRO] O script build_vector.py falhou: {e}")
         else:
             print(f"[AVISO] Script {build_vector_script} não encontrado.")
+        
     else:
         print("\n[INFO] Nenhuma atualização necessária hoje. Sistema inativo.")
 
