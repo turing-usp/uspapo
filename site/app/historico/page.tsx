@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { listarConversas, apagarConversa, alternarFavorita, renomearConversa, type Conversa } from "@/lib/conversas";
+import { listarConversas, apagarConversa, alternarFavorita, renomearConversa, gerarTitulo, LIMITE_FAVORITAS, LIMITE, type Conversa } from "@/lib/conversas";
 import { MenuConversa } from "@/components/MenuConversa";
 
 type Grupo = { rotulo: string; conversas: Conversa[] };
@@ -126,8 +126,29 @@ export default function Historico() {
     };
   }, [pendente]);
 
+  const buscaRef = useRef<HTMLInputElement>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  useEffect(() => {
+    const aoTeclar = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        buscaRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", aoTeclar);
+    return () => document.removeEventListener("keydown", aoTeclar);
+  }, []);
+
+  const mostrarAviso = (texto: string) => {
+    setAviso(texto);
+    setTimeout(() => setAviso(null), 4000);
+  };
+
+  const naoFavoritas = conversas.filter((c) => !c.favorita).length;
+
   return (
-    <div className="app-container-chat flex flex-1 flex-col pt-8 pb-[max(4rem,env(safe-area-inset-bottom))]">
+    <div className="app-container-chat flex flex-1 flex-col pt-8 pb-[max(6rem,env(safe-area-inset-bottom))]">
       <div className="flex items-center mb-2">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-7 h-7 text-[#ffffff]">
             <circle cx="12" cy="12" r="10" strokeWidth="2" fill="none" />
@@ -135,16 +156,37 @@ export default function Historico() {
         </svg>
         <p className="font-geom text-2xl sm:text-3xl ml-3">Histórico de conversas</p>
       </div>
-      <p className="text-[#AEB8CF] ml-3 mb-4">Retome suas perguntas anteriores e continue de onde parou</p>
-      <div className="glass w-full rounded-[2rem] mb-8">
+      <p className="text-[#AEB8CF] mb-4">Retome suas perguntas anteriores e continue de onde parou</p>
+      <p className="text-[#AEB8CF]/70 text-xs mt-2 mb-5">
+        Suas conversas ficam salvas apenas neste dispositivo.
+      </p>
+
+      {naoFavoritas >= LIMITE * 0.9 && (
+        <div className="flex items-start gap-3 p-3 mb-5 rounded-xl glass">
+          <span className="text-[#f1863d] shrink-0">⚠</span>
+          <p className="text-[#AEB8CF] text-sm">
+            Você tem {naoFavoritas} de {LIMITE} conversas salvas. As mais antigas serão
+            removidas automaticamente — favorite as que quiser manter.
+          </p>
+        </div>
+      )}
+
+      <div className="glass w-full rounded-[2rem] mb-2">
         <input
           type="text"
+          ref={buscaRef}
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar nas conversas"
+          placeholder="Buscar nas conversas (Ctrl+K)"
           className="relative w-full h-14 px-5 rounded-[2rem] bg-transparent text-white text-base placeholder:text-[#AEB8CF] border-[0.15rem] border-white/25 focus:border-[#f1863d] focus:outline-none transition-colors"
         />
       </div>
+
+      {busca.trim() && (
+        <p className="text-[#AEB8CF] text-sm mt-3 mb-2">
+          {filtradas.length} {filtradas.length === 1 ? "conversa encontrada" : "conversas encontradas"}
+        </p>
+      )}
 
       {carregando ? null : filtradas.length === 0 ? (
         <div className="text-center py-16">
@@ -164,7 +206,14 @@ export default function Historico() {
         <div>
           {filtradasAgrupadas.map((grupo) => (
             <div key={grupo.rotulo} className="mb-6">
-              <p className="text-[#AEB8CF] text-sm font-medium mb-3">{grupo.rotulo}</p>
+              <p className="text-[#AEB8CF] text-sm font-medium my-3">
+                {grupo.rotulo}
+                {grupo.rotulo === "Favoritas" && (
+                  <span className="text-[#AEB8CF]/60 text-xs ml-2">
+                    {grupo.conversas.length}/{LIMITE_FAVORITAS}
+                  </span>
+                )}
+              </p>
               <ul className="flex flex-col gap-3">
                 {grupo.conversas.map((conversa) => {
                   return (
@@ -209,9 +258,16 @@ export default function Historico() {
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 z-30">
                             <MenuConversa
                               favorita={!!conversa.favorita}
-                              onFavoritar={() => { alternarFavorita(conversa.id); setConversas(listarConversas()); }}
+                              onFavoritar={() => {
+                                const ok = alternarFavorita(conversa.id);
+                                if (!ok) {
+                                  mostrarAviso(`Limite de ${LIMITE_FAVORITAS} favoritas atingido. Remova uma para adicionar outra.`);
+                                  return;
+                                }
+                                setConversas(listarConversas());
+                              }}
                               onRenomear={() => iniciarEdicao(conversa)}
-                              onApagar={() => { apagarComDesfazer(conversa); }}
+                              onApagar={() => apagarComDesfazer(conversa)}
                             />
                         </div>
 
@@ -229,6 +285,13 @@ export default function Historico() {
                               </div>
                             </div>
                           )}
+
+                        {aviso && !pendente && (
+                          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl glass">
+                            <span className="text-white text-sm">{aviso}</span>
+                          </div>
+                        )}
+
                       </>
                     )}
                     </li>

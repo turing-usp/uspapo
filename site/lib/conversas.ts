@@ -10,7 +10,8 @@ export type Conversa = {
 };
 
 const CHAVE = "uspapo:conversas";
-const LIMITE = 20;
+export const LIMITE = 20;
+export const LIMITE_FAVORITAS = 5;
 
 function ler(): Conversa[] {
   if (typeof window === "undefined") return [];
@@ -40,9 +41,13 @@ export function obterConversa(id: string): Conversa | null {
 }
 
 export function salvarConversa(conversa: Conversa): void {
-  const conversas = ler().filter((c) => c.id !== conversa.id);
-  conversas.unshift(conversa);
-  escrever(conversas.slice(0, LIMITE));
+  const outras = ler().filter((c) => c.id !== conversa.id);
+  const todas = [conversa, ...outras];
+
+  const favoritas = todas.filter((c) => c.favorita);
+  const naoFavoritas = todas.filter((c) => !c.favorita);
+
+  escrever([...favoritas, ...naoFavoritas.slice(0, LIMITE)]);
 }
 
 export function apagarConversa(id: string): void {
@@ -54,12 +59,23 @@ export function gerarTitulo(primeiraPergunta: string): string {
   return limpo.length > 50 ? limpo.slice(0, 50) + "..." : limpo;
 }
 
-export function alternarFavorita(id: string): void {
+export function alternarFavorita(id: string): boolean {
   const conversas = ler();
   const alvo = conversas.find((c) => c.id === id);
-  if (!alvo) return;
+  if (!alvo) return false;
+
+  if (!alvo.favorita) {
+    const total = conversas.filter((c) => c.favorita).length;
+    if (total >= LIMITE_FAVORITAS) return false;
+  }
+
   alvo.favorita = !alvo.favorita;
   escrever(conversas);
+  return true;
+}
+
+export function contarNaoFavoritas(): number {
+  return ler().filter((c) => !c.favorita).length;
 }
 
 export function renomearConversa(id: string, novoTitulo: string): void {
