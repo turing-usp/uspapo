@@ -1,5 +1,5 @@
+import AppShell from "../../components/AppShell";
 import Navbar from "../../components/navbar";
-import Leftmenu from "../../components/leftmenu";
 
 export default function AppLayout({
   children,
@@ -7,10 +7,10 @@ export default function AppLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <>
+      <AppShell>
         <Navbar />
-        <Leftmenu />
+        <div aria-hidden className="page-fade-b" />
         {children}
-    </>
+      </AppShell>
   )
 }

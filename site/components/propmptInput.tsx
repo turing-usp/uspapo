@@ -1,31 +1,74 @@
-import Image from "next/image";
+"use client";
+import { useLayoutEffect, useRef } from "react";
+
+/* Cresce até aqui e depois rola por dentro. */
+const ALTURA_MAXIMA = "40vh";
 
 export default function PromptInput({ value, onChange, onSubmit }: { value: string; onChange: (value: string) => void; onSubmit: (e: React.SyntheticEvent) => void; }) {
+  const campoRef = useRef<HTMLTextAreaElement>(null);
+
+  /* Auto-resize: zera a altura para o scrollHeight refletir só o conteúdo. */
+  useLayoutEffect(() => {
+    const el = campoRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+
+  const aoTeclar = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    /* isComposing: não roubar o Enter de quem está montando um caractere no IME. */
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      onSubmit(e);
+    }
+  };
+
+  const temTexto = value.trim().length > 0;
+
   return (
-    <form onSubmit={onSubmit} className="relative flex justify-center items-center w-full">
-      <div className="glass w-full rounded-[2rem]">
-        <button type="button" className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 z-10 text-[#f1863d] text-3xl md:text-4xl leading-none hover:cursor-pointer">
-          ＋
+    <form onSubmit={onSubmit} className="w-full">
+      {/* items-end mantém os botões na base conforme o campo cresce. */}
+      <div className="glass glass-brand flex items-end gap-1 w-full p-2 rounded-[1.75rem]">
+        <button
+          type="button"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand cursor-pointer"
+          aria-label="Anexar arquivo"
+        >
+          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m-7-7h14" />
+          </svg>
         </button>
-        <input
+
+        <textarea
+          ref={campoRef}
+          rows={1}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="relative bg-transparent text-white text-base md:text-lg pl-13 pr-12 md:pl-16 md:pr-14 w-full h-14 rounded-[2rem] border-[0.15rem] border-[#f1863d] placeholder:text-[#AEB8CF] focus:outline-none"
+          onKeyDown={aoTeclar}
+          /* text-[1rem] e não text-base: abaixo de 16px o iOS dá zoom ao focar. */
+          className="min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent py-2.5 text-[1rem] md:text-lg leading-6 text-foreground caret-brand placeholder:text-muted-foreground focus:outline-none"
+          style={{ maxHeight: ALTURA_MAXIMA }}
           placeholder="Pesquise sobre a USP"
         />
+
         <button
-          type={value.trim() ? "submit" : "button"}
-          className="absolute right-4 top-1/2 -translate-y-1/2 hover:cursor-pointer z-10"
-          aria-label={value.trim() ? "Enviar pergunta" : "Falar"}
+          type={temTexto ? "submit" : "button"}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand cursor-pointer"
+          aria-label={temTexto ? "Enviar pergunta" : "Falar"}
         >
-          {value.trim() ? (
-            <span className="flex items-center justify-center w-9 h-9 rounded-full bg-[#f1863d] hover:bg-[#f1863d]/85 transition-colors">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          {temTexto ? (
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-brand-foreground transition-colors hover:bg-brand-strong">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m0 0l-6 6m6-6l6 6" />
               </svg>
             </span>
           ) : (
-            <Image src="/mic.png" alt="" width={20} height={20} />
+            <span className="text-muted-foreground transition-colors hover:text-brand">
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18 11a6 6 0 0 1-12 0M12 17v4m-3 0h6" />
+              </svg>
+            </span>
           )}
         </button>
       </div>

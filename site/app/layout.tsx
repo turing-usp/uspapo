@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Orbitron, Geom, Roboto} from "next/font/google";
 import "./globals.css";
-import Navbar from "../components/navbar";
-import Leftmenu from "../components/leftmenu";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,8 +35,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#03042c",
-  viewportFit: "cover",
+  /* Espelha --base do globals.css nos dois esquemas. */
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#dde4f6" },
+    { media: "(prefers-color-scheme: dark)", color: "#03042c" },
+  ],
 };
 
 export default function RootLayout({
@@ -52,7 +53,7 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable} ${geom.variable} ${roboto.variable} h-full antialiased`}
     >
-    <body className="min-h-full flex flex-col">
+    <body className="h-full">
       {children}
     </body>
     </html>

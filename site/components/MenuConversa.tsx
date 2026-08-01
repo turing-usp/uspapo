@@ -43,7 +43,7 @@ export function MenuConversa({ favorita, onFavoritar, onRenomear, onApagar }: Pr
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAberto((v) => !v); }}
         aria-label="Ações da conversa"
         aria-expanded={aberto}
-        className="p-2 rounded-lg text-[#AEB8CF] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+        className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-tint/10 transition-colors cursor-pointer"
       >
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
           <circle cx="5" cy="12" r="1.8" />
@@ -53,14 +53,14 @@ export function MenuConversa({ favorita, onFavoritar, onRenomear, onApagar }: Pr
       </button>
 
       {aberto && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-44 py-1 rounded-xl bg-[#0a0d3c] border border-white/15 shadow-2xl">
-          <button onClick={acao(onFavoritar)} className="w-full text-left px-4 py-2.5 text-sm text-[#AEB8CF] hover:text-white hover:bg-white/5 transition-colors cursor-pointer">
+        <div className="absolute right-0 top-full mt-1 z-50 w-44 py-1 rounded-xl bg-surface-raised border border-line/15 shadow-2xl">
+          <button onClick={acao(onFavoritar)} className="w-full text-left px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-tint/5 transition-colors cursor-pointer">
             {favorita ? "Remover dos favoritos" : "Favoritar"}
           </button>
-          <button onClick={acao(onRenomear)} className="w-full text-left px-4 py-2.5 text-sm text-[#AEB8CF] hover:text-white hover:bg-white/5 transition-colors cursor-pointer">
+          <button onClick={acao(onRenomear)} className="w-full text-left px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-tint/5 transition-colors cursor-pointer">
             Renomear
           </button>
-          <button onClick={acao(onApagar)} className="w-full text-left px-4 py-2.5 text-sm text-[#AEB8CF] hover:text-red-400 hover:bg-white/5 transition-colors cursor-pointer">
+          <button onClick={acao(onApagar)} className="w-full text-left px-4 py-2.5 text-sm text-muted-foreground hover:text-danger hover:bg-tint/5 transition-colors cursor-pointer">
             Apagar
           </button>
         </div>

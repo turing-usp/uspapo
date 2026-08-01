@@ -1,10 +1,18 @@
 "use client";
-import React, { useState} from "react";
+import React, { useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
 
+/* Estável de propósito: o useSyncExternalStore abaixo não observa nada. */
+const assinarNada = () => () => {};
+
 export default function LeftMenu() {
   const [isOpen, setIsOpen] = useState(false);
+  /* O portal precisa do document, que não existe no render do servidor.
+     useSyncExternalStore dá "já hidratou?" sem setState dentro de efeito
+     e sem divergência de hidratação: false no servidor, true no cliente. */
+  const montado = useSyncExternalStore(assinarNada, () => true, () => false);
 
   // Espelha o breakpoint md do Tailwind (48rem) em vez de repetir 768px em px.
   const fecharSeMobile = () => {
@@ -13,47 +21,52 @@ export default function LeftMenu() {
 
   return (
     <>
-      {/* Botão para abrir o menu (exibido no canto superior esquerdo quando a barra lateral está fechada) */}
-      {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="fixed top-3 left-3 md:top-3.5 md:left-4 z-50 p-2.5 rounded-xl bg-[#0a0d3c]/80 text-[#AEB8CF] hover:text-[#f1863d] border border-white/10 hover:border-[#f1863d]/50 backdrop-blur-md transition-all shadow-lg cursor-pointer flex items-center justify-center group"
-          aria-label="Abrir menu lateral"
-          title="Abrir menu"
+      <button
+        onClick={() => setIsOpen(true)}
+        className={`shrink-0 touch-manipulation glass rounded-xl p-2.5 text-muted-foreground hover:text-brand transition cursor-pointer flex items-center justify-center group ${
+          isOpen ? "opacity-0 duration-150" : "opacity-100 duration-200 delay-300"
+        }`}
+        aria-label="Abrir menu lateral"
+        aria-expanded={isOpen}
+        title="Abrir menu"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={2}
+          stroke="currentColor"
+          className="w-6 h-6 transition-transform group-hover:scale-110"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-            className="w-6 h-6 transition-transform group-hover:scale-110"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-            />
-          </svg>
-        </button>
-      )}
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+          />
+        </svg>
+      </button>
 
-      {/* Fundo escuro para fechar no celular ao clicar fora */}
-      {isOpen && (
-        <div
-          onClick={() => setIsOpen(false)}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity"
-        />
-      )}
+      {montado && createPortal(
+        <>
+      {/* Fundo escuro para fechar no celular ao clicar fora. Pelo mesmo motivo
+          do botão, some junto com o painel em vez de sumir de uma vez. */}
+      <div
+        onClick={() => setIsOpen(false)}
+        aria-hidden
+        className={`fixed inset-0 bg-scrim/60 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300 ${
+          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      />
 
       {/* Painel da Barra Lateral */}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 md:w-72 bg-[#050738]/95 backdrop-blur-xl border-r border-white/10 z-50 flex flex-col p-4 shadow-2xl transition-transform duration-300 ease-in-out ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
+        aria-hidden={!isOpen}
+        className={`fixed top-0 left-0 h-dvh w-64 md:w-72 glass glass-panel border-r border-line/10 z-50 flex flex-col p-4 transition-transform duration-300 ease-in-out ${
+          isOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
         }`}
       >
         {/* Cabeçalho do Menu com o Logo da USPapo ao lado do nome e o Botão 'X' para fechar */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+        <div className="flex items-center justify-between pb-4 border-b border-line/10">
           <div className="flex items-center gap-2.5">
             <Image
               src="/logo.svg"
@@ -61,13 +74,13 @@ export default function LeftMenu() {
               width={32}
               height={32}
             />
-            <span className="font-geom text-xl text-[#f1863d] font-bold">
+            <span className="font-geom text-xl text-brand font-bold">
               USPapo
             </span>
           </div>
           <button
             onClick={() => setIsOpen(false)}
-            className="p-1.5 rounded-lg text-[#AEB8CF] hover:text-[#f1863d] hover:bg-white/5 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-brand hover:bg-tint/5 transition-colors cursor-pointer"
             aria-label="Fechar menu lateral"
             title="Fechar menu"
           >
@@ -93,7 +106,7 @@ export default function LeftMenu() {
           <Link
             href="/"
             onClick={fecharSeMobile}
-            className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-[#AEB8CF] hover:text-white hover:bg-[#f1863d]/15 border border-transparent hover:border-[#f1863d]/30 transition-all cursor-pointer group"
+            className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-muted-foreground hover:text-foreground hover:bg-brand/15 border border-transparent hover:border-brand/30 transition-all cursor-pointer group"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -101,7 +114,7 @@ export default function LeftMenu() {
               viewBox="0 0 24 24"
               strokeWidth={2}
               stroke="currentColor"
-              className="w-5 h-5 text-[#f1863d] group-hover:scale-110 transition-transform"
+              className="w-5 h-5 text-brand group-hover:scale-110 transition-transform"
             >
               <path
                 strokeLinecap="round"
@@ -115,7 +128,7 @@ export default function LeftMenu() {
           <Link
             href="/historico"
             onClick={fecharSeMobile}
-            className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-[#AEB8CF] hover:text-white hover:bg-[#f1863d]/15 border border-transparent hover:border-[#f1863d]/30 transition-all cursor-pointer group text-left w-full"
+            className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-muted-foreground hover:text-foreground hover:bg-brand/15 border border-transparent hover:border-brand/30 transition-all cursor-pointer group text-left w-full"
           >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -123,7 +136,7 @@ export default function LeftMenu() {
                 viewBox="0 0 24 24"
                 strokeWidth={2}
                 stroke="currentColor"
-                className="w-5 h-5 text-[#f1863d] group-hover:scale-110 transition-transform"
+                className="w-5 h-5 text-brand group-hover:scale-110 transition-transform"
               >
                 <path
                   strokeLinecap="round"
@@ -138,7 +151,7 @@ export default function LeftMenu() {
 
           <button
             onClick={fecharSeMobile}
-            className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-[#AEB8CF] hover:text-white hover:bg-[#f1863d]/15 border border-transparent hover:border-[#f1863d]/30 transition-all cursor-pointer group text-left w-full"
+            className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-muted-foreground hover:text-foreground hover:bg-brand/15 border border-transparent hover:border-brand/30 transition-all cursor-pointer group text-left w-full"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -146,7 +159,7 @@ export default function LeftMenu() {
               viewBox="0 0 24 24"
               strokeWidth={2}
               stroke="currentColor"
-              className="w-5 h-5 text-[#f1863d] group-hover:rotate-90 transition-transform duration-500"
+              className="w-5 h-5 text-brand group-hover:rotate-90 transition-transform duration-500"
             >
               <path
                 strokeLinecap="round"
@@ -163,6 +176,9 @@ export default function LeftMenu() {
           </button>
         </nav>
       </aside>
+        </>,
+        document.body,
+      )}
     </>
   );
 }

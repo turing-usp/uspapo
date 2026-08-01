@@ -148,55 +148,57 @@ export default function Historico() {
   const naoFavoritas = conversas.filter((c) => !c.favorita).length;
 
   return (
-    <div className="app-container-chat flex flex-1 flex-col pt-8 pb-[max(6rem,env(safe-area-inset-bottom))]">
+    <>
+    <div className="app-scroll">
+    <div className="app-container-chat flex min-h-full flex-col pt-8 pb-24">
       <div className="flex items-center mb-2">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-7 h-7 text-[#ffffff]">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-7 h-7 text-foreground">
             <circle cx="12" cy="12" r="10" strokeWidth="2" fill="none" />
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 2" />
         </svg>
         <p className="font-geom text-2xl sm:text-3xl ml-3">Histórico de conversas</p>
       </div>
-      <p className="text-[#AEB8CF] mb-4">Retome suas perguntas anteriores e continue de onde parou</p>
-      <p className="text-[#AEB8CF]/70 text-xs mt-2 mb-5">
+      <p className="text-muted-foreground mb-4">Retome suas perguntas anteriores e continue de onde parou</p>
+      <p className="text-faint-foreground text-xs mt-2 mb-5">
         Suas conversas ficam salvas apenas neste dispositivo.
       </p>
 
       {naoFavoritas >= LIMITE * 0.9 && (
         <div className="flex items-start gap-3 p-3 mb-5 rounded-xl glass">
-          <span className="text-[#f1863d] shrink-0">⚠</span>
-          <p className="text-[#AEB8CF] text-sm">
+          <span className="text-brand shrink-0">⚠</span>
+          <p className="text-muted-foreground text-sm">
             Você tem {naoFavoritas} de {LIMITE} conversas salvas. As mais antigas serão
             removidas automaticamente — favorite as que quiser manter.
           </p>
         </div>
       )}
 
-      <div className="glass w-full rounded-[2rem] mb-2">
+      <div className="glass glass-field w-full rounded-[1.75rem] mb-2">
         <input
           type="text"
           ref={buscaRef}
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           placeholder="Buscar nas conversas (Ctrl+K)"
-          className="relative w-full h-14 px-5 rounded-[2rem] bg-transparent text-white text-base placeholder:text-[#AEB8CF] border-[0.15rem] border-white/25 focus:border-[#f1863d] focus:outline-none transition-colors"
+          className="w-full h-14 px-5 rounded-[1.75rem] border-0 bg-transparent text-foreground text-[1rem] caret-brand placeholder:text-muted-foreground focus:outline-none"
         />
       </div>
 
       {busca.trim() && (
-        <p className="text-[#AEB8CF] text-sm mt-3 mb-2">
+        <p className="text-muted-foreground text-sm mt-3 mb-2">
           {filtradas.length} {filtradas.length === 1 ? "conversa encontrada" : "conversas encontradas"}
         </p>
       )}
 
       {carregando ? null : filtradas.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-[#AEB8CF] mb-4">
+          <p className="text-muted-foreground mb-4">
             {busca ? "Nenhuma conversa encontrada." : "Você ainda não tem conversas salvas."}
           </p>
           {!busca && (
             <Link
               href="/"
-              className="inline-block px-6 py-2.5 rounded-2xl border border-[#f1863d] text-[#f1863d] hover:bg-[#f1863d]/10 transition-colors"
+              className="inline-block px-6 py-2.5 rounded-2xl border border-brand text-brand hover:bg-brand/10 transition-colors"
             >
               Começar uma conversa
             </Link>
@@ -206,10 +208,10 @@ export default function Historico() {
         <div>
           {filtradasAgrupadas.map((grupo) => (
             <div key={grupo.rotulo} className="mb-6">
-              <p className="text-[#AEB8CF] text-sm font-medium my-3">
+              <p className="text-muted-foreground text-sm font-medium my-3">
                 {grupo.rotulo}
                 {grupo.rotulo === "Favoritas" && (
-                  <span className="text-[#AEB8CF]/60 text-xs ml-2">
+                  <span className="text-faint-foreground text-xs ml-2">
                     {grupo.conversas.length}/{LIMITE_FAVORITAS}
                   </span>
                 )}
@@ -229,26 +231,26 @@ export default function Historico() {
                             if (e.key === "Enter") confirmarEdicao();
                             if (e.key === "Escape") setEditandoId(null);
                           }}
-                          className="flex-1 min-w-0 bg-transparent text-white text-base sm:text-lg border-b border-[#f1863d] focus:outline-none"
+                          className="flex-1 min-w-0 bg-transparent text-foreground text-base sm:text-lg border-b border-brand focus:outline-none"
                         />
                       </div>
                     ) : (
                       <>
                         <Link
                             href={`/chat/${conversa.id}`}
-                            className="group flex items-start gap-4 p-4 pl-5 pr-14 rounded-2xl overflow-hidden glass hover:bg-[#000000]/20 transition-colors"
+                            className="group flex items-start gap-4 p-4 pl-5 pr-14 rounded-2xl overflow-hidden glass hover:bg-scrim/20 transition-colors"
                         >
                             <span
                             aria-hidden
                             className={`absolute inset-y-0 left-0 w-1 transition-colors ${
                                 conversa.favorita
-                                ? "bg-[#f1863d]"
+                                ? "bg-brand"
                                 : "bg-transparent"
                             }`}
                             />
                             <div className="min-w-0">
-                            <p className="text-white text-base sm:text-lg truncate">{conversa.titulo}</p>
-                            <p className="text-[#AEB8CF] text-sm mt-1">
+                            <p className="text-foreground text-base sm:text-lg truncate">{conversa.titulo}</p>
+                            <p className="text-muted-foreground text-sm mt-1">
                                 {formatarData(conversa.criadoEm)} · {conversa.mensagens.length}{" "}
                                 {conversa.mensagens.length === 1 ? "pergunta" : "perguntas"}
                             </p>
@@ -275,11 +277,11 @@ export default function Historico() {
                             <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl glass overflow-hidden">
                               <div
                                 key={pendente.id}
-                                className="h-1 w-full bg-[#f1863d] origin-left animate-[encolher_6s_linear_forwards]"
+                                className="h-1 w-full bg-brand origin-left animate-[encolher_6s_linear_forwards]"
                               />
                               <div className="flex items-center gap-4 px-5 py-3">
-                                <span className="text-white text-sm">Conversa apagada</span>
-                                <button onClick={desfazer} className="text-[#f1863d] text-sm font-medium hover:underline cursor-pointer">
+                                <span className="text-foreground text-sm">Conversa apagada</span>
+                                <button onClick={desfazer} className="text-brand text-sm font-medium hover:underline cursor-pointer">
                                   Desfazer
                                 </button>
                               </div>
@@ -288,7 +290,7 @@ export default function Historico() {
 
                         {aviso && !pendente && (
                           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl glass">
-                            <span className="text-white text-sm">{aviso}</span>
+                            <span className="text-foreground text-sm">{aviso}</span>
                           </div>
                         )}
 
@@ -302,5 +304,10 @@ export default function Historico() {
         </div>
       )}
     </div>
+    </div>
+    {/* Mesmo dissolvido do chat: a lista some no fundo em vez de ser cortada
+        na borda da área de scroll. Sem composer, é só o rabo de 2.5rem. */}
+    <div aria-hidden className="page-fade-t" />
+    </>
   );
 }

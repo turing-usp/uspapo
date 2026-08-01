@@ -1,3 +1,4 @@
+import { novoId } from "./conversas";
 // lib/stream.ts
 import type { Mensagem } from "@/lib/conversas";
 
@@ -74,12 +75,12 @@ export function obterIdDispositivo(): string {
   try {
     idDispositivo = localStorage.getItem(CHAVE_DISPOSITIVO) ?? "";
     if (!idDispositivo) {
-      idDispositivo = crypto.randomUUID();
+      idDispositivo = novoId();
       localStorage.setItem(CHAVE_DISPOSITIVO, idDispositivo);
     }
   } catch {
     /* Navegação privada pode bloquear o storage... */
-    idDispositivo = idDispositivo || crypto.randomUUID();
+    idDispositivo = idDispositivo || novoId();
   }
 
   return idDispositivo;

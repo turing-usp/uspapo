@@ -13,6 +13,7 @@ import {
     type StatusStream,
 } from "@/lib/stream";
 import { UserBubble } from "@/components/UserBubble";
+import { useAlturaPublicada } from "@/lib/janela";
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useEffect, useRef } from "react";
@@ -30,6 +31,10 @@ export default function ChatPage() {
     const [status, setStatus] = useState<StatusStream>(STATUS_INICIAL);
     const jaProcessouInicial = useRef(false);
     const fimDasMensagensRef = useRef<HTMLDivElement>(null);
+    const composerRef = useRef<HTMLDivElement>(null);
+
+    /* O fade atrás do composer precisa saber onde ele começa. */
+    useAlturaPublicada(composerRef, "--composer-h");
 
     const completarResposta = async (texto: string, anteriores: Mensagem[]) => {
         setRespondendo(true);
@@ -152,8 +157,9 @@ export default function ChatPage() {
 
   return (
     <>
-        <div className="flex flex-1 flex-col">
-        <div className="flex-1">
+        {/* Só as mensagens rolam. Navbar e composer são irmãos fixos do shell,
+            então nada se desloca quando o teclado abre. */}
+        <div className="app-scroll">
             {historico.map((item, index) => {
             const streamando = respondendo && streaming && index === historico.length - 1;
             const semTexto = item.bot === PENDENTE;
@@ -175,18 +181,20 @@ export default function ChatPage() {
             })}
             <div ref={fimDasMensagensRef} />
         </div>
-        <div className="sticky bottom-0 z-20 pt-8 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <div
-                aria-hidden
-                className="pointer-events-none absolute inset-0 -z-10 page-fade-t"
-            />
+        {/* Dissolve as mensagens que chegam no composer. Fica fora do wrapper
+            abaixo para compartilhar a caixa da casca; a altura vem do
+            --composer-h publicado pelo useAlturaPublicada. */}
+        <div aria-hidden className="page-fade-t" />
+        <div
+            ref={composerRef}
+            className="relative z-30 flex-none pt-8 pb-4"
+        >
             <div className="app-container-chat">
                 <PromptInput value={pergunta} onChange={setPergunta} onSubmit={lidarComEnvio} />
-                <p className="mt-2 text-center text-sm text-[#AEB8CF] text-balance">
+                <p className="mt-2 text-center text-sm text-muted-foreground text-balance">
                     O uspapo é uma IA e pode cometer erros. Sempre confirme as informações com fontes oficiais.
                 </p>
             </div>
-        </div>
         </div>
     </>
   );

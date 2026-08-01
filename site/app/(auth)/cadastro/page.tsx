@@ -35,13 +35,10 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="bg relative min-h-screen w-full h-screen flex items-center justify-center overflow-hidden text-white px-4 py-8">
-      {/* Background visual decorativo (luzes/gradientes radiais em camadas) */}
-      <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+    <main className="flex min-h-full w-full items-center justify-center px-4 py-8 text-foreground">
 
       {/* Container principal do formulário */}
-      <div className="w-full max-w-md z-10 flex flex-col items-center">
+      <div className="w-full max-w-md flex flex-col items-center">
         <div className="mb-6 flex items-center justify-center">
           {
             <Image
@@ -52,7 +49,7 @@ export default function RegisterPage() {
         </div>
 
         {/* Título da Página */}
-        <h1 className="text-xl md:text-2 font-geom text-slate-100 mb-8 tracking-wide text-center">
+        <h1 className="text-xl md:text-2xl font-geom text-foreground mb-8 tracking-wide text-center">
           Crie a sua conta
         </h1>
 
@@ -60,9 +57,9 @@ export default function RegisterPage() {
         <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
           
           {/* INPUT 1: Nome Completo */}
-          <div className="glass relative w-full rounded-full">
+          <div className="glass glass-field relative w-full rounded-full">
             {/* PLACEHOLDER ÍCONE ESQUERDA: Usuário */}
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted-foreground">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
@@ -73,7 +70,7 @@ export default function RegisterPage() {
               placeholder="Nome completo"
               value={formData.fullName}
               onChange={handleChange}
-              className="w-full pl-12 pr-4 py-3 text-slate-100 placeholder-slate-400 rounded-full text-sm border border-transparent focus:outline-none focus:border-[#f58233] focus:ring-1 focus:ring-[#f58233] transition-all duration-200"
+              className="w-full pl-12 pr-4 py-3 rounded-full border-0 bg-transparent text-[1rem] text-foreground caret-brand placeholder:text-muted-foreground focus:outline-none"
             />
           </div>
 
@@ -81,9 +78,9 @@ export default function RegisterPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
             {/* INPUT 2: Data de Nascimento */}
-            <div className="glass rounded-full relative w-full">
+            <div className="glass glass-field rounded-full relative w-full">
               {/* PLACEHOLDER ÍCONE ESQUERDA: Calendário */}
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted-foreground">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
@@ -94,14 +91,14 @@ export default function RegisterPage() {
                 placeholder="DD/MM/AAAA"
                 value={formData.birthDate}
                 onChange={handleChange}
-                className="w-full pl-12 pr-4 py-3 text-slate-100 placeholder-slate-400 rounded-full text-sm border border-transparent focus:outline-none focus:border-[#f58233] focus:ring-1 focus:ring-[#f58233] transition-all duration-200"
+                className="w-full pl-12 pr-4 py-3 rounded-full border-0 bg-transparent text-[1rem] text-foreground caret-brand placeholder:text-muted-foreground focus:outline-none"
               />
             </div>
 
             {/* INPUT 3: Gênero */}
-            <div className="glass rounded-full relative w-full">
+            <div className="glass glass-field rounded-full relative w-full">
               {/* PLACEHOLDER ÍCONE ESQUERDA: Gênero / Usuário */}
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted-foreground">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
@@ -112,15 +109,15 @@ export default function RegisterPage() {
                 placeholder="Gênero"
                 value={formData.gender}
                 onChange={handleChange}
-                className="w-full pl-12 pr-4 py-3 text-slate-100 placeholder-slate-400 rounded-full text-sm border border-transparent focus:outline-none focus:border-[#f58233] focus:ring-1 focus:ring-[#f58233] transition-all duration-200"
+                className="w-full pl-12 pr-4 py-3 rounded-full border-0 bg-transparent text-[1rem] text-foreground caret-brand placeholder:text-muted-foreground focus:outline-none"
               />
             </div>
           </div>
 
           {/* INPUT 4: Usuário / E-mail */}
-          <div className="glass rounded-full relative w-full">
+          <div className="glass glass-field rounded-full relative w-full">
             {/* PLACEHOLDER ÍCONE ESQUERDA: Cadeado / Usuário */}
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted-foreground">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
@@ -131,13 +128,13 @@ export default function RegisterPage() {
               placeholder="Senha"
               value={formData.username}
               onChange={handleChange}
-              className="w-full pl-12 pr-4 py-3 text-slate-100 placeholder-slate-400 rounded-full text-sm border border-transparent focus:outline-none focus:border-[#f58233] focus:ring-1 focus:ring-[#f58233] transition-all duration-200"
+              className="w-full pl-12 pr-4 py-3 rounded-full border-0 bg-transparent text-[1rem] text-foreground caret-brand placeholder:text-muted-foreground focus:outline-none"
             />
             {/* BOTÃO MASCARAR/EXIBIR */}
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="cursor-pointer absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-200 focus:outline-none"
+              className="cursor-pointer absolute inset-y-0 right-0 pr-4 flex items-center text-muted-foreground hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand focus:outline-none"
             >
               {showPassword ? (
                 /* Ícone Olho Fechado (riscado) */
@@ -156,9 +153,9 @@ export default function RegisterPage() {
           </div>
 
           {/* INPUT 5: Confirmar Senha */}
-          <div className="glass rounded-full relative w-full">
+          <div className="glass glass-field rounded-full relative w-full">
             {/* PLACEHOLDER ÍCONE ESQUERDA: Cadeado */}
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted-foreground">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
@@ -169,13 +166,13 @@ export default function RegisterPage() {
               placeholder="Confirmar senha"
               value={formData.confirmPassword}
               onChange={handleChange}
-              className="w-full pl-12 pr-4 py-3 text-slate-100 placeholder-slate-400 rounded-full text-sm border border-transparent focus:outline-none focus:border-[#f58233] focus:ring-1 focus:ring-[#f58233] transition-all duration-200"
+              className="w-full pl-12 pr-4 py-3 rounded-full border-0 bg-transparent text-[1rem] text-foreground caret-brand placeholder:text-muted-foreground focus:outline-none"
             />
             {/* BOTÃO MASCARAR/EXIBIR */}
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="cursor-pointer absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-200 focus:outline-none"
+              className="cursor-pointer absolute inset-y-0 right-0 pr-4 flex items-center text-muted-foreground hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand focus:outline-none"
             >
               {showConfirmPassword ? (
                 /* Ícone Olho Fechado (riscado) */
@@ -203,10 +200,10 @@ export default function RegisterPage() {
                 onChange={handleChange}
                 className="sr-only peer"
               />
-              <div className="w-5 h-5 rounded-full border-2 border-[#f58233] flex items-center justify-center transition-all peer-checked:bg-transparent">
-                <div className={`w-2.5 h-2.5 rounded-full bg-[#f58233] transition-opacity duration-150 ${formData.isUspStudent ? 'opacity-100' : 'opacity-0'}`} />
+              <div className="w-5 h-5 rounded-full border-2 border-brand flex items-center justify-center transition-all peer-checked:bg-transparent">
+                <div className={`w-2.5 h-2.5 rounded-full bg-brand transition-opacity duration-150 ${formData.isUspStudent ? 'opacity-100' : 'opacity-0'}`} />
               </div>
-              <span className="ml-3 text-sm text-slate-200 select-none">
+              <span className="ml-3 text-sm text-muted-foreground select-none">
                 Sou aluno da USP
               </span>
             </label>
@@ -215,7 +212,7 @@ export default function RegisterPage() {
           {/* BOTÃO PRINCIPAL: Cadastrar */}
           <button
             type="submit"
-            className="cursor-pointer w-full py-3.5 mt-2 bg-[#f58233] hover:bg-[#e07125] text-white font-medium rounded-full text-base transition-colors duration-200 shadow-md hover:shadow-lg active:scale-[0.99]"
+            className="cursor-pointer w-full py-3.5 mt-2 bg-brand hover:bg-brand-strong text-brand-foreground font-medium rounded-full text-base transition-colors duration-200 shadow-md hover:shadow-lg active:scale-[0.99]"
           >
             Cadastrar
           </button>
@@ -223,9 +220,9 @@ export default function RegisterPage() {
 
         {/* DIVISOR DA OPÇÃO DE LOGIN SOCIAL */}
         <div className="w-full flex items-center my-6">
-          <div className="flex-1 border-t border-slate-600/60" />
-          <span className="px-4 text-l font-geom tracking-wider">OU</span>
-          <div className="flex-1 border-t border-slate-600/60" />
+          <div className="flex-1 border-t border-line/15" />
+          <span className="px-4 text-sm font-geom tracking-wider">OU</span>
+          <div className="flex-1 border-t border-line/15" />
         </div>
 
         {/* ========================================================= */}
@@ -233,7 +230,7 @@ export default function RegisterPage() {
         {/* ========================================================= */}
         <button
           type="button"
-          className="cursor-pointer w-full py-3 px-4 bg-white hover:bg-slate-50 text-slate-800 font-medium rounded-full text-sm flex items-center justify-center relative transition-all duration-200 border border-transparent focus:outline-none focus:border-[#f58233] focus:ring-2 focus:ring-[#f58233]"
+          className="cursor-pointer w-full py-3 px-4 bg-surface-raised hover:bg-surface text-foreground font-medium rounded-full text-sm flex items-center justify-center relative transition-colors duration-200 border border-line/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
           {/* Ícone Logo do Google */}
           <div className="absolute left-4 flex items-center justify-center">
@@ -264,11 +261,11 @@ export default function RegisterPage() {
         </button>
 
         {/* LINK FOOTER: Já possui conta */}
-        <p className="mt-8 text-sm text-slate-300">
+        <p className="mt-8 text-sm text-muted-foreground">
           Já possui uma conta?{' '}
           <a
             href="/login"
-            className="cursor-pointer text-[#f58233] font-medium hover:underline transition-colors"
+            className="cursor-pointer text-brand font-medium hover:underline transition-colors"
           >
             Entre
           </a>
