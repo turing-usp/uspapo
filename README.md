@@ -124,3 +124,51 @@ git log --oneline
 Respeite o trabalho dos colegas e evite sobrescrever código de outras pessoas.
 
 ---
+
+## 🧠 Backend (API do chat)
+
+O backend vive em `backend/` e responde ao site em `site/`. Antes de rodar, copie
+o `.env.example` da raiz para `.env` e preencha as chaves.
+
+```bash
+python backend/app_stub.py   # busca falsa, NÃO precisa de Pinecone
+python backend/app.py        # busca de verdade, precisa de PINECONE_API_KEY
+```
+
+Em produção (Render), o comando é:
+
+```bash
+gunicorn --chdir backend app:app
+```
+
+### Como o código está organizado
+
+Os dois arquivos acima são só entrypoints de ~30 linhas: a única coisa que muda
+entre eles é **qual conjunto de ferramentas** o modelo enxerga. Todo o resto está
+no pacote `backend/uspapo/` e é compartilhado.
+
+| Módulo | Do que cuida |
+| --- | --- |
+| `config.py` | lê o `.env` (uma vez só) e guarda as constantes de todo mundo |
+| `provedores.py` | a cadeia `LLM_PROVIDERS`, com queda para o próximo provedor |
+| `prompt.py` | o prompt de sistema, com a data de hoje |
+| `limites.py` | rate limit por aparelho (header `X-Device-Id`) |
+| `contexto.py` | orçamento de tokens e poda do histórico da conversa |
+| `conteudo.py` | separa `<think>`/`<tool_call>` do texto, token a token |
+| `toolcalls.py` | parsers de tool call inline e o coletor de cada rodada |
+| `conversa.py` | o motor: laço de ferramentas e fallback entre provedores |
+| `saida.py` | os eventos viram SSE ou o JSON legado |
+| `web.py` | `criar_app()`: CORS, `/chat` e `/health` |
+| `ferramentas/` | o registro, a busca no Pinecone e as ferramentas simuladas |
+
+**Para adicionar uma ferramenta nova**, escreva uma função decorada em
+`ferramentas/busca.py` (ou num módulo novo) e pronto — o schema fica junto da
+implementação e mais nada precisa mudar:
+
+```python
+@registro.ferramenta(nome="...", descricao="...", parametros={...})
+def minha_ferramenta(...) -> tuple[str, list[str]]:
+    """Devolve (texto para o modelo ler, lista de URLs consultadas)."""
+```
+
+---
