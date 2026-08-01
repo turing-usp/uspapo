@@ -114,9 +114,10 @@ def carregar_provedores() -> list[tuple[dict, OpenAI]]:
                 f"LLM_PROVIDERS[{posicao}] ('{nome}'): faltam os campos {faltando}."
             )
 
-        chave = cfg.get("api_key") or os.getenv(cfg.get("api_key_env") or "", "")
+        # A chave vem inteira aqui dentro: nada de apontar para outra variável.
+        chave = str(cfg.get("api_key") or "").strip()
         if not chave:
-            print(f"   [!] provedor '{nome}' ignorado: sem chave de API configurada.")
+            print(f"   [!] provedor '{nome}' ignorado: 'api_key' vazia no LLM_PROVIDERS.")
             continue
 
         cliente = OpenAI(
@@ -129,7 +130,8 @@ def carregar_provedores() -> list[tuple[dict, OpenAI]]:
 
     if not provedores:
         raise RuntimeError(
-            "Nenhum provedor de LLM utilizável em LLM_PROVIDERS! Todos estão sem chave."
+            "Nenhum provedor de LLM utilizável em LLM_PROVIDERS! "
+            "Todos estão com a 'api_key' vazia."
         )
 
     return provedores
