@@ -8,7 +8,7 @@ from tqdm import tqdm
 from pinecone import Pinecone
 
 # 1. Trava de segurança para execução sem API Key
-DRY_RUN = True
+DRY_RUN = False
 
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
@@ -238,6 +238,18 @@ def rechunking_ancorado(old_chunks, novos_paragrafos_puros, target_size=800, max
         })
 
     ids_velhos = {c["chunk_id"]: c for c in old_chunks if "chunk_id" in c}
+    
+    # === CORREÇÃO + PRINTS DE DEPURAÇÃO ===
+    old_hash_map = {c["hash_chunk"]: c["chunk_id"] for c in old_chunks if "chunk_id" in c}
+    for c_final in chunks_finais:
+        if "chunk_id" not in c_final:
+            h_c = c_final.get("hash_chunk")
+            if h_c in old_hash_map:
+                c_final["chunk_id"] = old_hash_map[h_c]
+            else:
+                continue
+    # =======================================
+
     ids_novos_preservados = set()
     chunks_nascidos = []
 
@@ -248,6 +260,10 @@ def rechunking_ancorado(old_chunks, novos_paragrafos_puros, target_size=800, max
             chunks_nascidos.append(c_final)
 
     ids_mortos = list(set(ids_velhos.keys()) - ids_novos_preservados)
+
+    # Print para mostrar o saldo de cada página com problema
+    if ids_mortos or chunks_nascidos:
+        print(f"      [DEBUG] Saldo da página -> Mortos: {len(ids_mortos)} | Nascidos: {len(chunks_nascidos)}")
 
     return chunks_finais, ids_mortos, chunks_nascidos
 
