@@ -1,48 +1,217 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   Dicionário de cores
+
+   Cada token declara os dois esquemas lado a lado com light-dark(claro, escuro).
+
+   ========================================================================== */
+
 :root {
+  /* Faz o light-dark() resolver e adapta scrollbar/controles nativos. */
+  color-scheme: light dark;
+
+  /* Marca: o laranja do Turing */
+  --brand:            light-dark(#f1863d, #f1863d);
+  --brand-strong:     light-dark(#e07125, #e07125);   /* hover / pressed */
+  --brand-foreground: light-dark(#ffffff, #ffffff);   /* texto sobre o laranja */
+
+  /* Superfícies. O claro não pode ser quase branco por causa do vidro. */
+  --canvas:         light-dark(#dde4f6, #03042c);     /* fundo da página */
+  --surface:        light-dark(#ccd6ef, #050738);     /* menu lateral */
+  --surface-raised: light-dark(#ffffff, #0a0d3c);     /* menus flutuantes */
+
+  /* Texto */
+  --foreground:       light-dark(#0b1030, #ffffff);
+  --muted-foreground: light-dark(#55618a, #aeb8cf);
+  --faint-foreground: light-dark(#8790ad, #7b86a3);
+
+  /* Interface: será mudada a opacidade nos componentes */
+  --line:   light-dark(#0b1030, #ffffff);   /* bordas:  /10, /15, /25 */
+  --tint:   light-dark(#0b1030, #ffffff);   /* hover:   /5, /10 */
+  --scrim:  light-dark(#0b1030, #000000);   /* overlays:/30, /60 */
+  --danger: light-dark(#c53434, #f87171);
+
+  /* Backdrop é decomposto em cores para que light-dark() alcance cada parada.
+     No claro os brilhos são o laranja da marca (241 134 61), e só ele. O alfa
+     subiu bastante: vidro é lente, e lente sobre fundo liso não mostra nada.
+     O que o vidro tem para borrar e saturar sai daqui.
+     No escuro seguem os azuis originais. */
+  --glow-a:        light-dark(rgb(241 134 61 / 0.20), rgb(29 44 135 / 0.85));
+  --glow-a-end:    light-dark(rgb(241 134 61 / 0),    rgb(29 44 135 / 0));
+  --glow-b:        light-dark(rgb(241 134 61 / 0.15), rgb(20 31 98 / 0.70));
+  --glow-b-end:    light-dark(rgb(241 134 61 / 0),    rgb(20 31 98 / 0));
+  --backdrop-from: light-dark(#d3dcf2, #050833);
+  --backdrop-to:   light-dark(#eaeefb, #010214);
+
   --page-backdrop:
-    /* Brilho Superior Direito (Mais forte e expandido) */
-    radial-gradient(circle at 90% 10%, rgba(29, 44, 135, 0.85) 0%, rgba(29, 44, 135, 0) 65%),
+    /* Brilho superior direito */
+    radial-gradient(circle at 90% 10%, var(--glow-a) 0%, var(--glow-a-end) 65%),
 
-    /* Brilho Inferior Esquerdo */
-    radial-gradient(circle at 10% 90%, rgba(20, 31, 98, 0.7) 0%, rgba(20, 31, 98, 0) 55%),
+    /* Brilho inferior esquerdo */
+    radial-gradient(circle at 10% 90%, var(--glow-b) 0%, var(--glow-b-end) 55%),
 
-    /* Fundo Escuro Base */
-    linear-gradient(135deg, #050833 0%, #010214 100%);
+    /* Fundo base */
+    linear-gradient(135deg, var(--backdrop-from) 0%, var(--backdrop-to) 100%);
 
-  background-color: #03042c;
-  background-image: var(--page-backdrop);
-  background-attachment: fixed;
-  background-size: cover;
+  /* ------------------------------------------------------------------
+     Vidro fosco
 
-  --foreground: #ffffff;
+     Uma lâmina fina, blur uniforme da cena com ganho de
+     saturação e de brilho um véu de opacidade baixa,
+     a luz da cena atravessando de leve e um fio de borda.
+     ------------------------------------------------------------------ */
+
+  /* Óptica: o que acontece com a cena atrás do vidro.
+     Números não passam pelo light-dark(), que só alcança cores: os valores
+     aqui são os do claro, e o escuro troca logo abaixo, na mão. */
+  --glass-blur:       44px;
+  --glass-saturate:   1.7;
+  --glass-brightness: 1.02;
+
+  /* Véu. Quase nada: quem faz o vidro aparecer é o blur e a saturação
+     mordendo as luzes do fundo, não a tinta. */
+  --glass-tint: light-dark(rgb(255 255 255 / 0.05), rgb(226 234 255 / 0.012));
+
+  /* A luz da cena atravessando a lâmina: mesmo matiz e mesmas direções dos
+     brilhos do --page-backdrop. Larga e fraca: é tônus, não brilho. */
+  --glass-light-a: light-dark(rgb(241 134 61 / 0.06), rgb(150 175 255 / 0.065));
+  --glass-light-b: light-dark(rgb(241 134 61 / 0.03), rgb(150 175 255 / 0.035));
+
+  /* Fio da borda: acende de leve no topo e some. Com o véu quase zerado,
+     é ele e a sombra que dão a forma da lâmina. */
+  --glass-edge-hi:    light-dark(rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.38));
+  --glass-edge-lo:    light-dark(rgb(11 16 48 / 0.14),    rgb(255 255 255 / 0.07));
+  --glass-edge-width: 1px;
+
+  /* Sombra: curta e difusa, só para a lâmina descolar do fundo.
+     Decomposta em cor, senão o light-dark() não alcança. */
+  --glass-shadow-color: light-dark(rgb(11 16 48 / 0.20), rgb(0 0 0 / 0.58));
+  --glass-shadow: 0 6px 20px -3px var(--glass-shadow-color);
+
+  /* Painel de navegação: mesmo véu do resto, só com muito mais blur, porque
+     atrás dele passa a conversa inteira. No escuro o navy é mais fundo: o
+     painel separa por ser vidro fumê, não por ser mais claro. */
+  --glass-tint-panel: light-dark(rgb(255 255 255 / 0.10), rgb(6 9 42 / 0.18));
 }
 
-/* Camadas de blur que copiam o background */
+/* Força um esquema independente do dispositivo */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
 
-/* Navbar */
-@utility page-fade-b {
-  background-color: #03042c;
-  background-image: var(--page-backdrop);
-  background-attachment: fixed;
-  background-size: cover;
-  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+/* Os dois números do vidro, que o light-dark() não consegue carregar.
+   A condição é a mesma do @custom-variant dark logo abaixo: o esquema do
+   dispositivo, a menos que o data-theme diga o contrário. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --glass-saturate: 1.7;
+    --glass-brightness: 1.14;
+  }
+}
+:root[data-theme="dark"] {
+  --glass-saturate: 1.7;
+  --glass-brightness: 1.14;
 }
 
-/* Rodapé */
-@utility page-fade-t {
-  background-color: #03042c;
-  background-image: var(--page-backdrop);
-  background-attachment: fixed;
-  background-size: cover;
-  -webkit-mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, 0.95) 50%, transparent 100%);
-  mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, 0.95) 50%, transparent 100%);
+/* Se não tiver light-dark() */
+@supports not (color: light-dark(#000, #fff)) {
+  :root {
+    color-scheme: dark;
+
+    --brand: #f1863d;
+    --brand-strong: #e07125;
+    --brand-foreground: #ffffff;
+
+    --canvas: #03042c;
+    --surface: #050738;
+    --surface-raised: #0a0d3c;
+
+    --foreground: #ffffff;
+    --muted-foreground: #aeb8cf;
+    --faint-foreground: #7b86a3;
+
+    --line: #ffffff;
+    --tint: #ffffff;
+    --scrim: #000000;
+    --danger: #f87171;
+
+    --glow-a: rgb(29 44 135 / 0.85);
+    --glow-a-end: rgb(29 44 135 / 0);
+    --glow-b: rgb(20 31 98 / 0.70);
+    --glow-b-end: rgb(20 31 98 / 0);
+    --backdrop-from: #050833;
+    --backdrop-to: #010214;
+
+    --glass-saturate: 1.7;
+    --glass-brightness: 1.14;
+    --glass-tint: rgb(226 234 255 / 0.012);
+    --glass-light-a: rgb(150 175 255 / 0.065);
+    --glass-light-b: rgb(150 175 255 / 0.035);
+    --glass-edge-hi: rgb(255 255 255 / 0.38);
+    --glass-edge-lo: rgb(255 255 255 / 0.07);
+    --glass-shadow-color: rgb(0 0 0 / 0.58);
+    --glass-tint-panel: rgb(6 9 42 / 0.18);
+  }
+}
+
+/* Sem vidro possível, o véu vira as superfícies opacas do dicionário. Elas
+   já existem nos dois esquemas e sobrevivem ao fallback acima, então nada
+   aqui depende de light-dark(). */
+
+/* Navegador sem backdrop-filter: sem isso o texto ficaria solto no fundo. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass-tint:       var(--surface-raised);
+    --glass-tint-panel: var(--surface);
+  }
+}
+
+/* Quem pediu menos transparência recebe a mesma superfície, sem blur. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-blur: 0px;
+    --glass-tint:       var(--surface-raised);
+    --glass-tint-panel: var(--surface);
+  }
+}
+
+
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:not([data-theme="light"] *) { @slot; }
+  }
+  &:where([data-theme="dark"] *) { @slot; }
+}
+
+/* Vertical encolhe em telas baixas para não rolar o home */
+@custom-variant curto (@media (max-height: 740px));
+@custom-variant curtinho (@media (max-height: 600px));
+
+@custom-variant light {
+  @media (prefers-color-scheme: light) {
+    &:not([data-theme="dark"] *) { @slot; }
+  }
+  &:where([data-theme="light"] *) { @slot; }
 }
 
 @theme inline {
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-foreground: var(--brand-foreground);
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+
   --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-faint-foreground: var(--faint-foreground);
+
+  --color-line: var(--line);
+  --color-tint: var(--tint);
+  --color-scrim: var(--scrim);
+  --color-danger: var(--danger);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-geom: var(--font-geom-src);
@@ -52,6 +221,7 @@
 
 /* Escala tipográfica fluida */
 @theme {
+  --text-xs:   clamp(0.6875rem, 0.67rem + 0.09vw, 0.75rem);
   --text-sm:   clamp(0.8125rem, 0.79rem + 0.11vw, 0.875rem);
   --text-base: clamp(0.9375rem, 0.90rem + 0.19vw, 1rem);
   --text-lg:   clamp(1rem,      0.95rem + 0.23vw, 1.125rem);
@@ -60,6 +230,125 @@
   --text-3xl:  clamp(1.4rem,    1.22rem + 0.90vw, 1.875rem);
   --text-4xl:  clamp(1.65rem,   1.40rem + 1.25vw, 2.25rem);
   --text-5xl:  clamp(2rem,      1.60rem + 2.00vw, 3rem);
+}
+
+/* ==========================================================================
+   Camadas de fundo
+   ========================================================================== */
+
+@utility page-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: var(--canvas);
+  background-image: var(--page-backdrop);
+  /* Escala e origem fixas, iguais nas três camadas: se dependesse da
+     caixa do elemento (cover), encolher a casca com o teclado aberto
+     reescalaria o gradiente e os brilhos subiriam junto. */
+  background-repeat: no-repeat;
+  background-position: left top;
+  background-size: 100% var(--backdrop-h, 100lvh);
+}
+
+/* Dissolve o conteúdo que passa sob a navbar */
+@utility page-fade-b {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  background-color: var(--canvas);
+  background-image: var(--page-backdrop);
+  /* Escala e origem fixas, iguais nas três camadas: se dependesse da
+     caixa do elemento (cover), encolher a casca com o teclado aberto
+     reescalaria o gradiente e os brilhos subiriam junto. */
+  background-repeat: no-repeat;
+  background-position: left top;
+  background-size: 100% var(--backdrop-h, 100lvh);
+
+  --fade-solido: var(--nav-h, 4.25rem);
+  -webkit-mask-image: linear-gradient(to bottom,
+    #000 0, #000 var(--fade-solido), transparent calc(var(--fade-solido) + 2.5rem));
+  mask-image: linear-gradient(to bottom,
+    #000 0, #000 var(--fade-solido), transparent calc(var(--fade-solido) + 2.5rem));
+}
+
+/* Dissolve o conteúdo que chega no rodapé: atrás do composer no chat
+   (--composer-h, publicado pela página) e na borda inferior da lista no
+   histórico (sem composer, só o rabo de 2.5rem). */
+@utility page-fade-t {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  background-color: var(--canvas);
+  background-image: var(--page-backdrop);
+  /* Escala e origem fixas, iguais nas três camadas: se dependesse da
+     caixa do elemento (cover), encolher a casca com o teclado aberto
+     reescalaria o gradiente e os brilhos subiriam junto. */
+  background-repeat: no-repeat;
+  background-position: left top;
+  background-size: 100% var(--backdrop-h, 100lvh);
+
+  --fade-solido: var(--composer-h, 0px);
+  -webkit-mask-image: linear-gradient(to top,
+    #000 0, #000 var(--fade-solido), transparent calc(var(--fade-solido) + 2.5rem));
+  mask-image: linear-gradient(to top,
+    #000 0, #000 var(--fade-solido), transparent calc(var(--fade-solido) + 2.5rem));
+}
+
+/* ==========================================================================
+   App shell
+
+   O documento nunca rola: o shell ocupa o visual viewport e o scroll acontece
+   dentro do .app-scroll. Quando o teclado abre, é o shell que encolhe. A
+   navbar e o composer acompanham, o resto da página fica parado.
+
+   ========================================================================== */
+
+/* Altura = o menor entre duas medidas que, por definição, nunca passam da
+   área visível:
+
+   100svh            o viewport COM a UI do navegador aberta. Como o documento
+                     não rola, a barra de endereço nunca se retrai, então esse
+                     é exatamente o visível. (O 100dvh não servia: no Android
+                     ele resolvia para o viewport grande e sobrava página
+                     embaixo, obrigando a rolar.)
+   --app-height      o visualViewport medido, que é o que encolhe quando o
+                     teclado abre.
+
+   Qualquer que seja o navegador, o min() não tem como estourar a tela. */
+@utility app-shell {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--app-offset, 0px);
+  height: min(100svh, var(--app-height, 100svh));
+  /* Com viewport-fit=cover a altura acima inclui a área sob as barras do
+     sistema. O padding (box-sizing: border-box) traz o conteúdo para dentro
+     da área utilizável sem encolher o fundo, que é absolute inset-0 e segue
+     sangrando até a borda. Onde não há barra, env() vale 0 e nada muda. */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* z dentro da casca: fundo 0, conteúdo que rola 10, dissolvidos 20,
+   navbar/composer 30 (o menu lateral vive fora da casca, em 50). */
+@utility app-scroll {
+  position: relative;
+  z-index: 10;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--line) 22%, transparent) transparent;
 }
 
 /* Container de conteúdo */
@@ -78,11 +367,28 @@
   padding-inline: clamp(1rem, 10vw, 4rem);
 }
 
-/* Utility para componentes de vidro */
-@utility glass {
-  position: relative;
-  z-index: 0;
+/* ==========================================================================
+   Vidro
+   ========================================================================== */
 
+/* O contexto de empilhamento do vidro vive na camada base, dentro de :where()
+   — especificidade zero — para que .absolute / .fixed / .z-* / shadow-*
+   aplicados no mesmo elemento vençam. Como @utility, o `position: relative`
+   daqui sequestrava o posicionamento de qualquer vidro que precisasse ser
+   fixo.
+
+   A sombra mora aqui, no hospedeiro, e não num pseudo: dois vidros têm
+   overflow-hidden (o card e o toast do histórico), que recortaria qualquer
+   sombra projetada por um filho. */
+@layer base {
+  :where(.glass) {
+    position: relative;
+    z-index: 0;
+    box-shadow: var(--glass-shadow);
+  }
+}
+
+@utility glass {
   &::before,
   &::after {
     content: "";
@@ -93,42 +399,124 @@
     pointer-events: none;
   }
 
-  /* Blur do background */
+  /* A lâmina: blur uniforme da cena, véu e a luz que a atravessa. */
   &::before {
-    -webkit-backdrop-filter: blur(20px) saturate(1.75);
-    backdrop-filter: blur(20px) saturate(1.75);
-    -webkit-mask-image: radial-gradient(ellipse 75% 140% at 50% 50%,
-      #000 0%, rgba(0, 0, 0, 0.6) 60%, rgba(0, 0, 0, 0.25) 100%);
-    mask-image: radial-gradient(ellipse 75% 140% at 50% 50%,
-      #000 0%, rgba(0, 0, 0, 0.6) 60%, rgba(0, 0, 0, 0.25) 100%);
+    -webkit-backdrop-filter:
+      blur(var(--glass-blur))
+      saturate(var(--glass-saturate))
+      brightness(var(--glass-brightness));
+    backdrop-filter:
+      blur(var(--glass-blur))
+      saturate(var(--glass-saturate))
+      brightness(var(--glass-brightness));
+
+    background-color: var(--glass-tint);
+    background-image:
+      /* brilho superior direito da cena */
+      radial-gradient(ellipse 140% 200% at 80% 0%,
+        var(--glass-light-a) 0%, transparent 68%),
+
+      /* brilho inferior esquerdo da cena */
+      radial-gradient(ellipse 130% 190% at 12% 100%,
+        var(--glass-light-b) 0%, transparent 70%);
   }
 
+  /* O fio da borda. Sem suporte a mask-composite fica um anel chapado.
+     Degrada bem, e sem o @supports o ::after viraria um retângulo sólido
+     por cima da lâmina. */
   &::after {
-    background-color: #f5f5f514; /* #F5F5F5 a ~12% */
-
-    /* Luzes do background no vidro */
-    background-image:
-      radial-gradient(ellipse 120% 220% at 72% 26%,
-        rgba(255, 255, 255, 0.065) 0%, rgba(255, 255, 255, 0.028) 45%,
-        rgba(255, 255, 255, 0) 100%),
-      radial-gradient(ellipse 110% 200% at 26% 78%,
-        rgba(255, 255, 255, 0.038) 0%, rgba(255, 255, 255, 0.015) 50%,
-        rgba(255, 255, 255, 0) 100%);
-
-    /* Anel do vidro */
     box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.14),
-      inset 0 1px 1px rgba(255, 255, 255, 0.22),
-      inset 0 -2px 2px rgba(255, 255, 255, 0.13);
+      inset 0 0 0 var(--glass-edge-width) var(--glass-edge-lo),
+      inset 0 1px 0 var(--glass-edge-hi);
+  }
+
+  @supports (mask-composite: exclude) or (-webkit-mask-composite: xor) {
+    &::after {
+      box-shadow: none;
+      padding: var(--glass-edge-width);
+      background: linear-gradient(165deg,
+        var(--glass-edge-hi) 0%,
+        var(--glass-edge-lo) 45%,
+        var(--glass-edge-lo) 100%);
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+    }
   }
 }
+
+/* Campos de entrada: um fio só, desenhado pelo vidro. */
+
+/* Fio sempre na cor da marca (composer). */
+@utility glass-brand {
+  --glass-edge-hi: color-mix(in srgb, var(--brand) 65%, white);
+  --glass-edge-lo: var(--brand);
+  --glass-edge-width: 1.5px;
+
+  &:has(:focus-visible) {
+    --glass-edge-width: 2px;
+  }
+}
+
+/* Painel de navegação: mesma lâmina, véu maior e blur bem mais largo. */
+@utility glass-panel {
+  --glass-tint: var(--glass-tint-panel);
+  --glass-blur: 80px;
+  --glass-brightness: 1;
+}
+
+/* Fio neutro que acende na marca no foco (busca, formulários de auth). */
+@utility glass-field {
+  --glass-edge-width: 1.5px;
+
+  &:has(:focus-visible) {
+    --glass-edge-hi: color-mix(in srgb, var(--brand) 65%, white);
+    --glass-edge-lo: var(--brand);
+    --glass-edge-width: 2px;
+  }
+}
+
+/* Faz o vidro sumir sem levar a óptica junto.
+
+   Opacidade abaixo de 1 no hospedeiro transforma ele num backdrop root: o
+   backdrop-filter do ::before deixa de enxergar a página, então blur,
+   saturação e brilho somem no primeiro quadro da transição e voltam de
+   estalo no quadro em que a opacidade fecha em 1. Aplicando a opacidade nos
+   próprios pseudos, cada um continua amostrando a cena e o vidro atravessa a
+   transição inteiro. O conteúdo do elemento some por conta própria, no
+   componente, com os mesmos três tokens.
+
+   A sombra também muda de lugar: no :where(.glass) ela mora no hospedeiro,
+   que aqui não desaparece, e ficaria boiando sozinha. */
+@utility glass-fade {
+  box-shadow: none;
+
+  &::before {
+    box-shadow: var(--glass-shadow);
+  }
+
+  &::before,
+  &::after {
+    opacity: var(--glass-fade, 1);
+    transition: opacity var(--glass-fade-dur, 200ms) ease-in-out
+                var(--glass-fade-delay, 0ms);
+  }
+}
+
+/* ==========================================================================
+   Animação de streaming
+   ========================================================================== */
 
 @keyframes encolher {
   from { width: 100%; }
   to   { width: 0%; }
 }
 
-/* Animação de streaming */
 .palavra {
   -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 40%, transparent 100%);
   mask-image: linear-gradient(90deg, #000 0%, #000 40%, transparent 100%);
@@ -145,14 +533,18 @@
   }
 }
 
+/* ==========================================================================
+   Documento
+   ========================================================================== */
+
+html {
+  background-color: var(--canvas);
+  overscroll-behavior: none;
+}
+
 body {
   color: var(--foreground);
   font-family: var(--font-roboto-src), Arial, Helvetica, sans-serif;
-  overflow-x: hidden;
-}
-
-.bg {
-    background-color: hsla(244, 100%, 50%, 1);
-    background-image: radial-gradient(circle at 50% 0%, hsla(319, 0%, 0%, 1) 49.15975941515135%, transparent 102.23193813062571%);
-    background-blend-mode: normal;
+  /* O scroll mora no .app-scroll; o documento em si nunca rola. */
+  overflow: hidden;
 }

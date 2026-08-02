@@ -24,7 +24,7 @@ export function UserBubble({ text }: { text: string }) {
   }, [text, expandido]);
 
   return (
-    <div className="glass max-w-[85%] sm:max-w-[75%] text-[#FFFFFF] text-lg px-5 py-3 rounded-[2rem] break-words">
+    <div className="glass max-w-[85%] sm:max-w-[75%] text-foreground text-lg px-5 py-3 rounded-[2rem] break-words">
       <p
         ref={textoRef}
         className={`whitespace-pre-wrap ${expandido ? "" : CLAMP_COLAPSADO}`}
@@ -34,7 +34,7 @@ export function UserBubble({ text }: { text: string }) {
       {temOverflow && (
         <button
           onClick={() => setExpandido((v) => !v)}
-          className="text-[#f1863d] text-sm mt-1 hover:underline hover:cursor-pointer"
+          className="text-brand text-sm mt-1 hover:underline hover:cursor-pointer"
         >
           {expandido ? "ver menos" : "ver mais"}
         </button>

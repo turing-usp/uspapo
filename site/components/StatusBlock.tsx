@@ -27,7 +27,7 @@ export default function StatusBlock({ ferramentas }: { ferramentas: string[] }) 
 
     return (
         <div className="mt-4 flex justify-start first:mt-0">
-            <span className="glass rounded-full px-4 py-1.5 font-roboto text-sm text-[#f1863d]">
+            <span className="glass rounded-full px-4 py-1.5 font-roboto text-sm text-brand">
                 <span className="animate-pulse">{rotulo}</span>
             </span>
         </div>

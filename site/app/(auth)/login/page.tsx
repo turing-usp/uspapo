@@ -25,19 +25,15 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="bg relative min-h-screen w-full h-screen flex items-center justify-center overflow-hidden text-white px-4 py-8">
-      {/* Background visual decorativo */}
-      <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
-
+    <main className="flex min-h-full w-full items-center justify-center px-4 py-8 text-foreground">
       {/* Container principal do formulário */}
-      <div className="w-full max-w-md z-10 flex flex-col items-center">
+      <div className="w-full max-w-md flex flex-col items-center">
         <div className="mb-6 flex items-center justify-center">
           <Image src={TuringLogo} alt="Turing Logo" />
         </div>
 
         {/* Título da Página */}
-        <h1 className="text-xl md:text-2 font-geom text-slate-100 mb-8 tracking-wide text-center">
+        <h1 className="text-xl md:text-2xl font-geom text-foreground mb-8 tracking-wide text-center">
           Entre com sua conta
         </h1>
 
@@ -45,9 +41,9 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
           
           {/* INPUT 1: Email */}
-          <div className="glass relative w-full rounded-full">
+          <div className="glass glass-field relative w-full rounded-full">
             {/* Ícone Envelope */}
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted-foreground">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
@@ -58,14 +54,14 @@ export default function LoginPage() {
               placeholder="Email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full pl-12 pr-4 py-3 text-slate-100 placeholder-slate-400 rounded-full text-sm border border-transparent focus:outline-none focus:border-[#f58233] focus:ring-1 focus:ring-[#f58233] transition-all duration-200"
+              className="w-full pl-12 pr-4 py-3 rounded-full border-0 bg-transparent text-[1rem] text-foreground caret-brand placeholder:text-muted-foreground focus:outline-none"
             />
           </div>
 
           {/* INPUT 2: Senha */}
-          <div className="glass rounded-full relative w-full">
+          <div className="glass glass-field rounded-full relative w-full">
             {/* Ícone Cadeado */}
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted-foreground">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
@@ -76,13 +72,13 @@ export default function LoginPage() {
               placeholder="Senha"
               value={formData.password}
               onChange={handleChange}
-              className="w-full pl-12 pr-12 py-3 text-slate-100 placeholder-slate-400 rounded-full text-sm border border-transparent focus:outline-none focus:border-[#f58233] focus:ring-1 focus:ring-[#f58233] transition-all duration-200"
+              className="w-full pl-12 pr-12 py-3 rounded-full border-0 bg-transparent text-[1rem] text-foreground caret-brand placeholder:text-muted-foreground focus:outline-none"
             />
             {/* Botão para alternar visibilidade */}
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="cursor-pointer absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-200 focus:outline-none"
+              className="cursor-pointer absolute inset-y-0 right-0 pr-4 flex items-center text-muted-foreground hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand focus:outline-none"
             >
               {showPassword ? (
                 /* Ícone Olho Fechado */
@@ -102,7 +98,7 @@ export default function LoginPage() {
           {/* BOTÃO PRINCIPAL: Entrar */}
           <button
             type="submit"
-            className="cursor-pointer w-full py-3.5 mt-2 bg-[#f58233] hover:bg-[#e07125] text-white font-medium rounded-full text-base transition-colors duration-200 shadow-md hover:shadow-lg active:scale-[0.99]"
+            className="cursor-pointer w-full py-3.5 mt-2 bg-brand hover:bg-brand-strong text-brand-foreground font-medium rounded-full text-base transition-colors duration-200 shadow-md hover:shadow-lg active:scale-[0.99]"
           >
             Entrar
           </button>
@@ -111,22 +107,22 @@ export default function LoginPage() {
         {/* LINK: Esqueceu a senha */}
         <a
           href="/forgot-password"
-          className="mt-4 text-sm text-[#f58233] font-medium hover:underline transition-colors cursor-pointer"
+          className="mt-4 text-sm text-brand font-medium hover:underline transition-colors cursor-pointer"
         >
           Esqueceu a senha?
         </a>
 
         {/* DIVISOR OU */}
         <div className="w-full flex items-center my-6">
-          <div className="flex-1 border-t border-slate-600/60" />
-          <span className="px-4 text-l font-geom tracking-wider">OU</span>
-          <div className="flex-1 border-t border-slate-600/60" />
+          <div className="flex-1 border-t border-line/15" />
+          <span className="px-4 text-sm font-geom tracking-wider">OU</span>
+          <div className="flex-1 border-t border-line/15" />
         </div>
 
         {/* BOTÃO GOOGLE */}
         <button
           type="button"
-          className="cursor-pointer w-full py-3 px-4 bg-white hover:bg-slate-50 text-slate-800 font-medium rounded-full text-sm flex items-center justify-center relative transition-all duration-200 border border-transparent focus:outline-none focus:border-[#f58233] focus:ring-2 focus:ring-[#f58233]"
+          className="cursor-pointer w-full py-3 px-4 bg-surface-raised hover:bg-surface text-foreground font-medium rounded-full text-sm flex items-center justify-center relative transition-colors duration-200 border border-line/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
           <div className="absolute left-4 flex items-center justify-center">
             <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -152,11 +148,11 @@ export default function LoginPage() {
         </button>
 
         {/* LINK FOOTER: Cadastre-se */}
-        <p className="mt-8 text-sm text-slate-300">
+        <p className="mt-8 text-sm text-muted-foreground">
           Não tem uma conta?{' '}
           <a
             href="/cadastro"
-            className="cursor-pointer text-[#f58233] font-medium hover:underline transition-colors"
+            className="cursor-pointer text-brand font-medium hover:underline transition-colors"
           >
             Cadastre-se
           </a>
