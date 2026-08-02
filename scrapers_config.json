@@ -30,7 +30,7 @@
         "selector": ".noticia_caixa a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-01-01",
     "frequency": "7d"
   },
   {

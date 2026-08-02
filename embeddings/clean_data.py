@@ -19,6 +19,8 @@ def limpeza_universal(texto: str) -> str:
     """Aplica formatação básica de HTML e espaçamento."""
     if not texto:
         return ""
+
+    texto = texto.replace('\r\n', '\n').replace('\r', '\n')
     
     texto = re.sub(r'<script.*?>.*?</script>', '', texto, flags=re.IGNORECASE | re.DOTALL)
     texto = re.sub(r'<style.*?>.*?</style>', '', texto, flags=re.IGNORECASE | re.DOTALL)

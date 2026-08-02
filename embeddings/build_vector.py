@@ -8,7 +8,7 @@ from tqdm import tqdm
 from pinecone import Pinecone
 
 # 1. Trava de segurança para execução sem API Key
-DRY_RUN = False
+DRY_RUN = True
 
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
@@ -306,7 +306,8 @@ def construir_banco():
         for pag_idx, pagina in enumerate(paginas):
             url_pagina = pagina.get("url", f"sem_url_{pag_idx}")
             titulo_pagina = pagina.get("titulo", "")
-            texto = pagina.get("texto_limpo", "")
+            texto = pagina.get("texto_limpo", "").replace('\r\n', '\n').replace('\r', '\n')
+
 
             paragrafos_pagina = [p.strip() for p in texto.split("\n\n") if p.strip()]
             if not paragrafos_pagina:
