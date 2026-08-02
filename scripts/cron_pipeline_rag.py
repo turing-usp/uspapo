@@ -11,7 +11,7 @@ DIRETORIO_RAIZ = os.path.abspath(os.path.join(DIRETORIO_ATUAL, ".."))
 ARQUIVO_CONFIG = os.path.join(DIRETORIO_RAIZ, "scrapers_config.json")
 
 # Caminhos absolutos para os scripts que serão chamados
-SCRIPT_SCRAPER = os.path.join(DIRETORIO_RAIZ, "rodar_scrapers.py")
+SCRIPT_SCRAPER = os.path.join(DIRETORIO_RAIZ, "scrapers", "spiders", "rodar_scrapers.py")
 SCRIPT_CLEAN = os.path.join(DIRETORIO_RAIZ, "embeddings", "clean_data.py")
 SCRIPT_VECTOR = os.path.join(DIRETORIO_RAIZ, "embeddings", "build_vector.py")
 
