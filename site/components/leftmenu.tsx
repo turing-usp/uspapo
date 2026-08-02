@@ -21,47 +21,75 @@ export default function LeftMenu() {
 
   return (
     <>
+      {/* Some enquanto o painel está aberto: o painel é translúcido, então o
+          botão apareceria borrado por baixo dele.
+
+          A opacidade vai nos pseudos do vidro (glass-fade) e no invólucro do
+          ícone, nunca no botão: opacidade no hospedeiro faria dele um backdrop
+          root e o backdrop-filter do vidro perderia a página no meio da
+          transição. O transition-colors também é de propósito: com o
+          `transition` cru, o delay-300 daqui embaixo atrasava o hover junto,
+          e a cor saía 300ms depois da escala do ícone. */}
       <button
         onClick={() => setIsOpen(true)}
-        className={`shrink-0 touch-manipulation glass rounded-xl p-2.5 text-muted-foreground hover:text-brand transition cursor-pointer flex items-center justify-center group ${
-          isOpen ? "opacity-0 duration-150" : "opacity-100 duration-200 delay-300"
+        className={`shrink-0 touch-manipulation glass glass-fade rounded-xl p-2.5 text-muted-foreground hover:text-brand transition-colors duration-200 cursor-pointer flex items-center justify-center group ${
+          isOpen
+            ? "[--glass-fade:0] [--glass-fade-dur:150ms] [--glass-fade-delay:0ms] pointer-events-none"
+            : "[--glass-fade:1] [--glass-fade-dur:200ms] [--glass-fade-delay:300ms]"
         }`}
         aria-label="Abrir menu lateral"
         aria-expanded={isOpen}
         title="Abrir menu"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2}
-          stroke="currentColor"
-          className="w-6 h-6 transition-transform group-hover:scale-110"
+        <span
+          className="flex opacity-[var(--glass-fade)] transition-opacity ease-in-out duration-[var(--glass-fade-dur)] delay-[var(--glass-fade-delay)]"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-          />
-        </svg>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+            className="w-6 h-6 transition-transform group-hover:scale-110"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+            />
+          </svg>
+        </span>
       </button>
 
       {montado && createPortal(
         <>
       {/* Fundo escuro para fechar no celular ao clicar fora. Pelo mesmo motivo
-          do botão, some junto com o painel em vez de sumir de uma vez. */}
+          do botão, some junto com o painel em vez de sumir de uma vez.
+
+          Aberto, ele anda os mesmos 16rem do painel (translate-x-64 = w-64) e
+          começa exatamente onde o painel termina: o painel é translúcido e fica
+          por cima (z-50), então o backdrop-filter dele amostraria este scrim e o
+          menu sairia de uma cor no celular e de outra no desktop, onde o scrim é
+          md:hidden. O que o scrim precisa cobrir para fechar ao clicar fora é
+          justamente a área que o painel não ocupa, então nada se perde. O que
+          sobra dele para fora da direita da tela não é visto.
+
+          O deslocamento é transform, e não left, pelo mesmo motivo do painel:
+          anima no compositor, sem recalcular layout a cada quadro. Como os dois
+          usam a mesma distância, duração e curva, a borda do scrim gruda na
+          borda do painel durante a transição inteira. */}
       <div
         onClick={() => setIsOpen(false)}
         aria-hidden
-        className={`fixed inset-0 bg-scrim/60 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300 ${
-          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        className={`fixed inset-0 bg-scrim/10 dark:bg-scrim/25 backdrop-blur-sm z-40 md:hidden transition duration-300 ease-in-out ${
+          isOpen ? "translate-x-64 opacity-100" : "translate-x-0 opacity-0 pointer-events-none"
         }`}
       />
 
       {/* Painel da Barra Lateral */}
       <aside
         aria-hidden={!isOpen}
-        className={`fixed top-0 left-0 h-dvh w-64 md:w-72 glass glass-panel border-r border-line/10 z-50 flex flex-col p-4 transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 left-0 h-dvh w-64 md:w-72 glass glass-panel z-50 flex flex-col p-4 transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
         }`}
       >
