@@ -1,7 +1,7 @@
 name: USPapo Data Pipeline
 
 on:
-  # Roda diariamente às 05:00 UTC (02:00 da manhã no fuso BRT)
+  schedule:
   - cron: '0 5 * * *'
   workflow_dispatch: # Cria um botão no GitHub para você rodar manualmente quando quiser
 
@@ -31,7 +31,7 @@ jobs:
         env:
           # O script puxa essa variável dos Secrets do GitHub
           PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
-        run: python scrapers/rodar_scrapers.py
+        run: python scrapers/spiders/rodar_scrapers.py
 
       - name: 💾 Salvar nova data, ledger e dados processados
         run: |
