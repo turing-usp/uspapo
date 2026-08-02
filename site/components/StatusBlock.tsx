@@ -8,6 +8,7 @@ const INTERVALO_MS = 6000;
 /* Rótulo por ferramenta */
 const ROTULOS: Record<string, string> = {
     buscar_documentos: "Pesquisando nos documentos",
+    consultar_bandejao: "Consultando cardápio"
 };
 
 export default function StatusBlock({ ferramentas }: { ferramentas: string[] }) {
