@@ -84,10 +84,10 @@
   --glass-edge-lo:    light-dark(rgb(11 16 48 / 0.14),    rgb(255 255 255 / 0.07));
   --glass-edge-width: 1px;
 
-  /* Sombra: curta e muito difusa, só para a lâmina descolar do fundo.
+  /* Sombra: curta e difusa, só para a lâmina descolar do fundo.
      Decomposta em cor, senão o light-dark() não alcança. */
-  --glass-shadow-color: light-dark(rgb(11 16 48 / 0.26), rgb(0 0 0 / 0.58));
-  --glass-shadow: 0 12px 34px -14px var(--glass-shadow-color);
+  --glass-shadow-color: light-dark(rgb(11 16 48 / 0.20), rgb(0 0 0 / 0.58));
+  --glass-shadow: 0 6px 20px -3px var(--glass-shadow-color);
 
   /* Painel de navegação: mesmo véu do resto, só com muito mais blur, porque
      atrás dele passa a conversa inteira. No escuro o navy é mais fundo: o

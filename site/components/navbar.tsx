@@ -23,17 +23,21 @@ export default function Navbar() {
           </Link>
         </div>
         {/* O estilo vai no próprio Link: <button> dentro de <a> herdava a cor
-            de botão do navegador em alguns temas e é aninhamento interativo. */}
+            de botão do navegador em alguns temas e é aninhamento interativo.
+
+            O Cadastrar não leva `border`, e sim glass-brand: o fio já é
+            desenhado pelo ::after do vidro, e uma borda por cima duplicaria o
+            traço */}
         <div className="flex gap-3 md:gap-2">
           <Link
             href="/login"
-            className="inline-flex items-center text-sm md:text-base text-brand px-4 md:px-8 py-1.5 rounded-[2rem] whitespace-nowrap hover:scale-103 transition-transform duration-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            className="glass inline-flex items-center text-sm md:text-base text-brand px-4 md:px-8 py-1.5 rounded-[2rem] whitespace-nowrap hover:scale-103 transition-transform duration-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           >
             Entrar
           </Link>
           <Link
             href="/cadastro"
-            className="inline-flex items-center text-sm md:text-base text-brand border border-brand px-4 md:px-8 py-1.5 rounded-[2rem] whitespace-nowrap hover:scale-103 transition-transform duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            className="glass glass-brand inline-flex items-center text-sm md:text-base text-brand px-4 md:px-8 py-1.5 rounded-[2rem] whitespace-nowrap hover:scale-103 transition-transform duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           >
             Cadastrar
           </Link>

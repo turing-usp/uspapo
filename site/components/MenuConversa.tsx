@@ -43,7 +43,7 @@ export function MenuConversa({ favorita, onFavoritar, onRenomear, onApagar }: Pr
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAberto((v) => !v); }}
         aria-label="Ações da conversa"
         aria-expanded={aberto}
-        className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-tint/10 transition-colors cursor-pointer"
+        className="p-2 rounded-lg text-muted-foreground hover:text-brand hover:bg-tint/10 transition-colors cursor-pointer"
       >
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
           <circle cx="5" cy="12" r="1.8" />

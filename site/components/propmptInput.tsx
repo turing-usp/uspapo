@@ -56,14 +56,17 @@ export default function PromptInput({ value, onChange, onSubmit }: { value: stri
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand cursor-pointer"
           aria-label={temTexto ? "Enviar pergunta" : "Falar"}
         >
+          {/* As key são obrigatórias, e não decoração: sem elas os dois ramos
+              são <span> na mesma posição, então o React reaproveita o nó e só
+              troca a className. */}
           {temTexto ? (
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-brand-foreground transition-colors hover:bg-brand-strong">
+            <span key="enviar" className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-brand-foreground transition-colors hover:bg-brand-strong">
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m0 0l-6 6m6-6l6 6" />
               </svg>
             </span>
           ) : (
-            <span className="text-muted-foreground transition-colors hover:text-brand">
+            <span key="falar" className="text-muted-foreground transition-colors hover:text-brand">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M18 11a6 6 0 0 1-12 0M12 17v4m-3 0h6" />

@@ -273,27 +273,6 @@ export default function Historico() {
                             />
                         </div>
 
-                        {pendente && (
-                            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl glass overflow-hidden">
-                              <div
-                                key={pendente.id}
-                                className="h-1 w-full bg-brand origin-left animate-[encolher_6s_linear_forwards]"
-                              />
-                              <div className="flex items-center gap-4 px-5 py-3">
-                                <span className="text-foreground text-sm">Conversa apagada</span>
-                                <button onClick={desfazer} className="text-brand text-sm font-medium hover:underline cursor-pointer">
-                                  Desfazer
-                                </button>
-                              </div>
-                            </div>
-                          )}
-
-                        {aviso && !pendente && (
-                          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl glass">
-                            <span className="text-foreground text-sm">{aviso}</span>
-                          </div>
-                        )}
-
                       </>
                     )}
                     </li>
@@ -308,6 +287,32 @@ export default function Historico() {
     {/* Mesmo dissolvido do chat: a lista some no fundo em vez de ser cortada
         na borda da área de scroll. Sem composer, é só o rabo de 2.5rem. */}
     <div aria-hidden className="page-fade-t" />
+
+    {/* Os avisos moram aqui, e não na lista, por dois motivos. Dentro do
+        .map() nascia um por conversa, e todos caíam no mesmo ponto da tela
+        somando blur, véu e fio de borda. E dentro do .app-scroll, que é um
+        contexto de empilhamento (z-10), o `fixed` ficava preso nele e o
+        page-fade-t (z-20) pintava por cima; irmão dele, o z-50 vence. */}
+    {pendente && (
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl glass overflow-hidden">
+        <div
+          key={pendente.id}
+          className="h-1 w-full bg-brand origin-left animate-[encolher_6s_linear_forwards]"
+        />
+        <div className="flex items-center gap-4 px-5 py-3">
+          <span className="text-foreground text-sm">Conversa apagada</span>
+          <button onClick={desfazer} className="text-brand text-sm font-medium hover:underline cursor-pointer">
+            Desfazer
+          </button>
+        </div>
+      </div>
+    )}
+
+    {aviso && !pendente && (
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl glass">
+        <span className="text-foreground text-sm">{aviso}</span>
+      </div>
+    )}
     </>
   );
 }
