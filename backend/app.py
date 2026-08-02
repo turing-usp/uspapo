@@ -6,7 +6,8 @@ provedores lida de LLM_PROVIDERS no .env: se o primário falhar, cai
 automaticamente para o próximo. Veja o .env.example na raiz.
 
 A busca vetorial no Pinecone é uma toolcall que o modelo aciona
-quando a pergunta exige um fato sobre a USP.
+quando a pergunta exige um fato sobre a USP. A outra é o cardápio dos
+bandejões, que vem do RUCard na hora.
 
     POST /chat  {"pergunta": "..."}                  -> {"resposta", "fontes"}
     POST /chat  {"pergunta": "...", "stream": true}  -> text/event-stream
@@ -29,8 +30,13 @@ no pacote uspapo/ e é o mesmo que o app_stub.py usa.
     gunicorn --chdir backend app:app       # produção (Render)
 """
 
-from uspapo.ferramentas import busca
+from uspapo.ferramentas import bandejao, busca
 from uspapo.web import criar_app, rodar
+
+# O cardápio é igual nos dois backends: vem do RUCard, não do Pinecone, então
+# a mesma ferramenta entra nos dois registros. Antes do criar_app: é dele que
+# sai o orçamento de tokens, calculado sobre os schemas já registrados.
+bandejao.registrar(busca.registro)
 
 # `app` no escopo do módulo é o que o gunicorn importa: não renomeie.
 app = criar_app(busca.registro, rotulo_indice=busca.PINECONE_INDEX)
