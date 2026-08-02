@@ -85,7 +85,7 @@
         "selector": ".card a::attr(href)"
       }
     ],
-    "last_update": "2026-01-01",
+    "last_update": "2026-08-02",
     "frequency": "7d"
   },
   {
