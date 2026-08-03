@@ -13,7 +13,7 @@ from uspapo import config
 from uspapo.ferramentas import Registro
 
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_INDEX = os.getenv("PINECONE_INDEX", "uspapo-embeddings")
+PINECONE_INDEX = os.getenv("PINECONE_INDEX", "uspapo-rag")
 PINECONE_NAMESPACE = os.getenv("PINECONE_NAMESPACE", "uspapo")
 
 EMBED_MODEL = "multilingual-e5-large"
