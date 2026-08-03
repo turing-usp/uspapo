@@ -57,9 +57,9 @@
         "Endereço 2\\s*Departamento de Geografia Avenida Professor Lineu Prestes, 338 Cidade Universitária São Paulo - SP CEP 05508-000.*?Últimas visitas:"
     ],
     "ime.usp.br": [
-    "Instituto de Matemática, Estatística e Ciência da Computação da Universidade de São Paulo",
-    "Compartilhe",
-    "Anterior\\s*\\d+\\s*…\\s*\\d+\\s*Próximo"
+        "Instituto de Matemática, Estatística e Ciência da Computação da Universidade de São Paulo",
+        "Compartilhe",
+        "Anterior\\s*\\d+\\s*…\\s*\\d+\\s*Próximo"
     ],
     "iq.usp.br": [
         "Instituto de Química da Universidade de São Paulo – IQ-USP",
@@ -93,5 +93,12 @@
     "if.usp.br": [
         "Instituto de Física da Universidade de São Paulo",
         "Acesso Rápido: Docentes \\| Alunos \\| Funcionários \\| Visitantes \\| Notícias Destaque"
-  ]
+    ],
+    "iri.usp.br": [
+    "Instituto de Relações Internacionais\\s*Universidade de São Paulo",
+    "Av\\.\\s*Prof\\.\\s*Lúcio Martins Rodrigues,?\\s*s/n,?\\s*Travessa do Labirinto,?\\s*286.*?São Paulo-SP",
+    "Como Chegar.*?Sobre.*?Graduação.*?Pós-Graduação.*?Pesquisa.*?Cultura e Extensão",
+    "Conecte-se Conosco!.*?Facebook.*?Instagram.*?Youtube",
+    "Universidade de São Paulo - Brasil.*?Instituto de Relações Internacionais - \\d{4}"
+    ]
 }

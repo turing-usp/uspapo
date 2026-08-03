@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from tqdm import tqdm
 from pinecone import Pinecone
 
-# 1. Trava de segurança para execução sem API Key
+# 1. Trava de segurança para execução sem API Key -- FALSE se é pra fazer upsert, TRUE se NÃO é pra fazer upsert
 DRY_RUN = False
 
 load_dotenv()
@@ -16,7 +16,7 @@ PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 if not PINECONE_API_KEY and not DRY_RUN:
     raise RuntimeError("PINECONE_API_KEY não encontrada no arquivo .env!")
 
-PINECONE_INDEX_NAME = "uspapo-embeddings"
+PINECONE_INDEX_NAME = "uspapo-rag"
 
 DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
 PASTA_PROCESSED = os.path.join(DIRETORIO_ATUAL, "..", "data", "processed")

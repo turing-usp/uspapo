@@ -86,13 +86,22 @@ def executar():
             dados_limpos = []
             paginas_descartadas = 0
             
-            for doc in dados_brutos:
+            for i, doc in enumerate(dados_brutos):
                 url_documento = doc.get("url", "")
+                
+                # DEBUG: Imprime a cada 10 páginas para sabermos que o Python está vivo
+                if i % 10 == 0:
+                    print(f"      [DEBUG] Processando página {i+1}/{len(dados_brutos)}: {url_documento[:60]}...")
+
                 texto_original = doc.get("texto_limpo", doc.get("clean_text", ""))
                 
-                texto_tratado = limpeza_universal(texto_original)
-                texto_tratado = aplicar_regras_regex(texto_tratado, url_documento, regras_ruido)
-                texto_tratado = limpeza_universal(texto_tratado)
+                try:
+                    texto_tratado = limpeza_universal(texto_original)
+                    texto_tratado = aplicar_regras_regex(texto_tratado, url_documento, regras_ruido)
+                    texto_tratado = limpeza_universal(texto_tratado)
+                except Exception as ex_regex:
+                    print(f"      [ERRO REGEX] Falha na URL {url_documento}: {ex_regex}")
+                    continue
                 
                 if len(texto_tratado) > 50:
                     dados_limpos.append({
