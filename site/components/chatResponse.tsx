@@ -1,5 +1,6 @@
 "use client";
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm'; 
 import { memo, useEffect, useRef, useState } from 'react';
 import type { Root, Element, Text, ElementContent } from 'hast';
 
@@ -133,7 +134,7 @@ function palavrasReveladas(sobra: number) {
         marcar(arvore);
     };
 }
-
+const remarkPlugins = [remarkGfm];
 function ChatResponse({ text, streaming = false }: { text: string; streaming?: boolean }) {
     const { visivel, sobra, revelando } = useRevelacao(text, streaming);
 
@@ -141,6 +142,7 @@ function ChatResponse({ text, streaming = false }: { text: string; streaming?: b
         <div className="flex flex-col text-foreground text-lg leading-relaxed">
             <ReactMarkdown
                 rehypePlugins={revelando ? [[palavrasReveladas, sobra]] : []}
+                remarkPlugins={remarkPlugins}
                 components={{
                     h1: ({ children }) => (
                         <h1 className="text-3xl font-roboto font-bold text-foreground mt-6 mb-3 text-balance">{children}</h1>
@@ -175,15 +177,32 @@ function ChatResponse({ text, streaming = false }: { text: string; streaming?: b
                     ),
                     hr: () => <hr className="border-line/10 my-4" />,
                     table: ({ children }) => (
-                        <div className="overflow-x-auto mb-3">
-                            <table className="min-w-full border-collapse border border-line/10">{children}</table>
+                        <div
+                            role="region"
+                            aria-label="Tabela"
+                            tabIndex={0}
+                            className="mb-4 overflow-x-auto rounded-xl border border-line/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                        >
+                            {/* border-separate porque border-collapse mata o raio do wrapper.
+                                A última linha perde o traço para não duplicar com a borda. */}
+                            <table className="w-full border-separate border-spacing-0 font-roboto text-base tabular-nums [&_tbody_tr:last-child_td]:border-b-0">
+                                {children}
+                            </table>
                         </div>
                     ),
+                    thead: ({ children }) => <thead className="bg-tint/[0.07]">{children}</thead>,
+                    tr: ({ children }) => (
+                        <tr className="transition-colors hover:bg-tint/[0.04]">{children}</tr>
+                    ),
                     th: ({ children }) => (
-                        <th className="border border-line/10 px-3 py-2 text-left bg-tint/5">{children}</th>
+                        <th className="whitespace-nowrap border-b border-line/20 px-3 py-2.5 text-left font-semibold text-foreground">
+                            {children}
+                        </th>
                     ),
                     td: ({ children }) => (
-                        <td className="border border-line/10 px-3 py-2">{children}</td>
+                        <td className="border-b border-line/10 px-3 py-2.5 align-top text-muted-foreground">
+                            {children}
+                        </td>
                     ),
                 }}
             >

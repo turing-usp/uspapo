@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import Leftmenu from "./leftmenu";
+import MenuUsuario from "./Menuusuario";
 
 export default function Navbar() {
   return (
@@ -29,18 +30,7 @@ export default function Navbar() {
             desenhado pelo ::after do vidro, e uma borda por cima duplicaria o
             traço */}
         <div className="flex gap-3 md:gap-2">
-          <Link
-            href="/login"
-            className="glass inline-flex items-center text-sm md:text-base text-brand px-4 md:px-8 py-1.5 rounded-[2rem] whitespace-nowrap hover:scale-103 transition-transform duration-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-          >
-            Entrar
-          </Link>
-          <Link
-            href="/cadastro"
-            className="glass glass-brand inline-flex items-center text-sm md:text-base text-brand px-4 md:px-8 py-1.5 rounded-[2rem] whitespace-nowrap hover:scale-103 transition-transform duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-          >
-            Cadastrar
-          </Link>
+          <MenuUsuario />
         </div>
       </div>
     </nav>
