@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
   },
   /* Testar mobile com cloudflare em dev */
   allowedDevOrigins: ["*.trycloudflare.com", "*.cfargotunnel.com"],
+  images: {
+  remotePatterns: [
+    { protocol: 'https', hostname: 'zgvbnmovongrigjoviyu.supabase.co' },
+  ],
+  },
 };
 
 export default nextConfig;

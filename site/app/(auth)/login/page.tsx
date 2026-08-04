@@ -3,10 +3,19 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import TuringLogo from '../../turing-logo.svg';
+import { entrar } from '@/lib/auth';
+import { useRouter, useSearchParams } from 'next/navigation';
+import {Suspense} from "react";
 
-export default function LoginPage() {
+function LoginForm() {
   // Estado para visibilidade da senha
   const [showPassword, setShowPassword] = useState(false);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const router = useRouter();
+  const params = useSearchParams();
+  const erroCallback = params.get('erro') === 'callback';
 
   // Estado simplificado para credenciais de login
   const [formData, setFormData] = useState({
@@ -15,13 +24,25 @@ export default function LoginPage() {
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+      const { name, value } = e.target;
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    };
 
-  const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Lógica de submissão do login
+    setErro(null);
+    setCarregando(true);
+
+    const { error } = await entrar(formData.email, formData.password);
+    setCarregando(false);
+
+    if (error) {
+      setErro('Email ou senha incorretos.');
+      return;
+    }
+
+    router.push('/');
+    router.refresh();
   };
 
   return (
@@ -52,6 +73,7 @@ export default function LoginPage() {
               type="email"
               name="email"
               placeholder="Email"
+              required
               value={formData.email}
               onChange={handleChange}
               className="w-full pl-12 pr-4 py-3 rounded-full border-0 bg-transparent text-[1rem] text-foreground caret-brand placeholder:text-muted-foreground focus:outline-none"
@@ -70,6 +92,7 @@ export default function LoginPage() {
               type={showPassword ? 'text' : 'password'}
               name="password"
               placeholder="Senha"
+              required
               value={formData.password}
               onChange={handleChange}
               className="w-full pl-12 pr-12 py-3 rounded-full border-0 bg-transparent text-[1rem] text-foreground caret-brand placeholder:text-muted-foreground focus:outline-none"
@@ -95,18 +118,27 @@ export default function LoginPage() {
             </button>
           </div>
 
+          {erroCallback && !erro && (
+            <p className="px-2 text-xs text-faint-foreground">
+              Não foi possível confirmar o link. Tente entrar com seu email e senha.
+            </p>
+          )}
+
+          {erro && <p className="px-2 text-xs text-danger" role="alert">{erro}</p>}
+
           {/* BOTÃO PRINCIPAL: Entrar */}
           <button
             type="submit"
+            disabled={carregando}
             className="cursor-pointer w-full py-3.5 mt-2 bg-brand hover:bg-brand-strong text-brand-foreground font-medium rounded-full text-base transition-colors duration-200 shadow-md hover:shadow-lg active:scale-[0.99]"
           >
-            Entrar
+            {carregando ? 'Entrando…' : 'Entrar'}
           </button>
         </form>
 
         {/* LINK: Esqueceu a senha */}
         <a
-          href="/forgot-password"
+          href="/esqueci-senha"
           className="mt-4 text-sm text-brand font-medium hover:underline transition-colors cursor-pointer"
         >
           Esqueceu a senha?
@@ -160,5 +192,13 @@ export default function LoginPage() {
 
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
