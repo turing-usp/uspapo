@@ -4,7 +4,7 @@ import Fontes from "@/components/Fontes";
 import PromptInput from "@/components/propmptInput";
 import StatusBlock from "@/components/StatusBlock";
 import TypingIndicator from "@/components/TypingIndicator";
-import { obterConversa, salvarConversa, gerarTitulo, type Mensagem } from "@/lib/conversas";
+import { obterConversa, salvarConversa, gerarTitulo, PENDENTE, type Mensagem } from "@/lib/conversas";
 import {
     perguntar,
     reduzirStatus,
@@ -18,7 +18,6 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 
-const PENDENTE = "...";
 
 export default function ChatPage() {
 
@@ -119,32 +118,40 @@ export default function ChatPage() {
         if (jaProcessouInicial.current) return;
         jaProcessouInicial.current = true;
 
-        const conversa = obterConversa(id as string);
-        if (!conversa) return;
+        (async () => {
+            const conversa = await obterConversa(id as string);
+            if (!conversa) return;
 
-        setHistorico(conversa.mensagens);
+            setHistorico(conversa.mensagens);
 
-        const ultima = conversa.mensagens[conversa.mensagens.length - 1];
-        if (ultima && ultima.bot === PENDENTE) {
-            /* A última é justamente a que está sem resposta: ela é a pergunta
-               de agora, não um turno anterior. */
-            completarResposta(ultima.user, conversa.mensagens.slice(0, -1));
-        }
+            const ultima = conversa.mensagens[conversa.mensagens.length - 1];
+            if (ultima && ultima.bot === PENDENTE) {
+                /* A última é justamente a que está sem resposta: ela é a pergunta
+                de agora, não um turno anterior. */
+                completarResposta(ultima.user, conversa.mensagens.slice(0, -1));
+            }
+        })();
     }, [id]);
-
-    // 2. salva quando o histórico muda, depois do stream
+    const turnos = historico.length;
+    // 2. salva a pergunta assim que entra e a resposta quando o stream acaba.
+    //    Depender do array inteiro dispararia uma escrita a cada 50ms do stream.
     useEffect(() => {
-        if (historico.length === 0 || respondendo) return;
+        if (turnos === 0) return;
 
-        const existente = obterConversa(id as string);
-        salvarConversa({
-            id: id as string,
-            titulo: existente?.titulo ?? gerarTitulo(historico[0].user),
-            criadoEm: existente?.criadoEm ?? Date.now(),
-            favorita: existente?.favorita,
-            mensagens: historico,
-        });
-    }, [historico, id, respondendo]);
+        (async () => {
+            const existente = await obterConversa(id as string);
+            await salvarConversa({
+                id: id as string,
+                titulo: existente?.titulo ?? gerarTitulo(historico[0].user),
+                criadoEm: existente?.criadoEm ?? Date.now(),
+                favorita: existente?.favorita,
+                mensagens: historico,
+            });
+        })();
+        // historico é lido, não observado: turnos e respondendo é que marcam
+        // os dois instantes em que vale salvar.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [turnos, respondendo, id]);
 
     // 3. rola até o fim
     useEffect(() => {
