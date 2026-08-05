@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useSessao } from '@/lib/useSessao';
 import { sair } from '@/lib/auth';
 import Image from 'next/image';
@@ -35,14 +36,20 @@ export default function MenuUsuario() {
 
   if (!usuario) {
     return (
-      <div className="flex items-center gap-2">
-        <a href="/login" className="px-4 py-2 text-sm text-foreground hover:text-brand transition-colors">
+      <>
+        <Link
+          href="/login"
+          className="glass inline-flex items-center text-sm md:text-base text-brand px-4 md:px-8 py-1.5 rounded-[2rem] whitespace-nowrap hover:scale-103 transition-transform duration-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        >
           Entrar
-        </a>
-        <a href="/cadastro" className="px-4 py-2 text-sm rounded-full border border-brand text-brand hover:bg-brand hover:text-brand-foreground transition-colors">
+        </Link>
+        <Link
+          href="/cadastro"
+          className="glass glass-brand inline-flex items-center text-sm md:text-base text-brand px-4 md:px-8 py-1.5 rounded-[2rem] whitespace-nowrap hover:scale-103 transition-transform duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        >
           Cadastrar
-        </a>
-      </div>
+        </Link>
+      </>
     );
   }
 

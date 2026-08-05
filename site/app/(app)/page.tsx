@@ -1,11 +1,6 @@
 import Image from "next/image";
 import BuscaInicial from "../../components/BuscaInicial";
-
-const PERGUNTAS_FREQUENTES = [
-  "O que é o USPapo?",
-  "O que é o Jupiterweb?",
-  "Cardápio de hoje?",
-];
+import { PERGUNTAS_FREQUENTES } from "@/lib/perguntas";
 
 export default function Home() {
   return (

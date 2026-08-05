@@ -7,8 +7,40 @@ motor sem uma linha de código duplicada.
 """
 
 import json
+import unicodedata
 from dataclasses import dataclass
 from typing import Callable
+
+
+# ─────────────────────────────────────────────
+# Higiene dos argumentos que o modelo manda
+# ─────────────────────────────────────────────
+# Mora aqui, e não num módulo de ferramenta, porque toda ferramenta precisa
+# disso: o modelo erra a caixa, o acento e o tipo do argumento em qualquer uma.
+def normalizar(texto) -> str:
+    """Baixa a caixa, tira acento e apara: 'Física' e 'fisica' viram a mesma coisa."""
+    bruto = unicodedata.normalize("NFKD", str(texto).strip().lower())
+    return "".join(c for c in bruto if not unicodedata.combining(c))
+
+
+def em_lista(valor, padrao: list[str]) -> list[str]:
+    """Aceita None, string ou lista e devolve sempre uma lista de strings.
+
+    Modelo manda string onde o schema pede lista com frequência — e às vezes
+    manda "central, fisica" numa string só.
+    """
+    if valor is None:
+        return list(padrao)
+
+    if isinstance(valor, str):
+        itens = valor.split(",")
+    elif isinstance(valor, (list, tuple, set)):
+        itens = [item for valor_bruto in valor for item in str(valor_bruto).split(",")]
+    else:
+        itens = [str(valor)]
+
+    limpos = [item.strip() for item in itens if str(item).strip()]
+    return limpos or list(padrao)
 
 
 @dataclass(frozen=True)
@@ -18,6 +50,11 @@ class Ferramenta:
     `executar` recebe os argumentos do modelo por nome e devolve
     (texto_para_o_modelo, fontes). Ferramenta que não tem fonte: um cálculo,
     por exemplo, devolve lista vazia.
+
+    Os dois canais são disjuntos de propósito: a URL vai SÓ na lista de fontes,
+    nunca no texto. O frontend já as renderiza embaixo da resposta, e ver link
+    no resultado da ferramenta faz o modelo copiar uma lista de links por
+    conta própria — duplicando o que o site mostra.
     """
 
     nome: str

@@ -16,13 +16,12 @@ chamam com o registro deles.
 import json
 import re
 import time
-import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 
 import requests
 
-from uspapo.ferramentas import Registro
+from uspapo.ferramentas import Registro, em_lista, normalizar
 from uspapo.prompt import DIAS_SEMANA, FUSO_BR
 
 # A página do aluno, e o endpoint que ela consulta por baixo dos panos.
@@ -100,34 +99,8 @@ _CACHE: dict[int, tuple[float, dict]] = {}
 
 
 # ─────────────────────────────────────────────
-# Normalização de texto
+# Leitura da resposta do DWR
 # ─────────────────────────────────────────────
-def _normalizar(texto) -> str:
-    """Baixa a caixa, tira acento e apara: 'Física' e 'fisica' viram a mesma coisa."""
-    bruto = unicodedata.normalize("NFKD", str(texto).strip().lower())
-    return "".join(c for c in bruto if not unicodedata.combining(c))
-
-
-def _em_lista(valor, padrao: list[str]) -> list[str]:
-    """Aceita None, string ou lista e devolve sempre uma lista de strings.
-
-    Modelo manda string onde o schema pede lista com frequência — e às vezes
-    manda "central, fisica" numa string só.
-    """
-    if valor is None:
-        return list(padrao)
-
-    if isinstance(valor, str):
-        itens = valor.split(",")
-    elif isinstance(valor, (list, tuple, set)):
-        itens = [item for valor_bruto in valor for item in str(valor_bruto).split(",")]
-    else:
-        itens = [str(valor)]
-
-    limpos = [item.strip() for item in itens if str(item).strip()]
-    return limpos or list(padrao)
-
-
 def _decodificar(literal: str) -> str:
     """Converte um literal capturado ('null' ou uma string JSON) em texto."""
     if literal == "null":
@@ -205,7 +178,7 @@ def _resolver_dias(
     """
     hoje = datetime.now(FUSO_BR).date()
     # DIAS_SEMANA já está na ordem do weekday() do Python (0 = segunda).
-    por_nome = {_normalizar(nome.split("-")[0]): posicao
+    por_nome = {normalizar(nome.split("-")[0]): posicao
                 for posicao, nome in enumerate(DIAS_SEMANA)}
 
     escolhidas: list[date] = []
@@ -213,7 +186,7 @@ def _resolver_dias(
     ininteligiveis: list[str] = []
 
     for pedido in pedidos:
-        chave = _normalizar(pedido)
+        chave = normalizar(pedido)
         raiz = chave.split("-")[0]
 
         if chave in ("semana", "todos", "todos os dias", "a semana", "semana toda"):
@@ -250,7 +223,7 @@ def _resolver_dias(
             # "amanhã" num domingo cai na semana que vem: dizer a data resolvida
             # evita a dúvida de qual dia o RUCard não tinha.
             data = alvo.strftime("%d/%m/%Y")
-            fora.append(data if _normalizar(pedido) == _normalizar(data) else f"{pedido} ({data})")
+            fora.append(data if normalizar(pedido) == normalizar(data) else f"{pedido} ({data})")
 
     return sorted(escolhidas), fora, ininteligiveis
 
@@ -337,8 +310,8 @@ def consultar_bandejao(restaurantes=None, dias=None) -> tuple[str, list[str]]:
     apelidos: list[str] = []
     desconhecidos: list[str] = []
 
-    for pedido in _em_lista(restaurantes, list(RESTAURANTES)):
-        chave = _normalizar(pedido)
+    for pedido in em_lista(restaurantes, list(RESTAURANTES)):
+        chave = normalizar(pedido)
         chave = SINONIMOS.get(chave, chave)
         if chave in RESTAURANTES:
             if chave not in apelidos:
@@ -353,7 +326,7 @@ def consultar_bandejao(restaurantes=None, dias=None) -> tuple[str, list[str]]:
             [],
         )
 
-    pedidos_dias = _em_lista(dias, ["hoje"])
+    pedidos_dias = em_lista(dias, ["hoje"])
 
     # As quatro consultas em paralelo: sequencial isso passaria de dois segundos
     # com o frontend parado no "Usando ferramenta...".
@@ -375,7 +348,7 @@ def consultar_bandejao(restaurantes=None, dias=None) -> tuple[str, list[str]]:
         url = URL_PAGINA.format(codigo=codigo)
         fontes.append(url)
 
-        cabecalho = f"## Restaurante {nome}\n{url}"
+        cabecalho = f"## Restaurante {nome}"
 
         if semana is None:
             partes.append(f"{cabecalho}\n\nNão consegui consultar este bandejão agora.")
@@ -442,33 +415,23 @@ def registrar(registro: Registro) -> None:
     registro.ferramenta(
         nome="consultar_bandejao",
         descricao=(
-            "Consulta o cardápio da semana dos restaurantes universitários "
-            "(bandejões) do campus Butantã: Central, da Prefeitura (PUSP-CB), "
-            "da Física e da Química. Devolve almoço, jantar e calorias de "
-            "cada dia. Use SEMPRE que perguntarem sobre cardápio, comida, "
-            "almoço, jantar, bandejão ou RU. NUNCA use buscar_documentos "
-            "para isso."
+            "Cardápio da semana dos bandejões do Butantã, com almoço, jantar e "
+            "calorias. Use para qualquer pergunta sobre cardápio, comida ou RU."
         ),
         parametros={
             "type": "object",
             "properties": {
                 "restaurantes": {
                     "type": "array",
-                    "items": {
-                        "type": "string",
-                        "enum": list(RESTAURANTES),
-                    },
-                    "description": (
-                        "Quais bandejões consultar. Omita para consultar os quatro."
-                    ),
+                    "items": {"type": "string", "enum": list(RESTAURANTES)},
+                    "description": "Omita para consultar os quatro.",
                 },
                 "dias": {
                     "type": "array",
                     "items": {"type": "string"},
                     "description": (
-                        "Quais dias: 'hoje', 'amanha', um dia da semana "
-                        "('segunda' a 'domingo'), uma data 'dd/mm/aaaa', ou "
-                        "'semana' para os sete dias. Omita para hoje."
+                        "'hoje', 'amanha', dia da semana, data 'dd/mm/aaaa' ou "
+                        "'semana'. Omita para hoje."
                     ),
                 },
             },

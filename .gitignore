@@ -161,6 +161,8 @@ activemq-data/
 # Environments
 .env
 .envrc
+# Next.js: o site lê .env.local, que o padrão .env acima não pega.
+.env*.local
 .venv
 env/
 venv/
