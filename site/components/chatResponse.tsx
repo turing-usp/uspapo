@@ -204,6 +204,7 @@ function ChatResponse({ text, streaming = false }: { text: string; streaming?: b
                             {children}
                         </td>
                     ),
+                    br: () => <br className="my-2" />,
                 }}
             >
                 {visivel}
