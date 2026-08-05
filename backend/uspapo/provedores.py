@@ -41,6 +41,16 @@ class Provedor:
 
         return parametros
 
+    def teto_contexto(self) -> int:
+        """Quanto contexto cabe numa requisição para ESTE provedor.
+
+        O padrão do .env é calibrado para o modelo local, que aceita o que a
+        gente mandar. Uma API cobrada por token costuma ter uma janela por
+        minuto bem menor e recusa a requisição inteira quando ela sozinha passa
+        do limite: não adianta ter orçamento de 16k se o provedor corta em 6k.
+        """
+        return int(self.cfg.get("max_tokens_contexto") or config.MAX_TOKENS_CONTEXTO)
+
 
 def carregar_provedores() -> list[Provedor]:
     """Lê LLM_PROVIDERS (JSON) e instancia um cliente OpenAI por provedor.
@@ -85,6 +95,10 @@ def carregar_provedores() -> list[Provedor]:
             print(f"   [!] provedor '{nome}' ignorado: 'api_key' vazia no LLM_PROVIDERS.")
             continue
 
+        # max_retries=0 de propósito: quem repete é o conversa.py, que sabe
+        # respeitar o Retry-After do provedor, encolher o contexto quando a
+        # recusa foi por tamanho e desistir para o próximo da cadeia. O retry
+        # do SDK não sabe nada disso e só atrasaria a queda para o próximo.
         cliente = OpenAI(
             api_key=chave,
             base_url=cfg["base_url"],

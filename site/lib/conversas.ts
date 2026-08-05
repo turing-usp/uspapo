@@ -1,5 +1,6 @@
 // lib/conversas.ts
 import { criarCliente } from "./supabase";
+import { LIMITES, perfil } from "./limites";
 
 export type Mensagem = { user: string; bot: string; fontes?: string[] };
 
@@ -15,9 +16,13 @@ export type Conversa = {
 };
 
 const CHAVE = "uspapo:conversas";
-export const LIMITE = 20;
-export const LIMITE_LOCAL = 5;
-export const LIMITE_FAVORITAS = 5;
+
+/* Os números moram em lib/limites.ts, um perfil para quem tem conta e outro
+   para quem não tem. Estes re-exports existem para quem só precisa do teto de
+   anônimo (o caminho do localStorage, que nem consulta a sessão). */
+export const LIMITE = LIMITES.conta.conversas;
+export const LIMITE_LOCAL = LIMITES.anonimo.conversas;
+export const LIMITE_FAVORITAS = LIMITES.conta.favoritas;
 
 /* Sem sessão, tudo cai no localStorage. Uma chamada por operação é
    barato: o cliente lê o cookie, não vai à rede. */
@@ -85,7 +90,7 @@ export async function salvarConversa(conversa: Conversa): Promise<void> {
     const todas = [conversa, ...outras];
     const favoritas = todas.filter((c) => c.favorita);
     const resto = todas.filter((c) => !c.favorita);
-    escrever([...favoritas, ...resto.slice(0, LIMITE_LOCAL)]);
+    escrever([...favoritas, ...resto.slice(0, LIMITES.anonimo.conversas)]);
     return;
   }
 
@@ -118,6 +123,25 @@ export async function salvarConversa(conversa: Conversa): Promise<void> {
         .eq("conversa_id", conversa.id).eq("ordem", i);
     }
   }
+
+  await podarConversas(supabase);
+}
+
+/* O teto da conta também precisa ser aplicado: até aqui só o localStorage
+   cortava, e quem tinha conta acumulava conversa sem limite enquanto lia na
+   tela que o teto era 20. As favoritas nunca entram na conta: é exatamente
+   para isso que elas servem. */
+async function podarConversas(supabase: ReturnType<typeof criarCliente>): Promise<void> {
+  const { data } = await supabase
+    .from("conversas").select("id")
+    .eq("favorita", false)
+    .order("atualizada_em", { ascending: false });
+
+  const excedentes = (data ?? []).slice(LIMITES.conta.conversas);
+  if (!excedentes.length) return;
+
+  /* As mensagens vão junto pelo cascade. */
+  await supabase.from("conversas").delete().in("id", excedentes.map((c) => c.id));
 }
 
 export function gerarTitulo(primeiraPergunta: string): string {
@@ -171,7 +195,7 @@ export async function alternarFavorita(id: string): Promise<boolean> {
     const conversas = ler();
     const alvo = conversas.find((c) => c.id === id);
     if (!alvo) return false;
-    if (!alvo.favorita && conversas.filter((c) => c.favorita).length >= LIMITE_FAVORITAS) {
+    if (!alvo.favorita && conversas.filter((c) => c.favorita).length >= LIMITES.anonimo.favoritas) {
       return false;
     }
     alvo.favorita = !alvo.favorita;

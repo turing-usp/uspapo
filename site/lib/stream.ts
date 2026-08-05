@@ -1,6 +1,8 @@
 import { novoId } from "./conversas";
 // lib/stream.ts
 import type { Mensagem } from "@/lib/conversas";
+import { perfil } from "./limites";
+import { criarCliente } from "./supabase";
 
 export type EventoChat =
   | { tipo: "modo"; streaming: boolean }
@@ -86,6 +88,20 @@ export function obterIdDispositivo(): string {
   return idDispositivo;
 }
 
+/* O access token da sessão, se houver uma. É com ele que o backend sabe que a
+   pergunta vem de uma conta e aplica a cota de conta em vez da de anônimo:
+   o X-Device-Id é falsificável e não serviria para liberar cota maior.
+   Sem sessão (ou com o Supabase fora do ar) devolve string vazia: perguntar
+   sem estar logado tem que continuar funcionando. */
+async function tokenDaSessao(): Promise<string> {
+  try {
+    const { data } = await criarCliente().auth.getSession();
+    return data.session?.access_token ?? "";
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Envia a pergunta e chama `aoEvento` para cada evento recebido.
  */
@@ -94,16 +110,25 @@ export async function perguntar(
   anteriores: Mensagem[],
   aoEvento: (evento: EventoChat) => void
 ): Promise<void> {
+  const token = await tokenDaSessao();
+  const { historico: profundidade } = perfil(Boolean(token));
+
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Device-Id": obterIdDispositivo(),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({
       pergunta,
       stream: true,
-      historico: anteriores.map((m) => ({ pergunta: m.user, resposta: m.bot })),
+      /* Só os últimos turnos: o backend ainda corta pelo orçamento de token,
+         mas mandar a conversa inteira pela rede a cada pergunta é desperdício
+         que cresce sem parar numa conversa longa. */
+      historico: anteriores
+        .slice(-profundidade)
+        .map((m) => ({ pergunta: m.user, resposta: m.bot })),
     }),
   });
 
@@ -111,7 +136,7 @@ export async function perguntar(
     /* O 429 do rate limit traz uma explicação pronta para o aluno ler; sem
        isto ela viraria "erro ao conectar com o servidor". */
     const corpo = await res.json().catch(() => null);
-    throw new Error(corpo?.erro ?? "Erro na comunicação com o back-end");
+    throw new Error(corpo?.erro ?? "Não consegui falar com o USPapo agora. Tente de novo em instantes.");
   }
 
   const tipoConteudo = res.headers.get("content-type") ?? "";

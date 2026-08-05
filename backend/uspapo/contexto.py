@@ -30,6 +30,24 @@ def custo_mensagem(mensagem: dict) -> int:
     return custo
 
 
+def cortar(texto: str, teto_tokens: int) -> str:
+    """Corta um texto que não cabe no orçamento, avisando que foi cortado.
+
+    O aviso não é gentileza: uma tabela truncada em silêncio é lida pelo modelo
+    como a lista completa, e ele responde "o curso tem 8 disciplinas" olhando
+    para as 8 que sobraram de 40.
+    """
+    if estimar_tokens(texto) <= teto_tokens:
+        return texto
+
+    limite = max(int(teto_tokens * config.CHARS_POR_TOKEN), 200)
+    return (
+        texto[:limite].rstrip()
+        + "\n\n[Resultado cortado por tamanho: havia mais conteúdo além deste "
+        "ponto. Diga isso ao aluno e ofereça uma consulta mais específica.]"
+    )
+
+
 def normalizar_historico(bruto: object) -> list[dict]:
     """Filtra os turnos anteriores que vieram do frontend.
 
@@ -69,21 +87,44 @@ class Orcamento:
         self.reserva = reserva
         self.custo_ferramentas = estimar_tokens(registro.json_schemas)
 
-    def montar(self, pergunta: str, historico: list[dict]) -> tuple[list[dict], int]:
+    def reserva_para(self, teto: int) -> int:
+        """O espaço guardado para os resultados de ferramenta, dado o teto.
+
+        São duas perguntas diferentes, e vale a menor resposta. RESERVA_
+        FERRAMENTAS diz quanto as ferramentas PRECISAM: uma grade curricular
+        completa dá ~2.600 tokens, o cardápio da semana dos quatro bandejões
+        ~2.300 — e isso é propriedade delas, não do modelo. O terço do teto diz
+        quanto DÁ para pagar: num orçamento de 6.000 uma reserva de 4.000 não
+        deixaria espaço nem para a pergunta do aluno.
+
+        Na prática o valor configurado manda de 12.000 para cima (o modelo
+        local) e a fração manda nos tetos apertados das APIs.
+        """
+        return min(self.reserva, teto // 3)
+
+    def montar(
+        self, pergunta: str, historico: list[dict], teto: int | None = None
+    ) -> tuple[list[dict], int]:
         """Monta as messages cabendo no orçamento.
 
         Devolve também o índice onde o turno de agora começa: dali para a frente
         as mensagens são intocáveis (a pergunta e o par assistant/tool das
         ferramentas), e só o prefixo de histórico pode ser podado mais tarde.
+
+        O `teto` permite um orçamento menor que o padrão nesta pergunta. Serve
+        para dois casos: um provedor cuja janela de token é menor que a do
+        modelo local, e a segunda tentativa depois de o provedor ter recusado a
+        requisição por tamanho.
         """
+        teto = teto or self.max_tokens
         sistema = {"role": "system", "content": montar_prompt_sistema()}
         atual = {"role": "user", "content": pergunta}
 
         disponivel = (
-            self.max_tokens
+            teto
             - custo_mensagem(sistema)
             - self.custo_ferramentas
-            - self.reserva
+            - self.reserva_para(teto)
         )
 
         # A pergunta de agora entra sempre. Se ela sozinha estourar o orçamento,
@@ -116,7 +157,9 @@ class Orcamento:
         mensagens = [sistema] + anteriores + [atual]
         return mensagens, len(mensagens) - 1
 
-    def podar(self, mensagens: list[dict], inicio_turno: int) -> int:
+    def podar(
+        self, mensagens: list[dict], inicio_turno: int, teto: int | None = None
+    ) -> int:
         """Descarta turnos antigos até o total caber de novo no orçamento.
 
         Roda entre as rodadas de ferramenta, quando os resultados já entraram na
@@ -124,12 +167,13 @@ class Orcamento:
         'assistant' que a chamou deixa um tool_call_id órfão, e aí o provedor
         recusa a requisição inteira.
         """
+        teto = teto or self.max_tokens
         total = self.custo_ferramentas + sum(
             custo_mensagem(mensagem) for mensagem in mensagens
         )
 
         # O índice 0 é o prompt de sistema; o histórico vai dali até inicio_turno.
-        while total > self.max_tokens and inicio_turno > 1:
+        while total > teto and inicio_turno > 1:
             # Os pares saem juntos, para a conversa nunca começar por uma
             # resposta sem a pergunta que a gerou.
             removidas = mensagens[1:3]

@@ -23,6 +23,47 @@ def normalizar(texto) -> str:
     return "".join(c for c in bruto if not unicodedata.combining(c))
 
 
+# Palavras que aparecem no nome das coisas e não distinguem nada: quem procura
+# "engenharia de computação" e quem procura "engenharia da computação" quer o
+# mesmo curso, e o "de/da" é a única diferença entre as duas buscas.
+LIGACOES = frozenset(
+    "de da do das dos e em no na nos nas a o as os um uma com para".split()
+)
+
+
+def palavras(texto) -> list[str]:
+    """As palavras que importam num pedido: sem acento, sem pontuação, sem ligação.
+
+    Hífen, barra e ponto viram separador, e não caractere: 'segunda-feira',
+    'segunda feira' e 'segunda.feira' têm que dar na mesma lista.
+    """
+    limpo = "".join(c if c.isalnum() else " " for c in normalizar(texto))
+    return [p for p in limpo.split() if p not in LIGACOES]
+
+
+def casa(pedido, alvo) -> bool:
+    """O `pedido` casa com o `alvo` se cada palavra dele aparece lá dentro.
+
+    Cada palavra do pedido precisa ser uma palavra do alvo ou o começo de uma
+    ('eng comp' casa com 'engenharia de computação'). A ordem não importa e as
+    ligações somem, que são as duas coisas que o aluno mais varia ao escrever.
+
+    Deliberadamente não é busca aproximada: sem erro de digitação tolerado, um
+    pedido que casa casa por um motivo explicável. Chutar o curso errado é bem
+    pior do que dizer que não encontrou — o aluno pode reescrever, mas não tem
+    como saber que a grade que ele leu era de outro curso.
+    """
+    pedidas = palavras(pedido)
+    if not pedidas:
+        return False
+
+    disponiveis = palavras(alvo)
+    return all(
+        any(tinha.startswith(procurada) for tinha in disponiveis)
+        for procurada in pedidas
+    )
+
+
 def em_lista(valor, padrao: list[str]) -> list[str]:
     """Aceita None, string ou lista e devolve sempre uma lista de strings.
 
