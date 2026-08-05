@@ -2,9 +2,9 @@
 "use client";
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { listarConversas, apagarConversa, alternarFavorita, renomearConversa, gerarTitulo, LIMITE_FAVORITAS, LIMITE, type Conversa } from "@/lib/conversas";
+import { listarConversas, apagarConversa, alternarFavorita, renomearConversa, gerarTitulo, LIMITE_FAVORITAS, LIMITE,buscarConversas, type Conversa } from "@/lib/conversas";
 import { MenuConversa } from "@/components/MenuConversa";
+import { useSessao } from '@/lib/useSessao';
 
 type Grupo = { rotulo: string; conversas: Conversa[] };
 
@@ -48,11 +48,9 @@ function formatarData(timestamp: number) {
 }
 
 export default function Historico() {
-  const router = useRouter();
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [busca, setBusca] = useState("");
   const [carregando, setCarregando] = useState(true);
-  const [agrupadas, setAgrupadas] = useState<Grupo[]>([]);
 
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [novoTitulo, setNovoTitulo] = useState("");
@@ -62,54 +60,53 @@ export default function Historico() {
     setNovoTitulo(conversa.titulo);
   };
 
-  const confirmarEdicao = () => {
-    if (editandoId && novoTitulo.trim()) {
-      renomearConversa(editandoId, novoTitulo);
-      setConversas(listarConversas());
-    }
-    setEditandoId(null);
-  };
+  const confirmarEdicao = async () => {
+  if (editandoId && novoTitulo.trim()) {
+    await renomearConversa(editandoId, novoTitulo);
+    setConversas(await listarConversas());
+  }
+  setEditandoId(null);
+};
 
   useEffect(() => {
-    const conversas = listarConversas();
-    setConversas(conversas);
-    setAgrupadas(agrupar(conversas));
-    setCarregando(false);
+    (async () => {
+      const lista = await listarConversas();
+      setConversas(lista);
+      setCarregando(false);
+    })();
   }, []);
 
   const [pendente, setPendente] = useState<Conversa | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const filtradas = useMemo(() => {
-    const semPendente = conversas.filter((c) => c.id !== pendente?.id);
+  const [filtradas, setFiltradas] = useState<Conversa[]>([]);
 
-    const termo = busca.trim().toLowerCase();
-    if (!termo) return semPendente;
-
-    return semPendente.filter((c) =>
-      c.titulo.toLowerCase().includes(termo) ||
-      c.mensagens.some(
-        (m) => m.user.toLowerCase().includes(termo) || m.bot.toLowerCase().includes(termo)
-      )
-    );
-  }, [conversas, busca, pendente]);
+  useEffect(() => {
+    /* Espera o usuário parar de digitar: sem isso, cada tecla vira uma
+      consulta ao Postgres. */
+    const t = setTimeout(async () => {
+      const achadas = await buscarConversas(busca);
+      setFiltradas(achadas.filter((c) => c.id !== pendente?.id));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [busca, conversas, pendente]);
 
   const filtradasAgrupadas = useMemo(() => agrupar(filtradas), [filtradas]);
 
-  const apagarComDesfazer = (conversa: Conversa) => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      apagarConversa(pendente!.id);   // confirma a exclusão anterior antes de começar outra
-    }
+    const apagarComDesfazer = (conversa: Conversa) => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        apagarConversa(pendente!.id);   // fire-and-forget: a UI já removeu
+      }
 
-    setPendente(conversa);
-    timerRef.current = setTimeout(() => {
-      apagarConversa(conversa.id);
-      setConversas(listarConversas());
-      setPendente(null);
-      timerRef.current = null;
-    }, 6000);
-  };
+      setPendente(conversa);
+      timerRef.current = setTimeout(async () => {
+        await apagarConversa(conversa.id);
+        setConversas(await listarConversas());
+        setPendente(null);
+        timerRef.current = null;
+      }, 6000);
+    };
 
   const desfazer = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -144,8 +141,10 @@ export default function Historico() {
     setAviso(texto);
     setTimeout(() => setAviso(null), 4000);
   };
+  
 
   const naoFavoritas = conversas.filter((c) => !c.favorita).length;
+  const {usuario} = useSessao();
 
   return (
     <>
@@ -160,7 +159,9 @@ export default function Historico() {
       </div>
       <p className="text-muted-foreground mb-4">Retome suas perguntas anteriores e continue de onde parou</p>
       <p className="text-faint-foreground text-xs mt-2 mb-5">
-        Suas conversas ficam salvas apenas neste dispositivo.
+        {usuario
+          ? "Suas conversas ficam salvas na sua conta e sincronizam entre dispositivos."
+          : "Suas conversas ficam salvas apenas neste navegador. Crie uma conta para sincronizar."}
       </p>
 
       {naoFavoritas >= LIMITE * 0.9 && (
@@ -251,8 +252,8 @@ export default function Historico() {
                             <div className="min-w-0">
                             <p className="text-foreground text-base sm:text-lg truncate">{conversa.titulo}</p>
                             <p className="text-muted-foreground text-sm mt-1">
-                                {formatarData(conversa.criadoEm)} · {conversa.mensagens.length}{" "}
-                                {conversa.mensagens.length === 1 ? "pergunta" : "perguntas"}
+                                {formatarData(conversa.criadoEm)} · {conversa.total ?? 0}{" "}
+                                {conversa.total === 1 ? "pergunta" : "perguntas"}
                             </p>
                             </div>
                         </Link>
@@ -260,13 +261,13 @@ export default function Historico() {
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 z-30">
                             <MenuConversa
                               favorita={!!conversa.favorita}
-                              onFavoritar={() => {
-                                const ok = alternarFavorita(conversa.id);
+                              onFavoritar={async () => {
+                                const ok = await alternarFavorita(conversa.id);
                                 if (!ok) {
                                   mostrarAviso(`Limite de ${LIMITE_FAVORITAS} favoritas atingido. Remova uma para adicionar outra.`);
                                   return;
                                 }
-                                setConversas(listarConversas());
+                                setConversas(await listarConversas());
                               }}
                               onRenomear={() => iniciarEdicao(conversa)}
                               onApagar={() => apagarComDesfazer(conversa)}
