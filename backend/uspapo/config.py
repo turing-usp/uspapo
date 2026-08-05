@@ -41,19 +41,36 @@ TOP_K_MAX = 5
 # Duas defesas para o mesmo problema, o custo por pergunta: o rate limit cuida
 # de quantas perguntas cada um faz, o orçamento cuida do tamanho de cada uma.
 
-# Quantas perguntas cada aparelho pode fazer por janela de tempo. As janelas
-# valem todas ao mesmo tempo: a de minuto segura a rajada, a de dia segura o uso
+# Quantas perguntas cada um pode fazer por janela de tempo. As janelas valem
+# todas ao mesmo tempo: a de minuto segura a rajada, a de dia segura o uso
 # crônico. Basta pôr 0 para desligar uma delas.
-LIMITES_TAXA = [
+#
+# São duas escadas. Quem está logado é identificado pela conta (um token que o
+# backend confere), então a cota vale para a pessoa e acompanha ela entre
+# celular e computador; quem não está é identificado pelo aparelho, um id que o
+# próprio navegador gera e qualquer um pode trocar. Por isso o anônimo é mais
+# apertado: não é castigo, é o que dá para sustentar quando a chave é
+# descartável.
+LIMITES_TAXA_ANONIMO = [
     ("minuto",     60,    int(os.getenv("RATE_LIMIT_MINUTO", "8"))),
     ("10 minutos", 600,   int(os.getenv("RATE_LIMIT_10MIN",  "30"))),
     ("hora",       3600,  int(os.getenv("RATE_LIMIT_HORA",   "100"))),
     ("dia",        86400, int(os.getenv("RATE_LIMIT_DIA",    "400"))),
 ]
 
-# Teto do que vai para o modelo, não importa o tamanho da conversa no frontend.
+LIMITES_TAXA_CONTA = [
+    ("minuto",     60,    int(os.getenv("RATE_LIMIT_CONTA_MINUTO", "15"))),
+    ("10 minutos", 600,   int(os.getenv("RATE_LIMIT_CONTA_10MIN",  "80"))),
+    ("hora",       3600,  int(os.getenv("RATE_LIMIT_CONTA_HORA",   "300"))),
+    ("dia",        86400, int(os.getenv("RATE_LIMIT_CONTA_DIA",    "1200"))),
+]
+
+# Teto padrão do que vai para o modelo, não importa o tamanho da conversa no
+# frontend. Cada provedor pode ter um teto menor (Provedor.teto_contexto).
 MAX_TOKENS_CONTEXTO = int(os.getenv("MAX_TOKENS_CONTEXTO", "16000"))
 # Espaço guardado para o que as ferramentas ainda vão devolver nesta pergunta.
+# É o quanto elas PRECISAM, que depende das ferramentas e não do modelo; o
+# quanto cabe é outra conta, e quem faz as duas é Orcamento.reserva_para().
 RESERVA_FERRAMENTAS = int(os.getenv("RESERVA_FERRAMENTAS", "4000"))
 # Corte grosso antes de qualquer contagem, para não estimar tokens à toa.
 MAX_MENSAGENS_HISTORICO = 40
@@ -72,9 +89,10 @@ ORIGENS_CORS = [
     "https://www.uspapo.turingusp.com",
 ]
 
-# X-Device-Id é header customizado: sem ele liberado aqui, o navegador barra a
-# requisição já no preflight OPTIONS.
-HEADERS_CORS = ["Content-Type", "X-Device-Id"]
+# X-Device-Id e Authorization são headers customizados: sem eles liberados
+# aqui, o navegador barra a requisição já no preflight OPTIONS, e aí o login
+# não chegaria nem a ser conferido.
+HEADERS_CORS = ["Content-Type", "X-Device-Id", "Authorization"]
 
 # O Render atribui a porta via variável de ambiente.
 PORTA = int(os.getenv("PORT", "5000"))

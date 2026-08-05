@@ -17,7 +17,8 @@ def gerar_sse(eventos: Iterator[dict]) -> Iterator[str]:
     except Exception as erro:
         # O status HTTP 200 já foi enviado; erro aqui só pode virar evento.
         print(f"[stream] erro inesperado: {type(erro).__name__}: {erro}")
-        yield f"data: {json.dumps({'tipo': 'erro', 'mensagem': 'Erro interno no servidor.'})}\n\n"
+        recado = {"tipo": "erro", "mensagem": "Deu algo errado por aqui. Tente perguntar de novo!"}
+        yield f"data: {json.dumps(recado, ensure_ascii=False)}\n\n"
         yield f"data: {json.dumps({'tipo': 'fim'})}\n\n"
 
 

@@ -11,12 +11,30 @@ os turnos anteriores da conversa (o frontend guarda tudo no localStorage).
 from flask import Flask, Response, jsonify, request, stream_with_context
 from flask_cors import CORS
 
-from uspapo import config
+from uspapo import config, contas, saude
 from uspapo.contexto import Orcamento, normalizar_historico
 from uspapo.conversa import executar_conversa
 from uspapo.limites import identificar_cliente, verificar_limite
 from uspapo.provedores import carregar_provedores
 from uspapo.saida import agregar, gerar_sse
+
+
+def _espera_legivel(segundos: int) -> str:
+    """'em 40 segundos', 'em 3 minutos': o que o aluno precisa saber.
+
+    Dizer o tempo concreto é melhor do que nomear a janela estourada: "limite
+    por 10 minutos" não responde a única pergunta de quem levou o bloqueio, que
+    é quando pode perguntar de novo.
+    """
+    if segundos < 60:
+        return f"em {segundos} segundo{'s' if segundos != 1 else ''}"
+
+    minutos = round(segundos / 60)
+    if minutos < 60:
+        return f"em {minutos} minuto{'s' if minutos != 1 else ''}"
+
+    horas = round(minutos / 60)
+    return f"em {horas} hora{'s' if horas != 1 else ''}"
 
 
 def criar_app(registro, *, rotulo_indice: str) -> Flask:
@@ -40,16 +58,19 @@ def criar_app(registro, *, rotulo_indice: str) -> Flask:
 
     print("-> Cadeia de LLMs:", " -> ".join(p.nome for p in provedores))
     print("-> Ferramentas:", ", ".join(sorted(registro.nomes)))
+    aviso = contas.aviso_de_configuracao()
+    print("-> Contas:", aviso or "reconhecidas pelo token do Supabase")
 
     @app.route("/chat", methods=["POST"])
     def chat():
         # Antes de qualquer trabalho: quem estourou o limite não custa nada.
-        excedeu = verificar_limite(identificar_cliente())
+        chave, escada = identificar_cliente()
+        excedeu = verificar_limite(chave, escada)
         if excedeu:
             janela, espera = excedeu
             resposta = jsonify({
-                "erro": f"Você fez muitas perguntas em pouco tempo (limite por {janela}). "
-                        "Espere um pouquinho e tente de novo.",
+                "erro": f"Você perguntou bastante coisa em pouco tempo! "
+                        f"Pode voltar a perguntar {_espera_legivel(espera)}.",
                 "limite": janela,
                 "retry_after": espera,
             })
@@ -61,12 +82,12 @@ def criar_app(registro, *, rotulo_indice: str) -> Flask:
         dados = request.get_json(silent=True)
 
         if not dados or "pergunta" not in dados:
-            return jsonify({"erro": "Campo 'pergunta' é obrigatório"}), 400
+            return jsonify({"erro": "Não recebi nenhuma pergunta. Tente escrever de novo."}), 400
 
         pergunta = str(dados["pergunta"]).strip()
 
         if not pergunta:
-            return jsonify({"erro": "Pergunta vazia"}), 400
+            return jsonify({"erro": "Sua pergunta chegou vazia. Escreva o que você quer saber!"}), 400
 
         historico = normalizar_historico(dados.get("historico"))
         eventos = executar_conversa(
@@ -88,7 +109,7 @@ def criar_app(registro, *, rotulo_indice: str) -> Flask:
             corpo, status = agregar(eventos)
         except Exception as erro:
             print(f"Erro ao processar pergunta: {erro}")
-            return jsonify({"erro": "Erro interno ao processar a pergunta no servidor."}), 500
+            return jsonify({"erro": "Deu algo errado por aqui. Tente perguntar de novo!"}), 500
 
         return jsonify(corpo), status
 
@@ -97,6 +118,10 @@ def criar_app(registro, *, rotulo_indice: str) -> Flask:
         return jsonify({
             "ok": True,
             "provedores": [p.nome for p in provedores],
+            # Quanto falta de castigo em cada provedor: é o que responde "por
+            # que a cadeia está caindo para o segundo?" sem abrir o log.
+            "castigos": saude.panorama([p.nome for p in provedores]),
+            "contas": contas.disponivel(),
             "indice": rotulo_indice,
             # Com dois conjuntos de ferramentas possíveis, é a forma mais rápida
             # de saber qual backend está no ar.

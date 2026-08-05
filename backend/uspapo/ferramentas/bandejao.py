@@ -21,7 +21,7 @@ from datetime import date, datetime, timedelta
 
 import requests
 
-from uspapo.ferramentas import Registro, em_lista, normalizar
+from uspapo.ferramentas import Registro, casa, em_lista, normalizar, palavras
 from uspapo.prompt import DIAS_SEMANA, FUSO_BR
 
 # A página do aluno, e o endpoint que ela consulta por baixo dos panos.
@@ -58,22 +58,85 @@ RESTAURANTES = {
     "quimica": (9, "da Química"),
 }
 
-# O que o modelo provavelmente vai mandar no lugar do apelido canônico.
+# Palavras que dizem "isto é um restaurante" sem dizer QUAL. Somem antes de
+# comparar, senão "ru da física" nunca casaria com "da Física".
+GENERICAS = frozenset(
+    "ru rus bandejao bandejoes bandeco bandex restaurante restaurantes "
+    "refeitorio cardapio comida campus predio".split()
+)
+
+# O que o aluno escreve no lugar do apelido canônico e o casamento por palavra
+# não resolve sozinho: sigla, nome oficial da unidade, referência geográfica.
+# As chaves já estão normalizadas (sem acento e em minúscula).
 SINONIMOS = {
-    "ru central": "central",
-    "restaurante central": "central",
+    # Central
+    "central butanta": "central",
+    "ru central butanta": "central",
+    "principal": "central",
+    # Prefeitura
     "pusp": "prefeitura",
     "pusp-cb": "prefeitura",
     "puspcb": "prefeitura",
     "pusp cb": "prefeitura",
     "prefeitura do campus": "prefeitura",
+    "prefeitura do campus butanta": "prefeitura",
+    # Física
     "fisicas": "fisica",
     "if": "fisica",
+    "ifusp": "fisica",
+    "instituto de fisica": "fisica",
+    # Química
     "quimicas": "quimica",
     "iq": "quimica",
+    "iqusp": "quimica",
+    "instituto de quimica": "quimica",
 }
 
 REFEICOES = {"A": "almoço", "J": "jantar"}
+
+# ─────────────────────────────────────────────
+# Vocabulário de dias
+# ─────────────────────────────────────────────
+# A raiz de três letras de cada dia, na ordem do weekday() do Python (0 =
+# segunda). É o truque que o disciplinas.py já usa: uma raiz absorve "seg",
+# "segunda", "segunda-feira" e "segunda feira" de uma vez.
+RAIZES_DIA = tuple(normalizar(nome)[:3] for nome in DIAS_SEMANA)
+
+# Palavras que acompanham o dia sem mudar QUAL dia é. "sexta no jantar" e
+# "sexta" pedem o mesmo dia — a refeição já vem inteira na resposta.
+#
+# "que vem" e "próxima" ficam DE FORA de propósito: elas mudam o dia, e para
+# outro que o RUCard nem publica. Tratá-las como enfeite faria "quinta que vem"
+# devolver o cardápio da quinta desta semana — resposta errada com cara de
+# certa, que é o pior resultado possível aqui.
+RUIDO_DIA = frozenset(
+    "feira dia almoco jantar janta noite tarde manha cedo dessa desta esse este essa".split()
+)
+
+# Pedidos que dá para entender mas ficam fora do que existe: o RUCard publica
+# só a semana corrente. Dizer isso é diferente de "não entendi".
+OUTRA_SEMANA = frozenset(
+    [
+        "semana que vem", "proxima semana", "semana proxima", "semana seguinte",
+        "mes que vem", "proximo mes", "semana passada", "semana anterior",
+    ]
+)
+
+# Frases inteiras, já reduzidas às palavras que importam.
+SEMANA_TODA = frozenset(
+    ["semana", "todos", "todos dias", "semana toda", "semana inteira", "tudo", "todas"]
+)
+FIM_DE_SEMANA = frozenset(["fim semana", "final semana", "fds", "sabado domingo"])
+# Quantos dias somar a hoje.
+RELATIVOS = {
+    "hoje": 0,
+    "hj": 0,
+    "agora": 0,
+    "amanha": 1,
+    "depois amanha": 2,
+    "ontem": -1,
+    "anteontem": -2,
+}
 
 # Cardápio longo demais vira custo de token sem virar informação.
 MAX_CELULA = 300
@@ -96,6 +159,43 @@ _AVISO_SEMANA = re.compile(rf"obscdpsmn:{_LITERAL}")
 _DESTAQUE = re.compile(r"\*\*(.+?)\*\*", re.S)
 
 _CACHE: dict[int, tuple[float, dict]] = {}
+
+
+# ─────────────────────────────────────────────
+# Qual restaurante o aluno pediu
+# ─────────────────────────────────────────────
+def _apelido(pedido: str) -> str | None:
+    """Traduz o que veio para um apelido de RESTAURANTES, ou None.
+
+    Em quatro passadas, da mais precisa para a mais tolerante: apelido exato,
+    sinônimo conhecido, e só então o casamento por palavra — depois de tirar as
+    genéricas, que é o que faz "ru da física" e "bandejão da física" chegarem
+    ao mesmo lugar que "física".
+    """
+    chave = normalizar(pedido)
+    if chave in RESTAURANTES:
+        return chave
+    if chave in SINONIMOS:
+        return SINONIMOS[chave]
+
+    especificas = [p for p in palavras(pedido) if p not in GENERICAS]
+    if not especificas:
+        return None
+
+    # Sem as genéricas o pedido pode ter virado um apelido ou sinônimo direto.
+    reduzido = " ".join(especificas)
+    if reduzido in RESTAURANTES:
+        return reduzido
+    if reduzido in SINONIMOS:
+        return SINONIMOS[reduzido]
+
+    # Casa contra o apelido e contra o nome de exibição ("da Física"). Só vale
+    # se UM restaurante casar: entre dois, chutar responderia sobre o errado.
+    achados = [
+        apelido for apelido, (_, nome) in RESTAURANTES.items()
+        if casa(reduzido, apelido) or casa(reduzido, nome)
+    ]
+    return achados[0] if len(achados) == 1 else None
 
 
 # ─────────────────────────────────────────────
@@ -177,32 +277,50 @@ def _resolver_dias(
     ele responder sobre o dia errado.
     """
     hoje = datetime.now(FUSO_BR).date()
-    # DIAS_SEMANA já está na ordem do weekday() do Python (0 = segunda).
-    por_nome = {normalizar(nome.split("-")[0]): posicao
-                for posicao, nome in enumerate(DIAS_SEMANA)}
 
     escolhidas: list[date] = []
     fora: list[str] = []
     ininteligiveis: list[str] = []
 
+    def anotar(alvo: date) -> None:
+        if alvo not in escolhidas:
+            escolhidas.append(alvo)
+
     for pedido in pedidos:
         chave = normalizar(pedido)
-        raiz = chave.split("-")[0]
+        # Sem o ruído sobra só o que identifica o dia: "sexta no jantar" e
+        # "sexta-feira" viram os mesmos ['sexta'].
+        uteis = [p for p in palavras(pedido) if p not in RUIDO_DIA]
+        frase = " ".join(uteis)
+        raiz = uteis[0][:3] if uteis else ""
 
-        if chave in ("semana", "todos", "todos os dias", "a semana", "semana toda"):
+        if frase in SEMANA_TODA:
             return list(disponiveis), [], []
 
+        # "quinta que vem", "semana que vem": entendido, mas fora do que o
+        # RUCard publica. Vai para `fora`, não para `ininteligiveis`.
+        if frase in OUTRA_SEMANA or {"vem", "proxima", "proximo"} & set(uteis):
+            fora.append(pedido)
+            continue
+
+        if frase in FIM_DE_SEMANA:
+            # Sábado e domingo da semana publicada, os que existirem nela.
+            achou = [d for d in disponiveis if d.weekday() >= 5]
+            if achou:
+                for dia in achou:
+                    anotar(dia)
+            else:
+                fora.append("o fim de semana")
+            continue
+
         alvo = None
-        if chave in ("hoje", "hj"):
-            alvo = hoje
-        elif chave == "amanha":
-            alvo = hoje + timedelta(days=1)
-        elif chave == "ontem":
-            alvo = hoje - timedelta(days=1)
-        elif raiz in por_nome:
-            alvo = next((d for d in disponiveis if d.weekday() == por_nome[raiz]), None)
+        if frase in RELATIVOS:
+            alvo = hoje + timedelta(days=RELATIVOS[frase])
+        elif raiz in RAIZES_DIA and len(uteis) == 1:
+            posicao = RAIZES_DIA.index(raiz)
+            alvo = next((d for d in disponiveis if d.weekday() == posicao), None)
             if alvo is None:
-                fora.append(DIAS_SEMANA[por_nome[raiz]])
+                fora.append(DIAS_SEMANA[posicao])
                 continue
         else:
             for formato in ("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d", "%d/%m"):
@@ -217,8 +335,7 @@ def _resolver_dias(
         if alvo is None:
             ininteligiveis.append(pedido)
         elif alvo in disponiveis:
-            if alvo not in escolhidas:
-                escolhidas.append(alvo)
+            anotar(alvo)
         else:
             # "amanhã" num domingo cai na semana que vem: dizer a data resolvida
             # evita a dúvida de qual dia o RUCard não tinha.
@@ -311,18 +428,16 @@ def consultar_bandejao(restaurantes=None, dias=None) -> tuple[str, list[str]]:
     desconhecidos: list[str] = []
 
     for pedido in em_lista(restaurantes, list(RESTAURANTES)):
-        chave = normalizar(pedido)
-        chave = SINONIMOS.get(chave, chave)
-        if chave in RESTAURANTES:
-            if chave not in apelidos:
-                apelidos.append(chave)
-        else:
+        apelido = _apelido(pedido)
+        if apelido is None:
             desconhecidos.append(pedido)
+        elif apelido not in apelidos:
+            apelidos.append(apelido)
 
     if not apelidos:
         return (
             f"Não conheço o restaurante {', '.join(desconhecidos)}. "
-            f"Os bandejões disponíveis são: {', '.join(RESTAURANTES)}.",
+            f"Os bandejões do Butantã são: {', '.join(RESTAURANTES)}.",
             [],
         )
 
@@ -430,8 +545,10 @@ def registrar(registro: Registro) -> None:
                     "type": "array",
                     "items": {"type": "string"},
                     "description": (
-                        "'hoje', 'amanha', dia da semana, data 'dd/mm/aaaa' ou "
-                        "'semana'. Omita para hoje."
+                        "'hoje', 'amanha', 'depois de amanha', dia da semana "
+                        "('sexta'), 'fim de semana', data 'dd/mm/aaaa' ou "
+                        "'semana' para a semana toda. Omita para hoje. Repasse "
+                        "o dia como o aluno disse, sem converter para data."
                     ),
                 },
             },
