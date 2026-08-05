@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import PromptInput from "./propmptInput";
-import { salvarConversa, gerarTitulo, novoId } from "@/lib/conversas";
+import { salvarConversa, gerarTitulo, novoId,PENDENTE } from "@/lib/conversas";
 import { sortear, QUANTAS_EXIBIR, type PerguntaFrequente } from "@/lib/perguntas";
 
 export default function BuscaInicial({ perguntasFrequentes }: { perguntasFrequentes: PerguntaFrequente[] }) {
@@ -22,14 +22,14 @@ export default function BuscaInicial({ perguntasFrequentes }: { perguntasFrequen
     setVisiveis(sortear(perguntasFrequentes, QUANTAS_EXIBIR));
   }, [perguntasFrequentes]);
 
-  const enviarPergunta = (texto: string) => {
+    const enviarPergunta = async (texto: string) => {
     if (!texto.trim()) return;
     const id = novoId();
-    salvarConversa({
-      id: id,
+    await salvarConversa({
+      id,
       titulo: gerarTitulo(texto),
       criadoEm: Date.now(),
-      mensagens: [{ user: texto, bot: "..." }],
+      mensagens: [{ user: texto, bot: PENDENTE }],
     });
     router.push(`/chat/${id}`);
   };
