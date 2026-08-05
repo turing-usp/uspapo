@@ -3,6 +3,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm'; 
 import { memo, useEffect, useRef, useState } from 'react';
 import type { Root, Element, Text, ElementContent } from 'hast';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 
 /* Largura do rastro de gradiente atrás da frente de revelação, em caracteres. */
 const RASTRO = 120;
@@ -141,7 +143,15 @@ function ChatResponse({ text, streaming = false }: { text: string; streaming?: b
     return (
         <div className="flex flex-col text-foreground text-lg leading-relaxed">
             <ReactMarkdown
-                rehypePlugins={revelando ? [[palavrasReveladas, sobra]] : []}
+                rehypePlugins={
+                    /* rehypeRaw revive o HTML cru; rehypeSanitize corta o que não for
+                    seguro logo em seguida (o conteúdo vem do modelo). A revelação
+                    vem por último: ela injeta spans com style que o sanitize
+                    removeria se rodasse depois. */
+                    revelando
+                        ? [rehypeRaw, rehypeSanitize, [palavrasReveladas, sobra]]
+                        : [rehypeRaw, rehypeSanitize]
+                }
                 remarkPlugins={remarkPlugins}
                 components={{
                     h1: ({ children }) => (
