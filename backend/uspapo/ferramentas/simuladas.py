@@ -101,19 +101,16 @@ registro = Registro()
 @registro.ferramenta(
     nome="buscar_documentos",
     descricao=(
-        "Busca trechos de documentos oficiais da USP (graduação, matrícula, "
-        "unidades, cursos, serviços ao aluno) numa base vetorial. Use SEMPRE "
-        "que a pergunta exigir uma informação factual sobre a USP."
+        "Busca em documentos oficiais da USP: matrícula, prazos, editais, "
+        "unidades, serviços ao aluno. Use para fatos que as outras ferramentas "
+        "não cobrem."
     ),
     parametros={
         "type": "object",
         "properties": {
             "consulta": {
                 "type": "string",
-                "description": (
-                    "A busca, em português, reformulada com os termos que "
-                    "provavelmente aparecem no documento oficial."
-                ),
+                "description": "A busca, com os termos do documento oficial.",
             },
             "limite": {
                 "type": "integer",
@@ -149,7 +146,7 @@ def buscar_documentos(
     urls: list[str] = []
 
     for posicao, doc in enumerate(escolhidos, 1):
-        blocos.append(f"[{posicao}] {doc['titulo']} — {doc['url']}\n{doc['texto']}")
+        blocos.append(f"[{posicao}] {doc['titulo']}\n{doc['texto']}")
         urls.append(doc["url"])
 
     return "\n\n---\n\n".join(blocos), urls
@@ -165,28 +162,16 @@ OPERACOES = {
 
 @registro.ferramenta(
     nome="calculadora",
-    descricao=(
-        "Calculadora básica com as quatro operações fundamentais da matemática "
-        "(soma, subtração, multiplicação e divisão). "
-        "Use SEMPRE que for calcular alguma coisa."
-    ),
+    descricao="As quatro operações básicas. Use sempre que precisar calcular.",
     parametros={
         "type": "object",
         "properties": {
-            "operador_1": {
-                "type": "integer",
-                "description": "O primeiro operador da operação (esquerda)",
-            },
-            "operador_2": {
-                "type": "integer",
-                "description": "O segundo operador da operação (direita)",
-            },
+            "operador_1": {"type": "integer", "description": "Número da esquerda."},
+            "operador_2": {"type": "integer", "description": "Número da direita."},
             "operacao": {
                 "type": "integer",
-                "description": (
-                    "Tipo da operacao, transformada em um número inteiro "
-                    "(1: soma | 2: subtração | 3: multiplicação | 4: divisão)."
-                ),
+                "enum": [1, 2, 3, 4],
+                "description": "1 soma, 2 subtração, 3 multiplicação, 4 divisão.",
             },
         },
         "required": ["operador_1", "operador_2", "operacao"],

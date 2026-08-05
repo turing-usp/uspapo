@@ -23,13 +23,9 @@ export default function Navbar() {
             />
           </Link>
         </div>
-        {/* O estilo vai no próprio Link: <button> dentro de <a> herdava a cor
-            de botão do navegador em alguns temas e é aninhamento interativo.
-
-            O Cadastrar não leva `border`, e sim glass-brand: o fio já é
-            desenhado pelo ::after do vidro, e uma borda por cima duplicaria o
-            traço */}
-        <div className="flex gap-3 md:gap-2">
+        {/* Este é o container do gap: o MenuUsuario devolve os dois botões num
+            fragmento, sem flex próprio. O estilo deles mora lá. */}
+        <div className="flex items-center gap-3 md:gap-2">
           <MenuUsuario />
         </div>
       </div>

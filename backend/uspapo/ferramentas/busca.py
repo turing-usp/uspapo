@@ -32,19 +32,16 @@ registro = Registro()
 @registro.ferramenta(
     nome="buscar_documentos",
     descricao=(
-        "Busca trechos de documentos oficiais da USP (graduação, matrícula, "
-        "unidades, cursos, serviços ao aluno) numa base vetorial. Use SEMPRE "
-        "que a pergunta exigir uma informação factual sobre a USP."
+        "Busca em documentos oficiais da USP: matrícula, prazos, editais, "
+        "unidades, serviços ao aluno. Use para fatos que as outras ferramentas "
+        "não cobrem."
     ),
     parametros={
         "type": "object",
         "properties": {
             "consulta": {
                 "type": "string",
-                "description": (
-                    "A busca, em português, reformulada com os termos que "
-                    "provavelmente aparecem no documento oficial."
-                ),
+                "description": "A busca, com os termos do documento oficial.",
             },
             "limite": {
                 "type": "integer",
@@ -98,7 +95,7 @@ def buscar_documentos(
 
         titulo = meta.get("titulo") or "Sem título"
         url = meta.get("url") or "URL desconhecida"
-        blocos.append(f"[{posicao}] {titulo} — {url}\n{texto}")
+        blocos.append(f"[{posicao}] {titulo}\n{texto}")
         urls.append(url)
 
     if not blocos:
