@@ -51,7 +51,7 @@
         "selector": "#Eventos_home a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-08-07",
     "frequency": "7d"
   },
   {
@@ -68,7 +68,7 @@
         "selector": ".ultp-post-grid-block .ultp-block-title a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-08-07",
     "frequency": "7d"
   },
   {
@@ -102,7 +102,7 @@
         "selector": ".card-content a::attr(href), .project a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-08-07",
     "frequency": "7d"
   },
   {
@@ -123,7 +123,7 @@
         "selector": ".view-content .renatinha-titulo a::attr(href), .carousel-inner #text button a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-08-07",
     "frequency": "7d"
   },
   {
@@ -140,7 +140,7 @@
         "selector": ".view-content a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-08-07",
     "frequency": "7d"
   },
   {
@@ -161,7 +161,7 @@
         "selector": ".sow-slider-image a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-08-07",
     "frequency": "7d"
   },
   {
@@ -178,7 +178,7 @@
         "selector": ".carousel-inner a::attr(href), .node__content a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-08-07",
     "frequency": "7d"
   },
   {
@@ -195,7 +195,7 @@
         "selector": ".hero-slide-content .field--name-field-link a::attr(href), .mosaic-lis-item a::attr(href), .agenda-list .title a::attr(href), .home-news-list-item .title a::attr(href), .home-comunicados-list .title a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-08-07",
     "frequency": "7d"
   },
   {
@@ -216,7 +216,7 @@
         "selector": "#camera_wrap_371 div::attr(data-link)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-08-07",
     "frequency": "7d"
   },
   {
@@ -233,7 +233,7 @@
         "selector": ".view-content a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-08-07",
     "frequency": "7d"
   },
   {
@@ -250,7 +250,7 @@
         "selector": "article.slide a::attr(href), main article a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-08-07",
     "frequency": "7d"
   },
   {
@@ -267,7 +267,7 @@
         "selector": ".cont-noticias a::attr(href), .ecs-event a::attr(href), .even-dest-cont-01 a::attr(href), .div-planetary a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-08-07",
     "frequency": "7d"
   },
   {
@@ -284,7 +284,7 @@
         "selector": "#destaques_slider .item a::attr(href), .bloco-div a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-08-07",
     "frequency": "7d"
   },
   {
@@ -301,7 +301,7 @@
         "selector": ".swiper-slide a::attr(href), .fsp-noticias-titulo a::attr(href), .fsp-eventos-detalhe a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-08-07",
     "frequency": "7d"
   },
   {
@@ -318,7 +318,7 @@
         "selector": ".jet-slider__item a::attr(href), .jet-listing-grid__item a::attr(href), .elementor-widget-image a::attr(href), .elementor-widget-heading a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "last_update": "2026-08-07",
     "frequency": "7d"
   }
 ]
