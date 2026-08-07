@@ -240,3 +240,18 @@ chroma_data/
 
 #Exceção do lib do site!
 !/site/lib/
+# --- USPapo: artefatos derivados do pipeline ---
+# Staging do scraping: o arquivo só sai daqui se passar na guarda de resultado
+# vazio (ver scrapers/spiders/rodar_scrapers.py).
+data/raw/_tmp/
+# Site em quarentena: material de site ainda não aprovado, não entra no índice.
+data/raw/_quarentena/
+# Estatística por rodada de crawl, escrita pelo spider.
+data/raw/_stats/
+# Ledger simulado por `build_vector --dry-run`. Nunca deve virar o ledger real.
+data/index/*.simulado.json
+data/index/*.tmp
+# Relatórios de limpeza/validação: úteis localmente, ruído no diff.
+data/reports/
+# Suíte de testes: roda localmente com pytest, não vai para o repositório.
+tests/

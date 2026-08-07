@@ -27,6 +27,21 @@ CONCURRENT_REQUESTS = 32
 CONCURRENT_REQUESTS_PER_DOMAIN = 2
 DOWNLOAD_DELAY = 4
 
+# ─────────────────────────────────────────────
+# Freios de segurança
+#
+# Nenhum destes existia, e é por isso que um domínio invadido (o iri.usp.br, com
+# 400 mil URLs de spam injetadas) conseguiria ocupar o crawler indefinidamente.
+# O teto por site vem do scrapers_config.json; os daqui são a rede embaixo dele.
+# ─────────────────────────────────────────────
+DEPTH_LIMIT = 3
+CLOSESPIDER_PAGECOUNT = 800
+CLOSESPIDER_TIMEOUT = 1800
+DOWNLOAD_MAXSIZE = 8 * 1024 * 1024      # PDF gigante não trava o job
+DOWNLOAD_TIMEOUT = 30
+URLLENGTH_LIMIT = 300
+RETRY_TIMES = 2
+
 # Disable cookies (enabled by default)
 #COOKIES_ENABLED = False
 
@@ -79,7 +94,10 @@ AUTOTHROTTLE_MAX_DELAY = 60
 # Enable and configure HTTP caching (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html#httpcache-middleware-settings
 HTTPCACHE_ENABLED = True
-HTTPCACHE_EXPIRATION_SECS = 0
+# Era 0, que em scrapy significa "nunca expira": localmente o cache servia para
+# sempre a mesma cópia e mudança nenhuma no site aparecia. Um dia é o intervalo
+# certo para um pipeline que roda no máximo diariamente.
+HTTPCACHE_EXPIRATION_SECS = 86400
 HTTPCACHE_DIR = "httpcache"
 # HTTPCACHE_IGNORE_HTTP_CODES = []
 # HTTPCACHE_STORAGE = "scrapy.extensions.httpcache.FilesystemCacheStorage"

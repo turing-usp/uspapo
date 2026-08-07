@@ -1,448 +1,465 @@
+"""Sincronização do banco vetorial: `data/processed/` -> Pinecone.
+
+O desenho central continua o mesmo, porque ele estava certo: o ledger guarda o
+hash de cada parágrafo, o rechunking ancorado reconhece o que não mudou, e só o
+que sobra vira requisição. Numa semana em que nada mudou, o custo é zero.
+
+O que mudou é tudo que acontece em volta disso, porque foi em volta que o
+pipeline quebrou:
+
+**Orçamento antes de qualquer requisição.** O plano inteiro é montado em memória
+e conferido contra três travas antes de a primeira chamada sair. A trava
+proporcional é a que importa: mexer em mais de um quarto do banco de uma vez não
+é manutenção, é migração, e migração pede `--forcar-migracao` na mão de alguém,
+não o cron das 5h.
+
+**Ordem à prova de queda.** Antes era deletar, depois inserir, e salvar o ledger
+só no fim. Uma queda no meio deixava o ledger apontando para vetores já apagados
+e nunca reescritos: um buraco permanente e silencioso na busca. Agora insere
+primeiro, salva o ledger com o que foi confirmado, e só então apaga, e o que
+está para apagar fica registrado em `pendencias.json` para o caso de a queda ser
+bem no meio disso. A invariante é `ledger ⊆ Pinecone`: sobra de vetor custa
+dinheiro, falta de vetor custa resposta errada.
+
+**Repetição com teto.** O `while not sucesso:` sem saída rodava até o GitHub
+Actions matar o job seis horas depois. Agora é backoff exponencial com número
+máximo de tentativas.
+
+Roda como `python -m embeddings.build_vector` a partir da raiz do projeto.
+"""
+
+import argparse
+import glob
 import json
 import os
-import hashlib
-import glob
+import random
 import time
-from dotenv import load_dotenv
+from collections import Counter
+from dataclasses import dataclass, field
+from datetime import datetime
+
 from tqdm import tqdm
-from pinecone import Pinecone
 
-# 1. Trava de segurança para execução sem API Key -- FALSE se é pra fazer upsert, TRUE se NÃO é pra fazer upsert
-DRY_RUN = False
+from embeddings import config_vetor as cfg
+from embeddings import ledger as L
+from embeddings.chunking import agrupar_paragrafos, gerar_hash, rechunking_ancorado, texto_para_embedding
+from embeddings.qualidade import filtrar_chunks
+from embeddings.texto import segmentar_paragrafos
 
-load_dotenv()
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-
-if not PINECONE_API_KEY and not DRY_RUN:
-    raise RuntimeError("PINECONE_API_KEY não encontrada no arquivo .env!")
-
-PINECONE_INDEX_NAME = "uspapo-rag"
-
-DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
-PASTA_PROCESSED = os.path.join(DIRETORIO_ATUAL, "..", "data", "processed")
-PASTA_INDEX = os.path.join(DIRETORIO_ATUAL, "..", "data", "index")
-ARQUIVO_LEDGER = os.path.join(PASTA_INDEX, "ledger_avancado.json")
+# Um arquivo que perde mais da metade das páginas de uma vez quase nunca é um
+# site que encolheu: é um scraper que quebrou. Melhor não sincronizar nada dele.
+LIMIAR_SUMICO_ARQUIVO = 0.5
 
 
-def gerar_hash(texto: str) -> str:
-    return hashlib.md5(texto.encode('utf-8')).hexdigest()
+class OrcamentoEstourado(RuntimeError):
+    pass
 
 
-def carregar_ledger() -> dict:
-    if os.path.exists(ARQUIVO_LEDGER):
-        with open(ARQUIVO_LEDGER, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {}
+@dataclass
+class Plano:
+    upserts: list[dict] = field(default_factory=list)
+    deletes: list[str] = field(default_factory=list)
+    total_no_ledger: int = 0
+    nascidos: Counter = field(default_factory=Counter)
+    mortos: Counter = field(default_factory=Counter)
+    reaproveitados: int = 0
+    descartes: Counter = field(default_factory=Counter)
+    realocados: list[dict] = field(default_factory=list)
+    arquivos_pulados: list[str] = field(default_factory=list)
+
+    @property
+    def toca(self) -> int:
+        return len(self.upserts) + len(self.deletes)
 
 
-def salvar_ledger(ledger: dict):
-    os.makedirs(PASTA_INDEX, exist_ok=True)
-    with open(ARQUIVO_LEDGER, 'w', encoding='utf-8') as f:
-        json.dump(ledger, f, indent=4, ensure_ascii=False)
-
-
-# NOVO: Função para fatiar textos gigantes (ex: PDFs sem quebra de linha)
-def fatiar_texto_gigante(texto: str, max_size=1100, overlap=200) -> list:
-    """Fatia na marra blocos de texto gigantes que não possuem quebra de parágrafo."""
-    fatias = []
-    i = 0
-    passo = max_size - overlap
-    while i < len(texto):
-        fatias.append(texto[i : i + max_size])
-        i += passo
-    return fatias
-
-
-def agrupar_lista_de_paragrafos(lista_textos_paragrafos: list, target_size=800, max_size=1100) -> list:
-    chunks_formados = []
-    chunk_atual_textos = []
-    tamanho_atual = 0
-
-    for p in lista_textos_paragrafos:
-        tam_p = len(p)
-        if tam_p > max_size:
-            if chunk_atual_textos:
-                texto_junto = "\n\n".join(chunk_atual_textos)
-                chunks_formados.append({
-                    "texto": texto_junto,
-                    "hash_chunk": gerar_hash(texto_junto),
-                    "paragrafos": [{"texto": txt, "hash_p": gerar_hash(txt)} for txt in chunk_atual_textos]
-                })
-                chunk_atual_textos = []
-                tamanho_atual = 0
-            
-            # --- CORREÇÃO: Fatiar o texto gigante forçadamente ---
-            fatias = fatiar_texto_gigante(p, max_size, overlap=200)
-            for fatia in fatias:
-                chunks_formados.append({
-                    "texto": fatia,
-                    "hash_chunk": gerar_hash(fatia),
-                    "paragrafos": [{"texto": fatia, "hash_p": gerar_hash(fatia)}]
-                })
-            continue
-
-        tamanho_projetado = tamanho_atual + tam_p + (2 if chunk_atual_textos else 0)
-
-        if tamanho_projetado <= target_size:
-            chunk_atual_textos.append(p)
-            tamanho_atual = tamanho_projetado
-        elif tamanho_projetado <= max_size:
-            chunk_atual_textos.append(p)
-            texto_junto = "\n\n".join(chunk_atual_textos)
-            chunks_formados.append({
-                "texto": texto_junto,
-                "hash_chunk": gerar_hash(texto_junto),
-                "paragrafos": [{"texto": txt, "hash_p": gerar_hash(txt)} for txt in chunk_atual_textos]
-            })
-            chunk_atual_textos = []
-            tamanho_atual = 0
-        else:
-            if chunk_atual_textos:
-                texto_junto = "\n\n".join(chunk_atual_textos)
-                chunks_formados.append({
-                    "texto": texto_junto,
-                    "hash_chunk": gerar_hash(texto_junto),
-                    "paragrafos": [{"texto": txt, "hash_p": gerar_hash(txt)} for txt in chunk_atual_textos]
-                })
-            chunk_atual_textos = [p]
-            tamanho_atual = tam_p
-
-    if chunk_atual_textos:
-        texto_junto = "\n\n".join(chunk_atual_textos)
-        chunks_formados.append({
-            "texto": texto_junto,
-            "hash_chunk": gerar_hash(texto_junto),
-            "paragrafos": [{"texto": txt, "hash_p": gerar_hash(txt)} for txt in chunk_atual_textos]
-        })
-
-    return chunks_formados
-
-
-def rechunking_ancorado(old_chunks, novos_paragrafos_puros, target_size=800, max_size=1100):
-    primeiro_p_map = {}
-    for c in old_chunks:
-        if not c.get("paragrafos"):
-            continue
-        first_hash = c["paragrafos"][0]["hash_p"]
-        assinatura = "".join([p["hash_p"] for p in c["paragrafos"]])
-        
-        if first_hash not in primeiro_p_map:
-            primeiro_p_map[first_hash] = []
-        primeiro_p_map[first_hash].append({
-            "assinatura": assinatura, 
-            "len": len(c["paragrafos"]), 
-            "chunk": c
-        })
-
-    chunks_finais = []
-    chunk_atual_textos = []
-    tamanho_atual = 0
-    used_chunk_ids = set()
-
-    idx = 0
-    total_p = len(novos_paragrafos_puros)
-    novos_hashes = [gerar_hash(p) for p in novos_paragrafos_puros]
-
-    while idx < total_p:
-        p_texto = novos_paragrafos_puros[idx]
-        p_hash = novos_hashes[idx]
-
-        ancorado = False
-        if p_hash in primeiro_p_map:
-            for candidato in primeiro_p_map[p_hash]:
-                c_id = candidato["chunk"].get("chunk_id")
-                if c_id and c_id in used_chunk_ids:
-                    continue
-
-                tam_janela = candidato["len"]
-                if idx + tam_janela <= total_p:
-                    assinatura_teste = "".join(novos_hashes[idx : idx + tam_janela])
-                    if assinatura_teste == candidato["assinatura"]:
-                        if chunk_atual_textos:
-                            texto_junto = "\n\n".join(chunk_atual_textos)
-                            chunks_finais.append({
-                                "texto": texto_junto,
-                                "hash_chunk": gerar_hash(texto_junto),
-                                "paragrafos": [{"texto": txt, "hash_p": gerar_hash(txt)} for txt in chunk_atual_textos]
-                            })
-                            chunk_atual_textos = []
-                            tamanho_atual = 0
-
-                        chunks_finais.append(candidato["chunk"])
-                        if c_id:
-                            used_chunk_ids.add(c_id)
-                        idx += tam_janela
-                        ancorado = True
-                        break
-        
-        if ancorado:
-            continue
-
-        tam_p = len(p_texto)
-        if tam_p > max_size:
-            if chunk_atual_textos:
-                texto_junto = "\n\n".join(chunk_atual_textos)
-                chunks_finais.append({
-                    "texto": texto_junto,
-                    "hash_chunk": gerar_hash(texto_junto),
-                    "paragrafos": [{"texto": txt, "hash_p": gerar_hash(txt)} for txt in chunk_atual_textos]
-                })
-                chunk_atual_textos = []
-                tamanho_atual = 0
-
-            # --- CORREÇÃO: Fatiar o texto gigante forçadamente ---
-            fatias = fatiar_texto_gigante(p_texto, max_size, overlap=200)
-            for fatia in fatias:
-                chunks_finais.append({
-                    "texto": fatia,
-                    "hash_chunk": gerar_hash(fatia),
-                    "paragrafos": [{"texto": fatia, "hash_p": gerar_hash(fatia)}]
-                })
-            idx += 1
-            continue
-
-        tamanho_projetado = tamanho_atual + tam_p + (2 if chunk_atual_textos else 0)
-
-        if tamanho_projetado <= target_size:
-            chunk_atual_textos.append(p_texto)
-            tamanho_atual = tamanho_projetado
-        elif tamanho_projetado <= max_size:
-            chunk_atual_textos.append(p_texto)
-            texto_junto = "\n\n".join(chunk_atual_textos)
-            chunks_finais.append({
-                "texto": texto_junto,
-                "hash_chunk": gerar_hash(texto_junto),
-                "paragrafos": [{"texto": txt, "hash_p": gerar_hash(txt)} for txt in chunk_atual_textos]
-            })
-            chunk_atual_textos = []
-            tamanho_atual = 0
-        else:
-            if chunk_atual_textos:
-                texto_junto = "\n\n".join(chunk_atual_textos)
-                chunks_finais.append({
-                    "texto": texto_junto,
-                    "hash_chunk": gerar_hash(texto_junto),
-                    "paragrafos": [{"texto": txt, "hash_p": gerar_hash(txt)} for txt in chunk_atual_textos]
-                })
-            chunk_atual_textos = [p_texto]
-            tamanho_atual = tam_p
-
-        idx += 1
-
-    if chunk_atual_textos:
-        texto_junto = "\n\n".join(chunk_atual_textos)
-        chunks_finais.append({
-            "texto": texto_junto,
-            "hash_chunk": gerar_hash(texto_junto),
-            "paragrafos": [{"texto": txt, "hash_p": gerar_hash(txt)} for txt in chunk_atual_textos]
-        })
-
-    ids_velhos = {c["chunk_id"]: c for c in old_chunks if "chunk_id" in c}
-    
-    # === CORREÇÃO + PRINTS DE DEPURAÇÃO ===
-    old_hash_map = {c["hash_chunk"]: c["chunk_id"] for c in old_chunks if "chunk_id" in c}
-    for c_final in chunks_finais:
-        if "chunk_id" not in c_final:
-            h_c = c_final.get("hash_chunk")
-            if h_c in old_hash_map:
-                c_final["chunk_id"] = old_hash_map[h_c]
-            else:
-                continue
-    # =======================================
-
-    ids_novos_preservados = set()
-    chunks_nascidos = []
-
-    for c_final in chunks_finais:
-        if "chunk_id" in c_final:
-            ids_novos_preservados.add(c_final["chunk_id"])
-        else:
-            chunks_nascidos.append(c_final)
-
-    ids_mortos = list(set(ids_velhos.keys()) - ids_novos_preservados)
-
-    # Print para mostrar o saldo de cada página com problema
-    if ids_mortos or chunks_nascidos:
-        print(f"      [DEBUG] Saldo da página -> Mortos: {len(ids_mortos)} | Nascidos: {len(chunks_nascidos)}")
-
-    return chunks_finais, ids_mortos, chunks_nascidos
-
-
-def construir_banco():
-    arquivos_json = glob.glob(os.path.join(PASTA_PROCESSED, "**", "*.json"), recursive=True)
-
-    if not arquivos_json:
-        print(f"[AVISO] Nenhum arquivo JSON encontrado em {PASTA_PROCESSED}.")
+# ─────────────────────────────────────────────
+# Disjuntor
+# ─────────────────────────────────────────────
+def verificar_orcamento(plano: Plano, permitir_migracao: bool) -> None:
+    """Três travas independentes. Qualquer uma aborta antes de tocar na nuvem."""
+    if permitir_migracao:
         return
 
-    ledger_avancado = carregar_ledger()
-    
-    if DRY_RUN:
-        print("-> [DRY RUN] Ignorando conexão com Pinecone (Modo Offline).")
-    else:
-        print("-> Conectando ao Pinecone...")
-        pc = Pinecone(api_key=PINECONE_API_KEY)
-        index = pc.Index(PINECONE_INDEX_NAME)
+    if len(plano.upserts) > cfg.ORCAMENTO_UPSERTS:
+        raise OrcamentoEstourado(
+            f"{len(plano.upserts)} upserts pedidos, teto é {cfg.ORCAMENTO_UPSERTS}. "
+            f"Maiores responsáveis: {plano.nascidos.most_common(3)}"
+        )
+    if len(plano.deletes) > cfg.ORCAMENTO_DELETES:
+        raise OrcamentoEstourado(
+            f"{len(plano.deletes)} deletes pedidos, teto é {cfg.ORCAMENTO_DELETES}. "
+            f"Maiores responsáveis: {plano.mortos.most_common(3)}"
+        )
 
-    lote_global_delete = []
-    lote_global_upsert = []
+    base = plano.total_no_ledger
+    if base and plano.toca / base > cfg.LIMIAR_ABORTO_PCT:
+        raise OrcamentoEstourado(
+            f"a operação mexeria em {plano.toca} de {base} vetores "
+            f"({100 * plano.toca / base:.0f}%), acima do limite de "
+            f"{100 * cfg.LIMIAR_ABORTO_PCT:.0f}%. Isso é uma migração, não uma "
+            "atualização de rotina. Se for mesmo o que você quer, rode com "
+            "--forcar-migracao."
+        )
 
-    # FASE 1: Limpeza de arquivos removidos no disco
-    nomes_arquivos_locais = {os.path.basename(caminho) for caminho in arquivos_json}
-    arquivos_no_ledger = set(ledger_avancado.keys())
-    arquivos_deletados = arquivos_no_ledger - nomes_arquivos_locais
 
-    if arquivos_deletados:
-        for arq_removido in arquivos_deletados:
-            print(f"   [Lixeira] Arquivo {arq_removido} removido localmente. Deletando vetores no Pinecone...")
-            for pag_data in ledger_avancado[arq_removido].get("paginas", {}).values():
-                for chunk_data in pag_data.get("chunks", []):
-                    if "chunk_id" in chunk_data:
-                        lote_global_delete.append(chunk_data["chunk_id"])
-            del ledger_avancado[arq_removido]
-
-    # FASE 2: Processamento PÁGINA A PÁGINA dentro de cada arquivo
-    for caminho_arquivo in arquivos_json:
-        nome_arquivo = os.path.basename(caminho_arquivo)
-        
+def executar_com_backoff(operacao, descricao: str):
+    """Repete com espera exponencial e desistência explícita."""
+    for tentativa in range(1, cfg.MAX_TENTATIVAS + 1):
         try:
-            with open(caminho_arquivo, 'r', encoding='utf-8') as f:
-                paginas = json.loads(f.read())
-        except Exception as e:
-            print(f"   [ERRO] Falha ao ler {nome_arquivo}: {e}")
+            return operacao()
+        except Exception as erro:
+            texto = str(erro)
+            recuperavel = any(
+                marca in texto
+                for marca in ("429", "RESOURCE_EXHAUSTED", "503", "502", "504", "timeout", "Timeout")
+            )
+            if not recuperavel or tentativa == cfg.MAX_TENTATIVAS:
+                raise
+            espera = min(cfg.BACKOFF_BASE * (2 ** (tentativa - 1)), cfg.BACKOFF_TETO)
+            espera += random.uniform(0, espera * 0.1)  # jitter, para não sincronizar retentativas
+            print(
+                f"\n[!] {descricao} falhou ({texto[:80]}). "
+                f"Tentativa {tentativa}/{cfg.MAX_TENTATIVAS}, aguardando {espera:.0f}s..."
+            )
+            time.sleep(espera)
+
+
+# ─────────────────────────────────────────────
+# Montagem do plano
+# ─────────────────────────────────────────────
+def _registro(chunk_id: str, texto: str, url: str, titulo: str, arquivo: str) -> dict:
+    return {
+        "_id": chunk_id,
+        "text": texto_para_embedding(titulo, texto),
+        "url": url,
+        "titulo": titulo or "Sem título",
+        "arquivo_origem": arquivo,
+    }
+
+
+def sincronizar_pagina(
+    ledger: dict, plano: Plano, arquivo: str, pagina: dict, estado: dict, contexto: dict
+) -> None:
+    url = pagina.get("url", "")
+    titulo = pagina.get("titulo", "")
+    contexto["titulos"][(arquivo, url)] = titulo
+    paragrafos = segmentar_paragrafos(pagina.get("texto_limpo", ""))
+    if not paragrafos:
+        return
+
+    antigos = estado.get(url, {}).get("chunks", [])
+    finais = (
+        rechunking_ancorado(antigos, paragrafos) if antigos else agrupar_paragrafos(paragrafos)
+    )
+
+    finais, descartes = filtrar_chunks(finais)
+    for motivo, quantos in descartes.items():
+        plano.descartes[motivo] += quantos
+    if not finais:
+        return
+
+    # Chunk reaproveitado vem do ledger sem texto, mas o texto está aqui: os
+    # `hashes_p` dele apontam para parágrafos DESTA página. Reconstruir custa
+    # nada e é o que permite reenviar o metadado de um chunk que trocou de dono.
+    mapa_paragrafos = {gerar_hash(p): p for p in paragrafos}
+    for chunk in finais:
+        if chunk.get("texto") is None:
+            partes = [mapa_paragrafos.get(h) for h in chunk.get("hashes_p", [])]
+            if partes and all(p is not None for p in partes):
+                chunk["texto"] = "\n\n".join(partes)
+
+    hash_url = gerar_hash(url)[:8]
+
+    # Adquirir ANTES de liberar. Se fosse ao contrário, um chunk que continua na
+    # página chegaria a zero referências no meio do caminho, seria agendado para
+    # deleção, e renasceria com outro id — churn puro.
+    for indice, chunk in enumerate(finais):
+        # O mapa de textos serve para reenviar metadado de chunk que trocou de
+        # dono; alimentá-lo com todo chunk cujo texto conhecemos, reaproveitado
+        # ou não, é o que faz essa reconciliação fechar na mesma execução.
+        if chunk.get("texto") is not None:
+            contexto["textos"][chunk["hash_chunk"]] = chunk["texto"]
+        chunk_id, nasceu = L.adquirir(
+            ledger,
+            chunk["hash_chunk"],
+            arquivo,
+            url,
+            lambda i=indice, h=chunk["hash_chunk"]: f"{arquivo}_{hash_url}_ch{i}_{h}",
+        )
+        chunk["chunk_id"] = chunk_id
+        if nasceu:
+            plano.upserts.append(_registro(chunk_id, chunk["texto"], url, titulo, arquivo))
+            plano.nascidos[arquivo] += 1
+        else:
+            plano.reaproveitados += 1
+
+    for antigo in antigos:
+        resultado = L.liberar(ledger, antigo["hash_chunk"], arquivo, url)
+        if resultado is None:
+            continue
+        if resultado["acao"] == "morto":
+            plano.deletes.append(resultado["chunk_id"])
+            plano.mortos[arquivo] += 1
+        else:
+            plano.realocados.append(resultado)
+
+    estado[url] = {"titulo": titulo, "chunks": [L.enxugar_chunk(c) for c in finais]}
+
+
+def soltar_pagina(ledger: dict, plano: Plano, arquivo: str, url: str, dados: dict) -> None:
+    for chunk in dados.get("chunks", []):
+        resultado = L.liberar(ledger, chunk["hash_chunk"], arquivo, url)
+        if resultado is None:
+            continue
+        if resultado["acao"] == "morto":
+            plano.deletes.append(resultado["chunk_id"])
+            plano.mortos[arquivo] += 1
+        else:
+            plano.realocados.append(resultado)
+
+
+def montar_plano(ledger: dict, arquivos: list[str], somente: list[str] | None) -> Plano:
+    plano = Plano(total_no_ledger=L.total_de_chunks(ledger))
+    contexto: dict = {"textos": {}, "titulos": {}}
+    locais = {os.path.basename(caminho) for caminho in arquivos}
+
+    # Arquivos que sumiram do disco: soltam tudo que tinham.
+    if not somente:
+        for nome in sorted(set(ledger["arquivos"]) - locais):
+            print(f"   [Lixeira] {nome} não existe mais localmente. Soltando referências...")
+            for url, dados in ledger["arquivos"][nome].get("paginas", {}).items():
+                soltar_pagina(ledger, plano, nome, url, dados)
+            del ledger["arquivos"][nome]
+
+    for caminho in arquivos:
+        nome = os.path.basename(caminho)
+        try:
+            with open(caminho, "r", encoding="utf-8") as f:
+                paginas = json.load(f)
+        except (OSError, json.JSONDecodeError) as erro:
+            print(f"   [ERRO] Falha ao ler {nome}: {erro}")
+            plano.arquivos_pulados.append(nome)
             continue
 
-        if nome_arquivo not in ledger_avancado:
-            ledger_avancado[nome_arquivo] = {"paginas": {}}
+        estado = L.paginas_do_arquivo(ledger, nome)
+        urls_atuais = {p.get("url", "") for p in paginas}
+        sumidas = set(estado) - urls_atuais
 
-        estado_arquivo_ledger = ledger_avancado[nome_arquivo]["paginas"]
-        novos_nascidos_no_arq = 0
-        removidos_no_arq = 0
+        # Trava de sanidade: scraper quebrado não vira deleção em massa.
+        if estado and len(sumidas) > len(estado) * LIMIAR_SUMICO_ARQUIVO:
+            print(
+                f"   [PULADO] {nome}: {len(sumidas)} de {len(estado)} páginas sumiram de uma vez. "
+                "Parece scraper quebrado, não site encolhendo. Nada foi sincronizado."
+            )
+            plano.arquivos_pulados.append(nome)
+            continue
 
-        for pag_idx, pagina in enumerate(paginas):
-            url_pagina = pagina.get("url", f"sem_url_{pag_idx}")
-            titulo_pagina = pagina.get("titulo", "")
-            texto = pagina.get("texto_limpo", "").replace('\r\n', '\n').replace('\r', '\n')
+        for url in sumidas:
+            soltar_pagina(ledger, plano, nome, url, estado[url])
+            del estado[url]
+
+        for pagina in paginas:
+            sincronizar_pagina(ledger, plano, nome, pagina, estado, contexto)
+
+        if plano.nascidos[nome] or plano.mortos[nome]:
+            print(
+                f"   [{nome:26s}] +{plano.nascidos[nome]:5d} novos  "
+                f"-{plano.mortos[nome]:5d} removidos"
+            )
+
+    _resolver_realocados(plano, contexto)
+    return plano
 
 
-            paragrafos_pagina = [p.strip() for p in texto.split("\n\n") if p.strip()]
-            if not paragrafos_pagina:
-                continue
+def _resolver_realocados(plano: Plano, contexto: dict) -> None:
+    """Reenvia o metadado dos chunks cujo dono mudou.
 
-            estado_antigo_pag = estado_arquivo_ledger.get(url_pagina, {"chunks": []})
-            old_chunks = estado_antigo_pag.get("chunks", [])
-
-            hash_url = gerar_hash(url_pagina)[:8]
-
-            # COLD START DA PÁGINA
-            if not old_chunks:
-                novos_chunks = agrupar_lista_de_paragrafos(paragrafos_pagina)
-                estado_novo_chunks = []
-
-                for idx, chunk_dict in enumerate(novos_chunks):
-                    pinecone_id = f"{nome_arquivo}_{hash_url}_ch{idx}_{chunk_dict['hash_chunk']}"
-                    chunk_dict["chunk_id"] = pinecone_id
-                    estado_novo_chunks.append(chunk_dict)
-
-                    lote_global_upsert.append({
-                        "_id": pinecone_id,
-                        "text": f"passage: {chunk_dict['texto']}",
-                        "url": url_pagina,             # URL EXATA DA PÁGINA!
-                        "titulo": titulo_pagina,        # TÍTULO EXATO DA PÁGINA!
-                        "arquivo_origem": nome_arquivo
-                    })
-
-                estado_arquivo_ledger[url_pagina] = {
-                    "titulo": titulo_pagina,
-                    "chunks": estado_novo_chunks
-                }
-                novos_nascidos_no_arq += len(estado_novo_chunks)
-                continue
-
-            # RECHUNKING INCREMENTAL ISOLADO DA PÁGINA
-            chunks_finais, ids_mortos, chunks_nascidos = rechunking_ancorado(old_chunks, paragrafos_pagina)
-
-            if not ids_mortos and not chunks_nascidos:
-                continue
-
-            lote_global_delete.extend(ids_mortos)
-            removidos_no_arq += len(ids_mortos)
-            novos_nascidos_no_arq += len(chunks_nascidos)
-
-            estado_novo_chunks = []
-            for idx, chunk_dict in enumerate(chunks_finais):
-                if "chunk_id" in chunk_dict:
-                    estado_novo_chunks.append(chunk_dict)
-                else:
-                    pinecone_id = f"{nome_arquivo}_{hash_url}_ch{idx}_{chunk_dict['hash_chunk']}"
-                    chunk_dict["chunk_id"] = pinecone_id
-                    estado_novo_chunks.append(chunk_dict)
-
-                    lote_global_upsert.append({
-                        "_id": pinecone_id,
-                        "text": f"passage: {chunk_dict['texto']}",
-                        "url": url_pagina,             # URL EXATA DA PÁGINA!
-                        "titulo": titulo_pagina,        # TÍTULO EXATO DA PÁGINA!
-                        "arquivo_origem": nome_arquivo
-                    })
-
-            estado_arquivo_ledger[url_pagina] = {
-                "titulo": titulo_pagina,
-                "chunks": estado_novo_chunks
-            }
-
-        if novos_nascidos_no_arq > 0 or removidos_no_arq > 0:
-            print(f"   [{nome_arquivo}] Atualizado por Página: {novos_nascidos_no_arq} novos | {removidos_no_arq} removidos.")
-
-    # FASE 3: Sincronização em Lote
-    if not lote_global_delete and not lote_global_upsert:
-        print("\n-> Banco vetorial sincronizado! Zero WUs gastos na nuvem.")
-        if not DRY_RUN:
-            salvar_ledger(ledger_avancado)
+    Acontece quando a página que criou um chunk compartilhado some e outra
+    continua usando o texto. O vetor segue válido, mas o `url` gravado nele
+    apontaria para uma página que não existe mais — e é essa URL que a busca
+    devolve como fonte.
+    """
+    if not plano.realocados:
         return
 
-    print("\n" + "="*50)
-    print("RESUMO DA OPERAÇÃO PARA O PINECONE:")
-    print("="*50)
-    print(f" -> Deletes agendados: {len(lote_global_delete)} vetores.")
-    print(f" -> Upserts agendados: {len(lote_global_upsert)} vetores.")
-    print("="*50)
+    pendentes = 0
+    for item in plano.realocados:
+        # `chunk_id` termina com o hash do texto: é dele que recuperamos o conteúdo.
+        hash_chunk = item["chunk_id"].rsplit("_", 1)[-1]
+        texto = contexto["textos"].get(hash_chunk)
+        if texto is None:
+            pendentes += 1
+            continue
+        titulo = contexto["titulos"].get((item["arquivo"], item["url"]), "")
+        plano.upserts.append(
+            _registro(item["chunk_id"], texto, item["url"], titulo, item["arquivo"])
+        )
 
-    if DRY_RUN:
-        print("\n[MODO DRY RUN ATIVADO] Nenhuma requisição foi enviada ao Pinecone.")
-        print("Salvando o ledger_avancado.json localmente para simular o estado da nuvem...")
-        salvar_ledger(ledger_avancado)
+    if pendentes:
+        print(
+            f"   [aviso] {pendentes} chunk(s) mudaram de dono mas o novo dono não foi "
+            "processado nesta execução; o metadado deles continua apontando para a "
+            "página antiga até a próxima execução completa."
+        )
+
+
+# ─────────────────────────────────────────────
+# Aplicação
+# ─────────────────────────────────────────────
+def aplicar_plano(plano: Plano, ledger: dict, index) -> None:
+    # Nunca apagar o que estamos reescrevendo nesta mesma execução.
+    ids_upsert = {registro["_id"] for registro in plano.upserts}
+    deletes = [i for i in plano.deletes if i not in ids_upsert]
+
+    if plano.upserts:
+        print(f"\n-> Enviando {len(plano.upserts)} vetores...")
+        for i in tqdm(range(0, len(plano.upserts), cfg.LOTE_UPSERT), desc="Sincronizando"):
+            lote = plano.upserts[i : i + cfg.LOTE_UPSERT]
+            executar_com_backoff(
+                lambda l=lote: index.upsert_records(namespace=cfg.PINECONE_NAMESPACE, records=l),
+                "upsert",
+            )
+            time.sleep(cfg.PAUSA_ENTRE_LOTES)
+
+    # O ledger é salvo AQUI: tudo que ele afirma existir já foi confirmado.
+    if deletes:
+        L.salvar_pendencias(deletes)
+    L.salvar_ledger(ledger)
+
+    if deletes:
+        print(f"\n-> Removendo {len(deletes)} vetores obsoletos...")
+        for i in range(0, len(deletes), cfg.LOTE_DELETE):
+            lote = deletes[i : i + cfg.LOTE_DELETE]
+            executar_com_backoff(
+                lambda l=lote: index.delete(ids=l, namespace=cfg.PINECONE_NAMESPACE), "delete"
+            )
+    L.limpar_pendencias()
+
+
+def _resgatar_pendencias(index) -> None:
+    """Termina as deleções que uma execução anterior deixou pela metade."""
+    pendentes = L.carregar_pendencias()
+    if not pendentes:
         return
+    print(f"-> {len(pendentes)} deleção(ões) pendente(s) de uma execução anterior. Concluindo...")
+    for i in range(0, len(pendentes), cfg.LOTE_DELETE):
+        lote = pendentes[i : i + cfg.LOTE_DELETE]
+        executar_com_backoff(
+            lambda l=lote: index.delete(ids=l, namespace=cfg.PINECONE_NAMESPACE), "delete pendente"
+        )
+    L.limpar_pendencias()
 
-    if lote_global_delete:
-        print(f"\n-> Removendo {len(lote_global_delete)} vetores obsoletos do Pinecone...")
-        for i in range(0, len(lote_global_delete), 1000):
-            lote_del = lote_global_delete[i:i+1000]
-            index.delete(ids=lote_del, namespace="uspapo")
 
-    if lote_global_upsert:
-        print(f"\n-> Enviando {len(lote_global_upsert)} novos vetores ao Pinecone...")
-        tamanho_lote = 90
-        for i in tqdm(range(0, len(lote_global_upsert), tamanho_lote), desc="Sincronizando"):
-            lote_up = lote_global_upsert[i : i + tamanho_lote]
-            sucesso = False
-            while not sucesso:
-                try:
-                    index.upsert_records(namespace="uspapo", records=lote_up)
-                    sucesso = True
-                    time.sleep(1.5)
-                except Exception as e:
-                    if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                        print("\n[!] Limite atingido. Pausando por 60s...")
-                        time.sleep(60)
-                    else:
-                        raise e
+# ─────────────────────────────────────────────
+# Entrada
+# ─────────────────────────────────────────────
+def construir_banco(
+    somente: list[str] | None = None,
+    dry_run: bool | None = None,
+    forcar_migracao: bool = False,
+) -> dict:
+    dry_run = cfg.DRY_RUN if dry_run is None else dry_run
 
-    salvar_ledger(ledger_avancado)
-    status = index.describe_index_stats()
-    print("\n[SUCESSO] Sincronização do banco de vetores finalizada!")
-    print(f"Total de blocos ativos no Pinecone: {status.total_vector_count}.")
+    arquivos = sorted(glob.glob(os.path.join(cfg.PASTA_PROCESSED, "**", "*.json"), recursive=True))
+    if somente:
+        alvos = {os.path.basename(a) for a in somente}
+        arquivos = [a for a in arquivos if os.path.basename(a) in alvos]
+    if not arquivos:
+        print(f"[AVISO] Nenhum JSON encontrado em {cfg.PASTA_PROCESSED}.")
+        return {}
+
+    index = None
+    if not dry_run:
+        from pinecone import Pinecone
+
+        print("-> Conectando ao Pinecone...")
+        pc = Pinecone(api_key=cfg.exigir_api_key())
+        index = pc.Index(cfg.PINECONE_INDEX)
+        _resgatar_pendencias(index)
+
+    ledger = L.carregar_ledger()
+    plano = montar_plano(ledger, arquivos, somente)
+
+    print("\n" + "=" * 56)
+    print("RESUMO DA OPERAÇÃO")
+    print("=" * 56)
+    print(f" Vetores hoje no ledger : {plano.total_no_ledger}")
+    print(f" Upserts agendados      : {len(plano.upserts)}")
+    print(f" Deletes agendados      : {len(plano.deletes)}")
+    print(f" Chunks reaproveitados  : {plano.reaproveitados}")
+    if plano.descartes:
+        print(f" Descartados na qualidade: {dict(plano.descartes)}")
+    if plano.arquivos_pulados:
+        print(f" Arquivos pulados       : {plano.arquivos_pulados}")
+    print("=" * 56)
+
+    relatorio = {
+        "data": datetime.now().isoformat(timespec="seconds"),
+        "dry_run": dry_run,
+        "total_no_ledger": plano.total_no_ledger,
+        "upserts": len(plano.upserts),
+        "deletes": len(plano.deletes),
+        "reaproveitados": plano.reaproveitados,
+        "descartes": dict(plano.descartes),
+        "nascidos_por_arquivo": dict(plano.nascidos),
+        "mortos_por_arquivo": dict(plano.mortos),
+        "arquivos_pulados": plano.arquivos_pulados,
+    }
+    os.makedirs(cfg.PASTA_RELATORIOS, exist_ok=True)
+    with open(os.path.join(cfg.PASTA_RELATORIOS, "ultima_execucao.json"), "w", encoding="utf-8") as f:
+        json.dump(relatorio, f, ensure_ascii=False, indent=2)
+
+    if not plano.toca:
+        print("\n-> Banco vetorial já sincronizado. Nada a enviar.")
+        if not dry_run:
+            L.salvar_ledger(ledger)  # persiste a migração de formato, se houve
+        return relatorio
+
+    verificar_orcamento(plano, forcar_migracao or cfg.PERMITIR_MIGRACAO_TOTAL)
+
+    if dry_run:
+        # O ledger simulado vai para OUTRO arquivo, de propósito. Se um ensaio
+        # sobrescrevesse o ledger de verdade, a execução seguinte veria "nada a
+        # fazer" e o Pinecone nunca receberia os vetores — uma perda silenciosa,
+        # e o comportamento antigo era exatamente esse.
+        simulado = cfg.ARQUIVO_LEDGER.replace(".json", ".simulado.json")
+        L.salvar_ledger(ledger, simulado)
+        print(
+            f"\n[DRY RUN] Nada foi enviado. Estado simulado em "
+            f"{os.path.relpath(simulado, cfg.RAIZ_PROJETO)} (o ledger real ficou intacto)."
+        )
+        return relatorio
+
+    aplicar_plano(plano, ledger, index)
+    print("\n[SUCESSO] Sincronização concluída.")
+    try:
+        print(f"Total de vetores no índice: {index.describe_index_stats().total_vector_count}")
+    except Exception:
+        pass
+    return relatorio
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Sincroniza data/processed com o Pinecone.")
+    parser.add_argument("--dry-run", action="store_true", help="Calcula o plano sem escrever na nuvem.")
+    parser.add_argument("--somente", nargs="*", default=None, help="Só estes arquivos de data/processed.")
+    parser.add_argument(
+        "--forcar-migracao",
+        action="store_true",
+        help="Desliga o disjuntor de orçamento. Use para o rebuild, nunca no cron.",
+    )
+    argumentos = parser.parse_args()
+
+    try:
+        construir_banco(
+            somente=argumentos.somente,
+            dry_run=True if argumentos.dry_run else None,
+            forcar_migracao=argumentos.forcar_migracao,
+        )
+    except OrcamentoEstourado as erro:
+        print(f"\n[ABORTADO PELO ORÇAMENTO] {erro}")
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":
-    construir_banco()
+    main()
