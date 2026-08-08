@@ -273,6 +273,16 @@ def executar_conversa(
             saude.marcar_sucesso(provedor.nome)
             yield {"tipo": "fontes", "urls": sorted(urls_turno)}
             yield {"tipo": "fim"}
+            try:
+                from uspapo.analytics import registrar
+                registrar(
+                    categoria="CHAT",
+                    nome_evento="RESPOSTA_CONCLUIDA",
+                    provedor=provedor.nome,
+                    metadata={"urls_fontes": len(urls_turno)}
+                )
+            except Exception:
+                pass
             return
 
         # Depois que o cliente já começou a receber a resposta não dá para

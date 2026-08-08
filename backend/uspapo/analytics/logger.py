@@ -2,48 +2,100 @@ import os
 import json
 import threading
 from pathlib import Path
-from supabase import create_client, Client
 from dotenv import load_dotenv
 
 # Carrega as variáveis de ambiente
 load_dotenv()
 
-# Inicializa o cliente do Supabase para o Backend
-URL = os.environ.get("SUPABASE_URL")
-KEY = os.environ.get("SUPABASE_SERVICE_KEY")
-supabase: Client = create_client(URL, KEY)
+# Instância lazy do Supabase para evitar crash se credenciais não existirem em dev local
+_supabase_client = None
+
+def _obter_supabase():
+    global _supabase_client
+    if _supabase_client is not None:
+        return _supabase_client
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_KEY")
+    if not url or not key:
+        return None
+    try:
+        from supabase import create_client
+        _supabase_client = create_client(url, key)
+        return _supabase_client
+    except Exception as e:
+        print(f"[AVISO ANALYTICS] Supabase não inicializado: {e}")
+        return None
 
 # Carrega o dicionário de eventos seguro
 caminho_json = Path(__file__).parent / "eventos.json"
-with open(caminho_json, "r", encoding="utf-8") as f:
-    DICIONARIO_EVENTOS = json.load(f)
+try:
+    with open(caminho_json, "r", encoding="utf-8") as f:
+        DICIONARIO_EVENTOS = json.load(f)
+except Exception:
+    DICIONARIO_EVENTOS = {}
 
-def _inserir_assincrono(dados_log):
-    """Roda em background para não travar a resposta do Flask"""
+def _inserir_assincrono(dados_log: dict):
+    """Roda em background em thread assíncrona para não travar o Flask."""
+    client = _obter_supabase()
+    if not client:
+        return
     try:
-        supabase.table("analytics_logs").insert(dados_log).execute()
+        client.table("analytics_logs").insert(dados_log).execute()
     except Exception as e:
         print(f"[ERRO ANALYTICS] Falha ao registrar log: {e}")
 
-def registrar(categoria: str, nome_evento: str, session_id: str, user_id: str = None, tokens: int = 0, latencia: int = 0):
+def registrar(
+    categoria: str,
+    nome_evento: str,
+    session_id: str = None,
+    user_id: str = None,
+    provedor: str = None,
+    modelo: str = None,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    total_tokens: int = 0,
+    latencia_ms: int = 0,
+    metadata: dict = None
+):
     """
-    Função principal para ser chamada em qualquer lugar do backend.
-    Exemplo de uso: registrar("CHAT", "NOVA_PERGUNTA", session_id)
+    Função principal para ser chamada em qualquer ponto do backend.
+    
+    Exemplo:
+        registrar(
+            categoria="CHAT",
+            nome_evento="RESPOSTA_CONCLUIDA",
+            session_id="sess_123",
+            user_id="user_456",
+            provedor="Groq",
+            modelo="llama-3.1-70b-versatile",
+            prompt_tokens=150,
+            completion_tokens=80,
+            total_tokens=230,
+            latencia_ms=450
+        )
     """
-    # Valida se o evento existe no JSON para padronizar o banco
     try:
-        evento_oficial = DICIONARIO_EVENTOS[categoria][nome_evento]
-    except KeyError:
-        print(f"[AVISO] Evento {categoria}.{nome_evento} não mapeado no eventos.json!")
-        evento_oficial = f"unknown_{nome_evento}"
+        evento_oficial = DICIONARIO_EVENTOS.get(categoria, {}).get(nome_evento)
+        if not evento_oficial:
+            evento_oficial = f"{categoria.lower()}_{nome_evento.lower()}"
+    except Exception:
+        evento_oficial = f"{categoria.lower()}_{nome_evento.lower()}"
+
+    if not total_tokens and (prompt_tokens or completion_tokens):
+        total_tokens = prompt_tokens + completion_tokens
 
     dados = {
         "evento": evento_oficial,
         "session_id": session_id,
         "user_id": user_id,
-        "tokens_gastos": tokens,
-        "latencia_ms": latencia
+        "provedor": provedor,
+        "modelo": modelo,
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+        "latencia_ms": latencia_ms,
+        "metadata": metadata or {}
     }
     
-    # Dispara a thread para não atrasar a vida do usuário
-    threading.Thread(target=_inserir_assincrono, args=(dados,)).start()
+    # Dispara em thread separada
+    threading.Thread(target=_inserir_assincrono, args=(dados,), daemon=True).start()

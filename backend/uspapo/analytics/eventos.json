@@ -1,11 +1,20 @@
 {
   "CHAT": {
-    "NOVA_PERGUNTA": "chat_query",
+    "NOVA_PERGUNTA": "chat_query_sent",
+    "RESPOSTA_CONCLUIDA": "chat_query_completed",
     "FEEDBACK_POSITIVO": "chat_thumb_up",
     "FEEDBACK_NEGATIVO": "chat_thumb_down"
   },
+  "LLM": {
+    "CHAMADA_PROVEDOR": "llm_provider_call"
+  },
+  "AUTH": {
+    "LOGIN": "auth_user_login",
+    "CADASTRO": "auth_user_signup"
+  },
   "SISTEMA": {
-    "ERRO_PINECONE": "sys_pinecone_error",
-    "LIMITE_TOKENS": "sys_rate_limit"
+    "RATE_LIMIT_ATINGIDO": "sys_rate_limit",
+    "ERRO_PROVEDOR": "sys_provider_error",
+    "ERRO_PINECONE": "sys_pinecone_error"
   }
 }

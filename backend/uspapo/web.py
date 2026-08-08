@@ -128,6 +128,15 @@ def criar_app(registro, *, rotulo_indice: str) -> Flask:
             "ferramentas": sorted(registro.nomes),
         })
 
+    @app.route("/api/analytics/resumo", methods=["GET"])
+    def analytics_resumo():
+        try:
+            from uspapo.analytics import obter_resumo_executivo
+            resumo = obter_resumo_executivo()
+            return jsonify({"ok": True, "data": resumo}), 200
+        except Exception as e:
+            return jsonify({"ok": False, "erro": str(e)}), 500
+
     return app
 
 
