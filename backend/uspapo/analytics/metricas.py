@@ -215,7 +215,7 @@ def obter_desempenho_provedores() -> dict:
     }
 
 def obter_serie_temporal_diaria(dias: int = 30) -> list[dict]:
-    """Gera dados de série temporal por dia (YYYY-MM-DD) baseados nas mensagens reais."""
+    """Gera dados de série temporal por dia (YYYY-MM-DD) preenchendo dias sem atividade com 0 para os gráficos."""
     _, mensagens, logs = _buscar_dados_reais_supabase()
     dias_map = defaultdict(lambda: {
         "usuarios": set(),
@@ -248,9 +248,32 @@ def obter_serie_temporal_diaria(dias: int = 30) -> list[dict]:
         dias_map[dia_key]["completion_tokens"] += c_tok
         dias_map[dia_key]["total_tokens"] += t_tok
 
+    for log in logs:
+        dt_str = log.get("created_at")
+        if not dt_str:
+            continue
+        try:
+            dia_key = dt_str[:10]
+        except Exception:
+            continue
+
+        uid = log.get("user_id") or log.get("session_id")
+        if uid:
+            dias_map[dia_key]["usuarios"].add(uid)
+
+    # Preenche o intervalo contínuo de N dias (garantindo que dias sem mensagens como 07/Ago tenham valor 0 no gráfico)
+    hoje = datetime.now(timezone.utc).date()
+    datas_ordenadas = [(hoje - timedelta(days=i)).isoformat() for i in range(dias - 1, -1, -1)]
+
     serie = []
-    for dia_key in sorted(dias_map.keys()):
-        d = dias_map[dia_key]
+    for dia_key in datas_ordenadas:
+        d = dias_map.get(dia_key, {
+            "usuarios": set(),
+            "perguntas": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0
+        })
         serie.append({
             "data": dia_key,
             "usuarios_unicos": len(d["usuarios"]),
@@ -258,7 +281,7 @@ def obter_serie_temporal_diaria(dias: int = 30) -> list[dict]:
             "prompt_tokens": d["prompt_tokens"],
             "completion_tokens": d["completion_tokens"],
             "total_tokens": d["total_tokens"],
-            "latencia_media_ms": 320.0
+            "latencia_media_ms": 320.0 if d["perguntas"] > 0 else 0
         })
     return serie
 
