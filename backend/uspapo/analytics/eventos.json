@@ -1,0 +1,11 @@
+{
+  "CHAT": {
+    "NOVA_PERGUNTA": "chat_query",
+    "FEEDBACK_POSITIVO": "chat_thumb_up",
+    "FEEDBACK_NEGATIVO": "chat_thumb_down"
+  },
+  "SISTEMA": {
+    "ERRO_PINECONE": "sys_pinecone_error",
+    "LIMITE_TOKENS": "sys_rate_limit"
+  }
+}
