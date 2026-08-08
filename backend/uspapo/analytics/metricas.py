@@ -214,17 +214,43 @@ def obter_desempenho_provedores() -> dict:
         }
     }
 
+def obter_resumo_conversas() -> dict:
+    """Retorna estatísticas comparativas entre número de Conversas (tópicos) vs Mensagens (turnos)."""
+    conversas, mensagens, _ = _buscar_dados_reais_supabase()
+    num_conversas = len(conversas)
+    num_mensagens = len(mensagens)
+    media_turnos = round(num_mensagens / max(num_conversas, 1), 2)
+
+    return {
+        "total_conversas": num_conversas,
+        "total_mensagens": num_mensagens,
+        "media_mensagens_por_conversa": media_turnos
+    }
+
 def obter_serie_temporal_diaria(dias: int = 30) -> list[dict]:
     """Gera dados de série temporal por dia (YYYY-MM-DD) preenchendo dias sem atividade com 0 para os gráficos."""
-    _, mensagens, logs = _buscar_dados_reais_supabase()
+    conversas, mensagens, logs = _buscar_dados_reais_supabase()
     dias_map = defaultdict(lambda: {
         "usuarios": set(),
+        "conversas_iniciadas": 0,
         "perguntas": 0,
         "prompt_tokens": 0,
         "completion_tokens": 0,
         "total_tokens": 0
     })
 
+    # 1. Conta conversas iniciadas por dia
+    for c in conversas:
+        dt_str = c.get("criada_em") or c.get("atualizada_em")
+        if not dt_str:
+            continue
+        try:
+            dia_key = dt_str[:10]
+            dias_map[dia_key]["conversas_iniciadas"] += 1
+        except Exception:
+            pass
+
+    # 2. Conta mensagens/turnos por dia
     for m in mensagens:
         dt_str = m.get("criada_em")
         if not dt_str:
@@ -269,6 +295,7 @@ def obter_serie_temporal_diaria(dias: int = 30) -> list[dict]:
     for dia_key in datas_ordenadas:
         d = dias_map.get(dia_key, {
             "usuarios": set(),
+            "conversas_iniciadas": 0,
             "perguntas": 0,
             "prompt_tokens": 0,
             "completion_tokens": 0,
@@ -277,6 +304,7 @@ def obter_serie_temporal_diaria(dias: int = 30) -> list[dict]:
         serie.append({
             "data": dia_key,
             "usuarios_unicos": len(d["usuarios"]),
+            "conversas_iniciadas": d["conversas_iniciadas"],
             "perguntas": d["perguntas"],
             "prompt_tokens": d["prompt_tokens"],
             "completion_tokens": d["completion_tokens"],
@@ -288,6 +316,7 @@ def obter_serie_temporal_diaria(dias: int = 30) -> list[dict]:
 def obter_resumo_executivo() -> dict:
     """Gera um resumo consolidado de telemetria baseado nos dados reais do Supabase."""
     dau_mau = obter_dau_mau()
+    resumo_conversas = obter_resumo_conversas()
     tokens = obter_consumo_tokens(dias=30)
     desempenho = obter_desempenho_provedores()
     top_usuarios = obter_consumo_por_usuario(top_k=5)
@@ -295,6 +324,7 @@ def obter_resumo_executivo() -> dict:
 
     return {
         "usuarios": dau_mau,
+        "resumo_conversas": resumo_conversas,
         "tokens": tokens,
         "desempenho_provedores": desempenho,
         "top_usuarios": top_usuarios,
