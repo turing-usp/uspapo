@@ -59,7 +59,7 @@ class TestAnalytics(unittest.TestCase):
             }
         ]
 
-        with patch("backend.uspapo.analytics.metricas._buscar_logs", return_value=logs_falsos):
+        with patch("backend.uspapo.analytics.metricas._buscar_dados_reais_supabase", return_value=([], [], logs_falsos)):
             dau_mau = obter_dau_mau()
             self.assertIn("dau", dau_mau)
             self.assertIn("mau", dau_mau)

@@ -188,6 +188,15 @@ def obter_consumo_por_usuario(top_k: int = 20) -> list[dict]:
         if dt_str and (not usuarios[uid]["ultima_atividade"] or dt_str > usuarios[uid]["ultima_atividade"]):
             usuarios[uid]["ultima_atividade"] = dt_str
 
+    if not mensagens and logs:
+        for log in logs:
+            uid = log.get("user_id") or "usuario_anonimo"
+            usuarios[uid]["total_tokens"] += log.get("total_tokens", 0)
+            usuarios[uid]["perguntas"] += 1
+            dt_str = log.get("created_at")
+            if dt_str and (not usuarios[uid]["ultima_atividade"] or dt_str > usuarios[uid]["ultima_atividade"]):
+                usuarios[uid]["ultima_atividade"] = dt_str
+
     ranking = [
         {
             "user_id": uid,
@@ -203,8 +212,28 @@ def obter_consumo_por_usuario(top_k: int = 20) -> list[dict]:
 def obter_desempenho_provedores() -> dict:
     """Retorna estatísticas de desempenho por provedor."""
     _, mensagens, logs = _buscar_dados_reais_supabase()
-    total_msgs = len(mensagens)
+    
+    if logs:
+        provs = defaultdict(lambda: {"total_chamadas": 0, "erros": 0, "latencia_acumulada": 0})
+        for l in logs:
+            prov = l.get("provedor") or "Outro"
+            provs[prov]["total_chamadas"] += 1
+            if l.get("evento") == "erro_provedor":
+                provs[prov]["erros"] += 1
+            provs[prov]["latencia_acumulada"] += (l.get("latencia_ms") or 0)
+        
+        resultado = {}
+        for prov, info in provs.items():
+            tot = info["total_chamadas"]
+            resultado[prov] = {
+                "total_chamadas": tot,
+                "erros": info["erros"],
+                "latencia_media_ms": round(info["latencia_acumulada"] / max(tot, 1), 2),
+                "taxa_erro": round(info["erros"] / max(tot, 1), 4)
+            }
+        return resultado
 
+    total_msgs = len(mensagens)
     return {
         "Groq": {
             "total_chamadas": max(total_msgs, 1),
