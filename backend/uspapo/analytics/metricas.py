@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
-from backend.uspapo.analytics.logger import _obter_supabase
+from .logger import _obter_supabase
 
 def _buscar_logs(dias: int = 30) -> list[dict]:
     """Busca os logs do Supabase dos últimos N dias."""
@@ -8,7 +8,7 @@ def _buscar_logs(dias: int = 30) -> list[dict]:
     if not client:
         return []
     try:
-        data_corte = (datetime.now(timezone.utc) - timedelta(dias=dias)).isoformat()
+        data_corte = (datetime.now(timezone.utc) - timedelta(days=dias)).isoformat()
         res = client.table("analytics_logs") \
             .select("*") \
             .gte("created_at", data_corte) \

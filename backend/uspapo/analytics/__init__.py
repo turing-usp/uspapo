@@ -1,5 +1,5 @@
-from backend.uspapo.analytics.logger import registrar
-from backend.uspapo.analytics.metricas import (
+from .logger import registrar
+from .metricas import (
     obter_dau_mau,
     obter_consumo_tokens,
     obter_consumo_por_usuario,
