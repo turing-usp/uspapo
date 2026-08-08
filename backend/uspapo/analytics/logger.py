@@ -42,7 +42,21 @@ def _inserir_assincrono(dados_log: dict):
     try:
         client.table("analytics_logs").insert(dados_log).execute()
     except Exception as e:
-        print(f"[ERRO ANALYTICS] Falha ao registrar log: {e}")
+        # Se a tabela ainda não tiver as colunas novas, faz fallback para o schema antigo (tokens_gastos)
+        if "completion_tokens" in str(e) or "PGRST204" in str(e):
+            try:
+                dados_fallback = {
+                    "evento": dados_log.get("evento"),
+                    "session_id": dados_log.get("session_id"),
+                    "user_id": dados_log.get("user_id"),
+                    "tokens_gastos": dados_log.get("total_tokens", 0),
+                    "latencia_ms": dados_log.get("latencia_ms", 0)
+                }
+                client.table("analytics_logs").insert(dados_fallback).execute()
+            except Exception as ex:
+                print(f"[ERRO ANALYTICS] Falha no fallback: {ex}")
+        else:
+            print(f"[ERRO ANALYTICS] Falha ao registrar log: {e}")
 
 def registrar(
     categoria: str,
