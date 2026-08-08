@@ -89,10 +89,12 @@ ORIGENS_CORS = [
     "https://www.uspapo.turingusp.com",
 ]
 
-# X-Device-Id e Authorization são headers customizados: sem eles liberados
-# aqui, o navegador barra a requisição já no preflight OPTIONS, e aí o login
-# não chegaria nem a ser conferido.
-HEADERS_CORS = ["Content-Type", "X-Device-Id", "Authorization"]
+# X-Device-Id, Authorization e X-Admin-Key são headers customizados: sem eles liberados
+# aqui, o navegador barra a requisição já no preflight OPTIONS.
+HEADERS_CORS = ["Content-Type", "X-Device-Id", "Authorization", "X-Admin-Key"]
+
+# Chave secreta de administração para a API de Analytics
+ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "uspapo-admin-secret-key-dev")
 
 # O Render atribui a porta via variável de ambiente.
 PORTA = int(os.getenv("PORT", "5000"))

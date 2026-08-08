@@ -45,7 +45,7 @@ registro = Registro()
             },
             "limite": {
                 "type": "integer",
-                "description": f"Quantos trechos retornar (1 a {config.TOP_K_MAX}).",
+                "description": f"Quantos trechos retornar de 1 a {config.TOP_K_MAX} (número inteiro sem aspas).",
                 "default": config.TOP_K_PADRAO,
             },
         },
@@ -81,6 +81,8 @@ def buscar_documentos(
         top_k=limite,
         include_metadata=True,
     )
+
+    print(f"[PINECONE BUSCA] consulta='{consulta}' -> {len(resultados.matches)} resultados encontrados.")
 
     blocos: list[str] = []
     urls: list[str] = []
