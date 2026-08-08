@@ -4,6 +4,11 @@ on:
   schedule:
   - cron: '0 5 * * *'
   workflow_dispatch: # Cria um botão no GitHub para você rodar manualmente quando quiser
+    inputs:
+      forcar_migracao:
+        description: 'Desliga o disjuntor de orçamento (use só para o rebuild completo)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write # Permite que o robô faça commit atualizando a data e o ledger no repositório
@@ -11,7 +16,11 @@ permissions:
 jobs:
   rodar-orquestrador:
     runs-on: ubuntu-latest
-    
+    # Sem este teto, um 429 persistente do Pinecone deixava o job rodando até o
+    # limite de 6 horas do GitHub. O `while not sucesso:` que causava isso já
+    # virou backoff com número máximo de tentativas, mas o teto fica como rede.
+    timeout-minutes: 45
+
     steps:
       - name: 📥 Clonar o repositório
         uses: actions/checkout@v4
@@ -29,9 +38,39 @@ jobs:
 
       - name: 🚀 Executar o Rodar Scrapers (Scraping + Clean + Pinecone)
         env:
-          # O script puxa essa variável dos Secrets do GitHub
           PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
-        run: python scrapers/spiders/rodar_scrapers.py
+          PINECONE_INDEX: ${{ vars.PINECONE_INDEX || 'uspapo-rag' }}
+          PINECONE_NAMESPACE: ${{ vars.PINECONE_NAMESPACE || 'uspapo' }}
+          # ─────────────────────────────────────────────
+          # Disjuntor de escrita. É o que impede que um erro a montante (um site
+          # que passou a devolver lixo, ou um domínio invadido) vire estouro de
+          # cota: acima destes números o build_vector aborta sem escrever nada.
+          # Mexer em >25% do banco de uma vez não é rotina, é migração — e
+          # migração passa pelo botão manual, não pelo cron das 5h.
+          # ─────────────────────────────────────────────
+          ORCAMENTO_UPSERTS: '2000'
+          ORCAMENTO_DELETES: '3000'
+          LIMIAR_ABORTO_PCT: '0.25'
+          PERMITIR_MIGRACAO_TOTAL: ${{ inputs.forcar_migracao && '1' || '0' }}
+        # 6 sites ao mesmo tempo. O trabalho é esperar `DOWNLOAD_DELAY`, não
+        # calcular, então isso cabe com folga nos 2 núcleos do runner — e sem
+        # ele um dia com muitos vencimentos coincidentes não fecha dentro do
+        # `timeout-minutes: 45` acima. Cada site continua vendo um crawler só.
+        run: python scrapers/spiders/rodar_scrapers.py --paralelos 6
+
+      - name: 📊 Resumo da execução
+        if: always()
+        run: |
+          if [ -f data/reports/ultima_execucao.json ]; then
+            {
+              echo '### Sincronização do banco vetorial'
+              echo '```json'
+              cat data/reports/ultima_execucao.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Nenhum relatório gerado (nada foi sincronizado).' >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: 💾 Salvar nova data, ledger e dados processados
         run: |
