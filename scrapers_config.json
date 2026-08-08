@@ -1,25 +1,34 @@
 [
   {
     "id_site": "poli",
+    "estado": "ativo",
     "start_url": "https://www.poli.usp.br/",
     "allowed_domain": "poli.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
-        "selector": "ul#menu-1-7a1b5c55 a::attr(href)"
+        "selector": "nav.elementor-nav-menu--main a::attr(href), ul#menu-1-7a1b5c55 a::attr(href)"
       },
       {
         "type": "posts",
         "selector": ".elementor-posts-container article a::attr(href)"
       }
     ],
-    "last_update": "2026-08-02",
+    "max_paginas": 350,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "sanfran",
+    "estado": "ativo",
     "start_url": "https://direito.usp.br/",
     "allowed_domain": "direito.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -30,13 +39,20 @@
         "selector": ".noticia_caixa a::attr(href)"
       }
     ],
-    "last_update": "2026-08-02",
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "fmusp",
+    "estado": "ativo",
     "start_url": "https://fm.usp.br/fmusp/portal/",
     "allowed_domain": "fm.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -51,13 +67,20 @@
         "selector": "#Eventos_home a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "ime",
+    "estado": "ativo",
     "start_url": "https://www.ime.usp.br/",
     "allowed_domain": "ime.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -68,13 +91,20 @@
         "selector": ".ultp-post-grid-block .ultp-block-title a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "max_paginas": 300,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "fau",
+    "estado": "ativo",
     "start_url": "https://www.fau.usp.br/",
     "allowed_domain": "fau.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -85,13 +115,20 @@
         "selector": ".card a::attr(href)"
       }
     ],
-    "last_update": "2026-08-02",
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "iq",
+    "estado": "ativo",
     "start_url": "https://www.iq.usp.br/portaliqusp/?q=pt-br/bem-vindo",
     "allowed_domain": "iq.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -102,13 +139,20 @@
         "selector": ".card-content a::attr(href), .project a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "max_paginas": 500,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "if",
+    "estado": "ativo",
     "start_url": "https://portal.if.usp.br/ifusp/",
-    "allowed_domain": "if.usp.br",
+    "allowed_domain": "portal.if.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -123,13 +167,20 @@
         "selector": ".view-content .renatinha-titulo a::attr(href), .carousel-inner #text button a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "max_paginas": 300,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "fflch",
+    "estado": "ativo",
     "start_url": "https://www.fflch.usp.br/",
     "allowed_domain": "www.fflch.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -140,13 +191,20 @@
         "selector": ".view-content a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "hu",
+    "estado": "ativo",
     "start_url": "https://www.hu.usp.br/",
     "allowed_domain": "hu.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -161,13 +219,20 @@
         "selector": ".sow-slider-image a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "geografia",
+    "estado": "ativo",
     "start_url": "http://geografia.fflch.usp.br/",
     "allowed_domain": "geografia.fflch.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -178,13 +243,20 @@
         "selector": ".carousel-inner a::attr(href), .node__content a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "eca",
+    "estado": "ativo",
     "start_url": "https://www.eca.usp.br/",
     "allowed_domain": "eca.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -195,13 +267,20 @@
         "selector": ".hero-slide-content .field--name-field-link a::attr(href), .mosaic-lis-item a::attr(href), .agenda-list .title a::attr(href), .home-news-list-item .title a::attr(href), .home-comunicados-list .title a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "max_paginas": 300,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "ib",
+    "estado": "ativo",
     "start_url": "https://www.ib.usp.br/",
     "allowed_domain": "ib.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -216,30 +295,45 @@
         "selector": "#camera_wrap_371 div::attr(data-link)"
       }
     ],
-    "last_update": "2026-07-31",
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "fea",
+    "estado": "desativado",
     "start_url": "https://www.fea.usp.br/",
     "allowed_domain": "fea.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
-        "selector": ".menu-principal a::attr(href), #nice-menu-1 a::attr(href)"
+        "selector": ".block-nice-menus-1 a::attr(href), .barra-menu-principal a::attr(href)"
       },
       {
         "type": "posts_e_eventos",
         "selector": ".view-content a::attr(href)"
       }
     ],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
     "last_update": "2026-07-31",
-    "frequency": "7d"
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 1,
+    "frequency": "7d",
+    "motivo": "robots.txt do www.fea.usp.br traz 'User-agent: * / Disallow: /'. Nao e seletor quebrado: o site proibe crawler. Nao reativar sem autorizacao da FEA."
   },
   {
     "id_site": "cepeusp",
+    "estado": "ativo",
     "start_url": "https://cepe.usp.br/",
     "allowed_domain": "cepe.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -250,13 +344,20 @@
         "selector": "article.slide a::attr(href), main article a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "icb",
+    "estado": "ativo",
     "start_url": "https://ww3.icb.usp.br/",
     "allowed_domain": "icb.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -267,13 +368,20 @@
         "selector": ".cont-noticias a::attr(href), .ecs-event a::attr(href), .even-dest-cont-01 a::attr(href), .div-planetary a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "feusp",
+    "estado": "ativo",
     "start_url": "https://www4.fe.usp.br/",
     "allowed_domain": "www4.fe.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -284,13 +392,20 @@
         "selector": "#destaques_slider .item a::attr(href), .bloco-div a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "fsp",
+    "estado": "ativo",
     "start_url": "https://www.fsp.usp.br/site/",
     "allowed_domain": "fsp.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -301,13 +416,20 @@
         "selector": ".swiper-slide a::attr(href), .fsp-noticias-titulo a::attr(href), .fsp-eventos-detalhe a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
   },
   {
     "id_site": "ee",
+    "estado": "ativo",
     "start_url": "https://www.ee.usp.br/",
     "allowed_domain": "ee.usp.br",
+    "descoberta": "hibrido",
     "sources": [
       {
         "type": "menu",
@@ -318,7 +440,647 @@
         "selector": ".jet-slider__item a::attr(href), .jet-listing-grid__item a::attr(href), .elementor-widget-image a::attr(href), .elementor-widget-heading a::attr(href)"
       }
     ],
-    "last_update": "2026-07-31",
+    "max_paginas": 300,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
     "frequency": "7d"
+  },
+  {
+    "id_site": "prg",
+    "estado": "ativo",
+    "start_url": "https://prg.usp.br/",
+    "allowed_domain": "prg.usp.br",
+    "descoberta": "sitemap",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "7d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "prpg",
+    "estado": "ativo",
+    "start_url": "https://prpg.usp.br/",
+    "allowed_domain": "prpg.usp.br",
+    "descoberta": "sitemap",
+    "sources": [],
+    "max_paginas": 200,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "7d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "prip",
+    "estado": "ativo",
+    "start_url": "https://prip.usp.br/",
+    "allowed_domain": "prip.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "7d",
+    "motivo": "sucessor do sas.usp.br, que foi reorganizado na Pro-Reitoria de Inclusao e Pertencimento; o dominio antigo esta em manutencao (verificado 2026-08-06)",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "prceu",
+    "estado": "quarentena",
+    "start_url": "https://prceu.usp.br/",
+    "allowed_domain": "prceu.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 150,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "",
+    "ultima_tentativa": "",
+    "falhas_consecutivas": 0,
+    "frequency": "7d",
+    "motivo": "quarentena: mediana_chars=136 (esperado >= 300)"
+  },
+  {
+    "id_site": "prpi",
+    "estado": "ativo",
+    "start_url": "https://prpi.usp.br/",
+    "allowed_domain": "prpi.usp.br",
+    "descoberta": "sitemap",
+    "sources": [],
+    "max_paginas": 120,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "14d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "fuvest",
+    "estado": "ativo",
+    "start_url": "https://www.fuvest.br/",
+    "allowed_domain": "fuvest.br",
+    "descoberta": "sitemap",
+    "sources": [],
+    "max_paginas": 150,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "7d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "usp_portal",
+    "estado": "ativo",
+    "start_url": "https://www5.usp.br/",
+    "allowed_domain": "www5.usp.br",
+    "descoberta": "sitemap",
+    "sources": [],
+    "max_paginas": 300,
+    "profundidade_max": 1,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "7d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "puspc",
+    "estado": "ativo",
+    "start_url": "https://puspc.usp.br/",
+    "allowed_domain": "puspc.usp.br",
+    "descoberta": "sitemap",
+    "sources": [],
+    "max_paginas": 120,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "14d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "sibi",
+    "estado": "quarentena",
+    "start_url": "https://www.abcd.usp.br/",
+    "allowed_domain": "abcd.usp.br",
+    "descoberta": "sitemap",
+    "sources": [],
+    "max_paginas": 150,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "",
+    "ultima_tentativa": "",
+    "falhas_consecutivas": 0,
+    "frequency": "14d",
+    "motivo": "quarentena: mediana_chars=8 (esperado >= 300)"
+  },
+  {
+    "id_site": "leginf",
+    "estado": "quarentena",
+    "start_url": "https://leginf.usp.br/",
+    "allowed_domain": "leginf.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 300,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "",
+    "ultima_tentativa": "",
+    "falhas_consecutivas": 0,
+    "frequency": "14d",
+    "motivo": "quarentena: pct_chars_paragrafo_gigante=0.1131 (esperado <= 0.05)"
+  },
+  {
+    "id_site": "each",
+    "estado": "ativo",
+    "start_url": "https://www5.each.usp.br/",
+    "allowed_domain": "each.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "14d",
+    "motivo": "each.usp.br é só um meta-refresh para www5.each.usp.br",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "iag",
+    "estado": "ativo",
+    "start_url": "https://iag.usp.br/",
+    "allowed_domain": "iag.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "14d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "ipusp",
+    "estado": "ativo",
+    "start_url": "https://www.ip.usp.br/",
+    "allowed_domain": "ip.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "14d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "fcf",
+    "estado": "ativo",
+    "start_url": "https://info.fcf.usp.br/",
+    "allowed_domain": "fcf.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "14d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "io",
+    "estado": "ativo",
+    "start_url": "https://www.io.usp.br/",
+    "allowed_domain": "io.usp.br",
+    "descoberta": "sitemap",
+    "sources": [],
+    "max_paginas": 200,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "14d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "iee",
+    "estado": "ativo",
+    "start_url": "https://www.iee.usp.br/",
+    "allowed_domain": "iee.usp.br",
+    "descoberta": "sitemap",
+    "sources": [],
+    "max_paginas": 200,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "14d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "fousp",
+    "estado": "ativo",
+    "start_url": "https://site.fo.usp.br/",
+    "allowed_domain": "fo.usp.br",
+    "descoberta": "sitemap",
+    "sources": [],
+    "max_paginas": 200,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "14d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "imt",
+    "estado": "quarentena",
+    "start_url": "https://fm.usp.br/imt/portal/",
+    "allowed_domain": "fm.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "",
+    "ultima_tentativa": "",
+    "falhas_consecutivas": 0,
+    "frequency": "14d",
+    "permitir": [
+      "^/imt/"
+    ],
+    "motivo": "quarentena: paginas=3 (esperado >= 10)"
+  },
+  {
+    "id_site": "iea",
+    "estado": "ativo",
+    "start_url": "https://iea.usp.br/",
+    "allowed_domain": "iea.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "21d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "mae",
+    "estado": "ativo",
+    "start_url": "https://mae.usp.br/",
+    "allowed_domain": "mae.usp.br",
+    "descoberta": "sitemap",
+    "sources": [],
+    "max_paginas": 150,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "21d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "mz",
+    "estado": "ativo",
+    "start_url": "https://mz.usp.br/",
+    "allowed_domain": "mz.usp.br",
+    "descoberta": "sitemap",
+    "sources": [],
+    "max_paginas": 150,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "21d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "iri",
+    "estado": "quarentena",
+    "start_url": "https://iri.usp.br/sobre/",
+    "allowed_domain": "iri.usp.br",
+    "descoberta": "links",
+    "sources": [],
+    "max_paginas": 80,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "permitir": [
+      "^/(sobre|graduacao|pos-graduacao|pesquisa|cultura-extensao|cooperacao|biblioteca)(/|$)"
+    ],
+    "negar": [
+      "/(bonusesr|games|store|order|hot|dell|android|recomendados|plataforma|video|article)/"
+    ],
+    "motivo": "dominio comprometido: spam de aposta injetado; nao promover",
+    "last_update": "",
+    "ultima_tentativa": "",
+    "falhas_consecutivas": 0,
+    "frequency": "21d"
+  },
+  {
+    "id_site": "eesc",
+    "estado": "quarentena",
+    "start_url": "https://eesc.usp.br/",
+    "allowed_domain": "eesc.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "",
+    "ultima_tentativa": "",
+    "falhas_consecutivas": 0,
+    "frequency": "21d",
+    "motivo": "quarentena: pct_duplicata_intra_pagina=0.06533 (esperado <= 0.03)"
+  },
+  {
+    "id_site": "icmc",
+    "estado": "ativo",
+    "start_url": "https://icmc.usp.br/",
+    "allowed_domain": "icmc.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "21d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "ifsc",
+    "estado": "ativo",
+    "start_url": "https://ifsc.usp.br/",
+    "allowed_domain": "ifsc.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "21d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "iqsc",
+    "estado": "ativo",
+    "start_url": "https://iqsc.usp.br/",
+    "allowed_domain": "iqsc.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "21d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "iau",
+    "estado": "ativo",
+    "start_url": "https://www.iau.usp.br/",
+    "allowed_domain": "iau.usp.br",
+    "descoberta": "sitemap",
+    "sources": [],
+    "max_paginas": 200,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "21d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "fmrp",
+    "estado": "ativo",
+    "start_url": "https://fmrp.usp.br/",
+    "allowed_domain": "fmrp.usp.br",
+    "descoberta": "sitemap",
+    "sources": [],
+    "max_paginas": 200,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "21d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "fearp",
+    "estado": "ativo",
+    "start_url": "https://fearp.usp.br/",
+    "allowed_domain": "fearp.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "21d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "ffclrp",
+    "estado": "quarentena",
+    "start_url": "https://ffclrp.usp.br/",
+    "allowed_domain": "ffclrp.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "",
+    "ultima_tentativa": "",
+    "falhas_consecutivas": 0,
+    "frequency": "21d",
+    "motivo": "quarentena: pct_duplicata_intra_pagina=0.09914 (esperado <= 0.03)"
+  },
+  {
+    "id_site": "fcfrp",
+    "estado": "ativo",
+    "start_url": "https://fcfrp.usp.br/",
+    "allowed_domain": "fcfrp.usp.br",
+    "descoberta": "sitemap",
+    "sources": [],
+    "max_paginas": 200,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "21d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "forp",
+    "estado": "quarentena",
+    "start_url": "https://www.forp.usp.br/",
+    "allowed_domain": "forp.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "",
+    "ultima_tentativa": "",
+    "falhas_consecutivas": 0,
+    "frequency": "21d",
+    "motivo": "quarentena: paginas=1 (esperado >= 10); mediana_chars=51 (esperado >= 300)"
+  },
+  {
+    "id_site": "esalq",
+    "estado": "ativo",
+    "start_url": "https://www.esalq.usp.br/",
+    "allowed_domain": "esalq.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 300,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "21d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "fzea",
+    "estado": "ativo",
+    "start_url": "https://www.fzea.usp.br/",
+    "allowed_domain": "fzea.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "2026-08-06",
+    "ultima_tentativa": "2026-08-06",
+    "falhas_consecutivas": 0,
+    "frequency": "21d",
+    "validado_em": "2026-08-06"
+  },
+  {
+    "id_site": "eerp",
+    "estado": "desativado",
+    "start_url": "https://www.eerp.usp.br/",
+    "allowed_domain": "eerp.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "",
+    "ultima_tentativa": "",
+    "falhas_consecutivas": 0,
+    "frequency": "30d",
+    "motivo": "host nao resolve (verificado 2026-08-06)"
+  },
+  {
+    "id_site": "eeferp",
+    "estado": "desativado",
+    "start_url": "https://eeferp.usp.br/",
+    "allowed_domain": "eeferp.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "",
+    "ultima_tentativa": "",
+    "falhas_consecutivas": 0,
+    "frequency": "30d",
+    "motivo": "host nao resolve (verificado 2026-08-06)"
+  },
+  {
+    "id_site": "mac",
+    "estado": "desativado",
+    "start_url": "https://www.mac.usp.br/",
+    "allowed_domain": "mac.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "",
+    "ultima_tentativa": "",
+    "falhas_consecutivas": 0,
+    "frequency": "30d",
+    "motivo": "host nao resolve (verificado 2026-08-06)"
+  },
+  {
+    "id_site": "cirp",
+    "estado": "desativado",
+    "start_url": "https://cirp.usp.br/",
+    "allowed_domain": "cirp.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "",
+    "ultima_tentativa": "",
+    "falhas_consecutivas": 0,
+    "frequency": "30d",
+    "motivo": "host nao resolve (verificado 2026-08-06)"
+  },
+  {
+    "id_site": "fmvz",
+    "estado": "desativado",
+    "start_url": "https://fmvz.usp.br/",
+    "allowed_domain": "fmvz.usp.br",
+    "descoberta": "hibrido",
+    "sources": [],
+    "max_paginas": 250,
+    "profundidade_max": 2,
+    "min_paginas": 5,
+    "last_update": "",
+    "ultima_tentativa": "",
+    "falhas_consecutivas": 0,
+    "frequency": "30d",
+    "motivo": "responde 404 na raiz (verificado 2026-08-06)"
   }
 ]

@@ -1,0 +1,55 @@
+name: Validar site novo (quarentena)
+
+# Só manual, e de propósito: este é o portão pelo qual um site novo passa antes
+# de poder entrar no índice. Ele NÃO fala com o Pinecone, NÃO escreve em
+# data/raw/ nem em data/processed/, e NÃO faz commit. O resultado sai como
+# artifact para alguém ler.
+#
+# Foi a falta de um passo assim que deixou o iri.usp.br, um domínio com mais de
+# 400 mil URLs de spam de aposta injetadas, chegar até o banco vetorial.
+on:
+  workflow_dispatch:
+    inputs:
+      id_site:
+        description: 'id_site em scrapers_config.json (ex.: prip, each, eesc)'
+        required: true
+        type: string
+
+permissions:
+  contents: read # não commita nada: só lê o repositório e publica o relatório
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: 📥 Clonar o repositório
+        uses: actions/checkout@v4
+
+      - name: 🐍 Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Sem PINECONE_API_KEY no ambiente: se algum dia este passo tentar
+      # escrever no índice, ele falha em vez de escrever.
+      - name: 🔎 Validar ${{ inputs.id_site }}
+        run: python -m scrapers.validar_site --id "${{ inputs.id_site }}"
+
+      - name: 📄 Publicar relatório
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onboarding-${{ inputs.id_site }}
+          path: |
+            data/reports/onboarding_${{ inputs.id_site }}.json
+            data/raw/_quarentena/${{ inputs.id_site }}_raw.json
+          if-no-files-found: warn
+          retention-days: 14

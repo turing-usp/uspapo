@@ -1,104 +1,101 @@
 {
+    "_meta": {
+        "versao": 2,
+        "nota": "Regras pontuais de remoção de ruído. O grosso do menu/rodapé agora sai sozinho pelo boilerplate.py — o que fica aqui é a exceção que a estatística não pega. Cada regra passa por regex_seguro.validar_padrao no carregamento: no máximo UM quantificador ilimitado, sem quantificador aninhado. Por padrão o '.' NÃO cruza quebra de linha (o DOTALL saiu de padrão); use flags 'is' só quando a regra precisar mesmo atravessar parágrafo, e nesse caso ponha um max_remocao_pct."
+    },
     "universal": [
-        "Retornar à página principal\\.",
-        "Clique para acessar\\.",
-        "Acesse no link\\s*\\.",
-        "VEJA TAMBÉM",
-        "\\bMENU\\b",
-        "Acesso Rápido",
-        "Última atualização em \\d{2}/\\d{2}/\\d{4}"
+        { "padrao": "Clique para acessar\\.", "flags": "i" },
+        { "padrao": "Acesse no link\\s*\\.", "flags": "i" },
+        { "padrao": "VEJA TAMBÉM", "flags": "i" },
+        { "padrao": "\\bMENU\\b", "flags": "" },
+        { "padrao": "Acesso Rápido", "flags": "i" },
+        { "padrao": "Última atualização em \\d{2}/\\d{2}/\\d{4}", "flags": "i" },
+        { "padrao": "Google Translate Widget by Infofru", "flags": "i" }
     ],
-    "cepe.usp.br": [
-        "Centro de Práticas Esportivas da Universidade de São Paulo\\s*Praça 02, Prof\\. Rubião Meira, 61 – Cidade UniversitáriaSão Paulo, SP – CEP 05508 110\\s*cepeusp@usp\\.br",
-        "Siga nossas redes sociais!",
-        "Intranet",
-        "Infraestrutura\\s*1 - Portarias I & II\\s*2 - Conjunto Aquático\\s*3 - Estádio\\s*4 - Campos de Futebol\\s*5 - Campo de Futebol Areia\\s*6 - Espaço Multiúso/Nuri\\s*7 - Vestiários, Lanchonete\\s*8 - Pista de Atletismo\\s*9 - Velódromo\\s*10 - Quadras Externas\\s*11 - Quadras Cobertas\\s*12 - Quadras de Tênis\\s*13 - Raia Olímpica",
-        "Ouvidoria:Prof\\. Dr\\. Pascoal Tambucci – ouvicepe@usp\\.brO serviço de ouvidoria é somente para os casos não resolvidosno âmbito do setor competente\\."
-    ],
-    "eca.usp.br": [
-        "Assistência estudantil\\s*Sistema Júpiter USP\\s*Pró-Reitoria de Graduação",
-        "Serviço de Pós-graduação\\s*Grupos de pesquisa\\s*Auxílio ao Pesquisador",
-        "Av\\. Prof\\. Lúcio Martins Rodrigues, 443, Cidade Universitária.*?CEP:\\s*05508-020",
-        "Prédio Central \\(Prédio 1\\), 1º andar.*?São Paulo \\| SP \\| Brasil",
-        "Horário de atendimento:.*?E-mail:.*?(?=\\n|$)"
-    ],
-    "ee.usp.br": [
-        "Estamos usando cookies para oferecer a você a melhor experiência em nosso site\\..*?Manter esse cookie ativado nos ajuda a melhorar nosso site\\.",
-        "PresidenteProf\\..*?Manter esse cookie ativado nos ajuda a melhorar nosso site\\.",
-        "Escola de\\s*ENFERMAGEM\\s*Universidade de São Paulo\\s*Av\\. Dr\\. Enéas de Carvalho Aguiar, 419.*?(?=\\n|$)"
-    ],
-    "fau.usp.br": [
-        "Faculdade de Arquitetura e Urbanismo e de Design da USP",
-        "Edifício Vilanova Artigas",
-        "Rua do Lago, 876 – Cidade Universitária.*?(?=\\n|$)"
-    ],
-    "fea.usp.br": [
-        "Faculdade de Economia, Administração, Contabilidade e Atuária da USP"
-    ],
-    "fe.usp.br": [
-        "Av\\. da Universidade, 308 – São Paulo – SP CEP 05508-040.*?(?=\\n|$)",
-        "Faculdade de Educação Programa de Pós-Graduação em Educação"
-    ],
-    "fflch.usp.br": [
-        "Faculdade de Filosofia, Letras e Ciências Humanas",
-        "Comissão Unificada de Segurança e Qualidade de Vida",
-        "Direção da FFLCH Comissão de Graduação da FFLCH"
-    ],
-    "fm.usp.br": [
-        "Faculdade de Medicina da Universidade de São Paulo",
-        "(Facebook\\s*){2,}(Twitter\\s*){2,}(Instagram\\s*){2,}(YouTube\\s*){2,}(LinkedIn\\s*){2,}",
-        "Hospital das Clínicas \\(HCFMUSP\\)"
-    ],
-    "fsp.usp.br": [
-        "Faculdade de Saúde Pública da Universidade de São Paulo",
-        "Avenida Doutor Arnaldo, 715 - 01246-904 São Paulo SP Brasil.*?\\+55 11 3061-7760"
-    ],
-    "geografia.fflch.usp.br": [
-        "Endereço 2\\s*Departamento de Geografia Avenida Professor Lineu Prestes, 338 Cidade Universitária São Paulo - SP CEP 05508-000.*?Últimas visitas:"
-    ],
-    "ime.usp.br": [
-        "Instituto de Matemática, Estatística e Ciência da Computação da Universidade de São Paulo",
-        "Compartilhe",
-        "Anterior\\s*\\d+\\s*…\\s*\\d+\\s*Próximo"
-    ],
-    "iq.usp.br": [
-        "Instituto de Química da Universidade de São Paulo – IQ-USP",
-        "Avenida Prof\\. Lineu Prestes, 748.*?(?=\\n|$)",
-        "Compartilhe",
-        "Seção Técnica de Informática.*?(?=\\n|$)"
-    ],
-    "poli.usp.br": [
-        "Escola Politécnica da Universidade de São Paulo",
-        "Avenida Prof\\. Luciano Gualberto.*?São Paulo \\| SP",
-        "Acompanhe a Poli nas redes sociais!"
-    ],
-    "direito.usp.br": [
-        "Faculdade de Direito - Universidade de São Paulo",
-        "Largo São Francisco.*?(?=\\n|$)",
-        "Programa de Pós-Graduação em Direito \\(PPGD\\)"
-    ],
-    "hu.usp.br": [
-        "Hospital Universitário da Universidade de São Paulo",
-        "Pesquisar\\s*Últimos textos.*?(?=\\n|$)"
-    ],
-    "ib.usp.br": [
-        "Instituto de Biociências – USP",
-        "Rua do Matão.*?(?=\\n|$)",
-        "CNPJ: 63\\.025\\.530/0004-57"
-    ],
-    "icb.usp.br": [
-        "Instituto de Ciências Biomédicas da Universidade de São Paulo",
-        "Av\\. Prof\\. Lineu Prestes, nº 2415 – Butantã – São Paulo/SP"
-    ],
-    "if.usp.br": [
-        "Instituto de Física da Universidade de São Paulo",
-        "Acesso Rápido: Docentes \\| Alunos \\| Funcionários \\| Visitantes \\| Notícias Destaque"
-    ],
-    "iri.usp.br": [
-    "Instituto de Relações Internacionais\\s*Universidade de São Paulo",
-    "Av\\.\\s*Prof\\.\\s*Lúcio Martins Rodrigues,?\\s*s/n,?\\s*Travessa do Labirinto,?\\s*286.*?São Paulo-SP",
-    "Como Chegar.*?Sobre.*?Graduação.*?Pós-Graduação.*?Pesquisa.*?Cultura e Extensão",
-    "Conecte-se Conosco!.*?Facebook.*?Instagram.*?Youtube",
-    "Universidade de São Paulo - Brasil.*?Instituto de Relações Internacionais - \\d{4}"
-    ]
+    "dominios": {
+        "cepe.usp.br": [
+            { "padrao": "Centro de Práticas Esportivas da Universidade de São Paulo\\s*Praça 02, Prof\\. Rubião Meira, 61 – Cidade UniversitáriaSão Paulo, SP – CEP 05508 110\\s*cepeusp@usp\\.br", "flags": "i" },
+            { "padrao": "Siga nossas redes sociais!", "flags": "i" },
+            { "padrao": "Ouvidoria:Prof\\. Dr\\. Pascoal Tambucci – ouvicepe@usp\\.brO serviço de ouvidoria é somente para os casos não resolvidosno âmbito do setor competente\\.", "flags": "i" }
+        ],
+        "eca.usp.br": [
+            { "padrao": "Assistência estudantil\\s*Sistema Júpiter USP\\s*Pró-Reitoria de Graduação", "flags": "i" },
+            { "padrao": "Serviço de Pós-graduação\\s*Grupos de pesquisa\\s*Auxílio ao Pesquisador", "flags": "i" },
+            { "padrao": "Av\\. Prof\\. Lúcio Martins Rodrigues, 443, Cidade Universitária.*", "flags": "i" },
+            { "padrao": "Horário de atendimento:.*", "flags": "i" }
+        ],
+        "ee.usp.br": [
+            { "padrao": "Estamos usando cookies para oferecer a você a melhor experiência em nosso site\\..*?Manter esse cookie ativado nos ajuda a melhorar nosso site\\.", "flags": "is", "max_remocao_pct": 60 },
+            { "padrao": "Escola de\\s*ENFERMAGEM\\s*Universidade de São Paulo\\s*Av\\. Dr\\. Enéas de Carvalho Aguiar, 419.*", "flags": "i" }
+        ],
+        "fau.usp.br": [
+            { "padrao": "Edifício Vilanova Artigas", "flags": "i" }
+        ],
+        "fea.usp.br": [
+            { "padrao": "Faculdade de Economia, Administração, Contabilidade e Atuária da USP", "flags": "i" }
+        ],
+        "fe.usp.br": [
+            { "padrao": "Av\\. da Universidade, 308 – São Paulo – SP CEP 05508-040.*", "flags": "i" },
+            { "padrao": "Faculdade de Educação Programa de Pós-Graduação em Educação", "flags": "i" }
+        ],
+        "fflch.usp.br": [
+            { "padrao": "Comissão Unificada de Segurança e Qualidade de Vida", "flags": "i" },
+            { "padrao": "Direção da FFLCH Comissão de Graduação da FFLCH", "flags": "i" }
+        ],
+        "geografia.fflch.usp.br": [
+            { "padrao": "Departamento de Geografia Avenida Professor Lineu Prestes, 338 Cidade Universitária São Paulo - SP CEP 05508-000.*", "flags": "i" },
+            { "padrao": "Últimas visitas:", "flags": "i" },
+            { "padrao": "^\\s*localização 2\\s*$", "flags": "im" },
+            { "padrao": "^\\s*Endereço 2\\s*$", "flags": "im" }
+        ],
+        "fm.usp.br": [
+            { "padrao": "Faculdade de Medicina da Universidade de São Paulo", "flags": "i" },
+            { "padrao": "(Facebook\\s*){2,}(Twitter\\s*){2,}(Instagram\\s*){2,}(YouTube\\s*){2,}(LinkedIn\\s*){2,}", "flags": "i" },
+            { "padrao": "Hospital das Clínicas \\(HCFMUSP\\)", "flags": "i" }
+        ],
+        "fsp.usp.br": [
+            { "padrao": "Faculdade de Saúde Pública da Universidade de São Paulo", "flags": "i" },
+            { "padrao": "Avenida Doutor Arnaldo, 715 - 01246-904 São Paulo SP Brasil.*", "flags": "i" }
+        ],
+        "ime.usp.br": [
+            { "padrao": "Instituto de Matemática, Estatística e Ciência da Computação da Universidade de São Paulo", "flags": "i" },
+            { "padrao": "Compartilhe", "flags": "i" }
+        ],
+        "iq.usp.br": [
+            { "padrao": "Avenida Prof\\. Lineu Prestes, 748.*", "flags": "i" },
+            { "padrao": "Compartilhe", "flags": "i" },
+            { "padrao": "^-{10,}$", "flags": "m" }
+        ],
+        "poli.usp.br": [
+            { "padrao": "Escola Politécnica da Universidade de São Paulo", "flags": "i" },
+            { "padrao": "Avenida Prof\\. Luciano Gualberto.*", "flags": "i" },
+            { "padrao": "Acompanhe a Poli nas redes sociais!", "flags": "i" }
+        ],
+        "direito.usp.br": [
+            { "padrao": "Largo São Francisco.*", "flags": "i" },
+            { "padrao": "Programa de Pós-Graduação em Direito \\(PPGD\\)", "flags": "i" }
+        ],
+        "hu.usp.br": [
+            { "padrao": "Hospital Universitário da Universidade de São Paulo", "flags": "i" },
+            { "padrao": "Pesquisar\\s*Últimos textos.*", "flags": "i" }
+        ],
+        "ib.usp.br": [
+            { "padrao": "Instituto de Biociências – USP", "flags": "i" },
+            { "padrao": "Rua do Matão.*", "flags": "i" },
+            { "padrao": "CNPJ: 63\\.025\\.530/0004-57", "flags": "i" }
+        ],
+        "icb.usp.br": [
+            { "padrao": "Instituto de Ciências Biomédicas da Universidade de São Paulo", "flags": "i" },
+            { "padrao": "Av\\. Prof\\. Lineu Prestes, nº 2415 – Butantã – São Paulo/SP", "flags": "i" }
+        ],
+        "if.usp.br": [
+            { "padrao": "Instituto de Física da Universidade de São Paulo", "flags": "i" }
+        ],
+        "iri.usp.br": [
+            { "padrao": "Instituto de Relações Internacionais\\s*Universidade de São Paulo", "flags": "i" },
+            { "padrao": "Av\\.\\s*Prof\\.\\s*Lúcio Martins Rodrigues,?\\s*s/n,?\\s*Travessa do Labirinto,?\\s*286.*", "flags": "i" },
+            { "padrao": "Conecte-se Conosco!.*", "flags": "i" },
+            { "padrao": "Universidade de São Paulo - Brasil.*Instituto de Relações Internacionais - \\d{4}", "flags": "i" }
+        ]
+    }
 }
