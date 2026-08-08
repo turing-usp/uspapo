@@ -46,5 +46,5 @@ curriculo.registrar(busca.registro)
 app = criar_app(busca.registro, rotulo_indice=busca.PINECONE_INDEX)
 
 if __name__ == "__main__":
-    print("-> Servidor USPapo ativado e super leve! 🚀")
+    print("-> Servidor USPapo ativado com Pinecone!")
     rodar(app)
