@@ -130,6 +130,10 @@ def criar_app(registro, *, rotulo_indice: str) -> Flask:
 
     @app.route("/api/analytics/resumo", methods=["GET"])
     def analytics_resumo():
+        chave_admin = request.headers.get("X-Admin-Key", "")
+        if chave_admin != config.ADMIN_API_KEY:
+            return jsonify({"ok": False, "erro": "Acesso não autorizado ao painel de analytics."}), 403
+
         try:
             from uspapo.analytics import obter_resumo_executivo
             resumo = obter_resumo_executivo()

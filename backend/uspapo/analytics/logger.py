@@ -1,5 +1,7 @@
 import os
 import json
+import time
+import uuid
 import threading
 from pathlib import Path
 from dotenv import load_dotenv
@@ -45,8 +47,13 @@ def _inserir_assincrono(dados_log: dict):
         # Se a tabela ainda não tiver as colunas novas, faz fallback para o schema antigo (tokens_gastos)
         if "completion_tokens" in str(e) or "PGRST204" in str(e):
             try:
+                mod_str = dados_log.get("modelo") or dados_log.get("provedor")
+                ev_str = str(dados_log.get("evento") or "")
+                if mod_str and ":" not in ev_str:
+                    ev_str = f"{ev_str}:{mod_str}"
+
                 dados_fallback = {
-                    "evento": dados_log.get("evento"),
+                    "evento": ev_str,
                     "session_id": dados_log.get("session_id"),
                     "user_id": dados_log.get("user_id"),
                     "tokens_gastos": dados_log.get("total_tokens", 0),
@@ -97,6 +104,9 @@ def registrar(
 
     if not total_tokens and (prompt_tokens or completion_tokens):
         total_tokens = prompt_tokens + completion_tokens
+
+    if not session_id:
+        session_id = f"sess_anon_{int(time.time())}"
 
     dados = {
         "evento": evento_oficial,

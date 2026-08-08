@@ -226,6 +226,7 @@ def executar_conversa(
     por_nome = {p.nome: p for p in provedores}
     cadeia = [por_nome[nome] for nome in saude.ordenar(list(por_nome))]
 
+    inicio_conversa = time.time()
     for indice, provedor in enumerate(cadeia):
         yield {"tipo": "provedor", "nome": provedor.nome, "indice": indice}
 
@@ -266,6 +267,17 @@ def executar_conversa(
             except Exception as erro:
                 ultimo_erro = erro
                 print(f"[llm] provedor '{provedor.nome}' falhou: {descrever(erro)}")
+                try:
+                    from uspapo.analytics import registrar
+                    registrar(
+                        categoria="CHAT",
+                        nome_evento="ERRO_PROVEDOR",
+                        provedor=provedor.nome,
+                        modelo=provedor.cfg.get("model", provedor.nome),
+                        metadata={"erro": str(erro)}
+                    )
+                except Exception:
+                    pass
 
             break
 
@@ -275,10 +287,13 @@ def executar_conversa(
             yield {"tipo": "fim"}
             try:
                 from uspapo.analytics import registrar
+                duracao_ms = int((time.time() - inicio_conversa) * 1000)
                 registrar(
                     categoria="CHAT",
                     nome_evento="RESPOSTA_CONCLUIDA",
                     provedor=provedor.nome,
+                    modelo=provedor.cfg.get("model", provedor.nome),
+                    latencia_ms=duracao_ms,
                     metadata={"urls_fontes": len(urls_turno)}
                 )
             except Exception:
