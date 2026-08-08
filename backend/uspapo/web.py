@@ -5,16 +5,21 @@
     GET  /health
 
 O corpo do /chat aceita ainda "historico": [{"pergunta", "resposta"}, ...] com
-os turnos anteriores da conversa (o frontend guarda tudo no localStorage).
+os turnos anteriores da conversa.
+
+O /chat exige login: `Authorization: Bearer <access token do Supabase>`. A
+portaria roda antes de qualquer trabalho e responde 401 (sem token ou token
+inválido), 403 (conta fora da whitelist), 429 (rate limit) ou 503 (não deu para
+falar com o JWKS do Supabase).
 """
 
 from flask import Flask, Response, jsonify, request, stream_with_context
 from flask_cors import CORS
 
-from uspapo import config, contas, saude
+from uspapo import acesso, config, contas, saude
 from uspapo.contexto import Orcamento, normalizar_historico
 from uspapo.conversa import executar_conversa
-from uspapo.limites import identificar_cliente, verificar_limite
+from uspapo.limites import verificar_limite
 from uspapo.provedores import carregar_provedores
 from uspapo.saida import agregar, gerar_sse
 
@@ -59,13 +64,39 @@ def criar_app(registro, *, rotulo_indice: str) -> Flask:
     print("-> Cadeia de LLMs:", " -> ".join(p.nome for p in provedores))
     print("-> Ferramentas:", ", ".join(sorted(registro.nomes)))
     aviso = contas.aviso_de_configuracao()
-    print("-> Contas:", aviso or "reconhecidas pelo token do Supabase")
+    print("-> Contas:", aviso or "reconhecidas pelo JWKS do Supabase")
+    print("-> Acesso:", acesso.aviso_de_configuracao())
+    sobras = config.aviso_de_variaveis_mortas()
+    if sobras:
+        print("-> Atenção:", sobras)
 
     @app.route("/chat", methods=["POST"])
     def chat():
-        # Antes de qualquer trabalho: quem estourou o limite não custa nada.
-        chave, escada = identificar_cliente()
-        excedeu = verificar_limite(chave, escada)
+        # A portaria inteira antes de ler o corpo do pedido: quem não passa daqui
+        # não custa uma chamada de LLM nem uma busca no Pinecone.
+        try:
+            conta = contas.conta_do_pedido()
+        except contas.FalhaDeVerificacao as erro:
+            # Não é culpa de quem perguntou, então não mandamos fazer login: a
+            # sessão dele provavelmente está boa e o que faltou foi o JWKS.
+            print(f"Não deu para verificar o token: {erro}")
+            return jsonify({
+                "erro": "Não consegui confirmar seu login agora. "
+                        "Tente de novo em instantes."
+            }), 503
+
+        if conta is None:
+            return jsonify({
+                "erro": "Entre com sua conta para conversar com o USPapo."
+            }), 401
+
+        if not acesso.liberado(conta.email):
+            return jsonify({
+                "erro": "O USPapo ainda está em teste fechado e esta conta não "
+                        "está na lista de acesso."
+            }), 403
+
+        excedeu = verificar_limite(f"conta:{conta.id}")
         if excedeu:
             janela, espera = excedeu
             resposta = jsonify({
@@ -122,6 +153,8 @@ def criar_app(registro, *, rotulo_indice: str) -> Flask:
             # que a cadeia está caindo para o segundo?" sem abrir o log.
             "castigos": saude.panorama([p.nome for p in provedores]),
             "contas": contas.disponivel(),
+            # Só o estado da portaria, nunca os emails da lista.
+            "whitelist": acesso.panorama(),
             "indice": rotulo_indice,
             # Com dois conjuntos de ferramentas possíveis, é a forma mais rápida
             # de saber qual backend está no ar.

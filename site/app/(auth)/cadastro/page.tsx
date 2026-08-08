@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import TuringLogo from '../../turing-logo.svg'
 import { validarCadastro, cadastrar } from '@/lib/auth';
 import { checarSenha } from '@/lib/auth';
@@ -68,15 +69,20 @@ export default function RegisterPage() {
         </h1>
 
         {/* Mensagem de sucesso após envio do formulário */}
+        {/* O texto aqui prometia "você já pode continuar usando o USPapo", de
+            quando dava para conversar sem conta. Hoje o login é obrigatório e a
+            conta só passa a valer depois da confirmação: até clicar no link do
+            email, entrar devolve "Email not confirmed". Mandar para o chat neste
+            ponto seria mandar para um redirecionamento de volta ao login. */}
         {enviado && (
           <div className="px-2 text-sm text-muted-foreground" role="status">
             <p>
-              Enviamos um link de confirmação para {formData.email}. Você já pode
-              continuar usando o USPapo — o histórico sincroniza depois que confirmar.
+              Enviamos um link de confirmação para {formData.email}. Abra o link
+              para ativar sua conta. Só depois disso dá para entrar no USPapo.
             </p>
-            <a href="/" className="mt-3 inline-block text-brand hover:underline">
-              Voltar ao chat
-            </a>
+            <Link href="/login" className="mt-3 inline-block text-brand hover:underline">
+              Já confirmei, quero entrar
+            </Link>
           </div>
         )}
 
