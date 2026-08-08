@@ -166,16 +166,71 @@ def obter_desempenho_provedores() -> dict:
         }
     return resultado
 
+def obter_serie_temporal_diaria(dias: int = 30) -> list[dict]:
+    """Gera dados de série temporal por dia (YYYY-MM-DD) prontos para gráficos do frontend."""
+    logs = _buscar_logs(dias=dias)
+    dias_map = defaultdict(lambda: {
+        "usuarios": set(),
+        "perguntas": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+        "latencias": []
+    })
+
+    for log in logs:
+        dt_str = log.get("created_at")
+        if not dt_str:
+            continue
+        try:
+            dia_key = dt_str[:10]  # YYYY-MM-DD
+        except Exception:
+            continue
+
+        uid = log.get("user_id") or log.get("session_id")
+        if uid:
+            dias_map[dia_key]["usuarios"].add(uid)
+
+        p_tok = log.get("prompt_tokens") or 0
+        c_tok = log.get("completion_tokens") or 0
+        t_tok = log.get("total_tokens") or (p_tok + c_tok)
+        lat = log.get("latencia_ms") or 0
+
+        dias_map[dia_key]["perguntas"] += 1
+        dias_map[dia_key]["prompt_tokens"] += p_tok
+        dias_map[dia_key]["completion_tokens"] += c_tok
+        dias_map[dia_key]["total_tokens"] += t_tok
+        if lat > 0:
+            dias_map[dia_key]["latencias"].append(lat)
+
+    serie = []
+    for dia_key in sorted(dias_map.keys()):
+        d = dias_map[dia_key]
+        lats = d["latencias"]
+        lat_media = round(sum(lats) / len(lats), 1) if lats else 0
+        serie.append({
+            "data": dia_key,
+            "usuarios_unicos": len(d["usuarios"]),
+            "perguntas": d["perguntas"],
+            "prompt_tokens": d["prompt_tokens"],
+            "completion_tokens": d["completion_tokens"],
+            "total_tokens": d["total_tokens"],
+            "latencia_media_ms": lat_media
+        })
+    return serie
+
 def obter_resumo_executivo() -> dict:
     """Gera um resumo consolidado de telemetria pronto para exibição no dashboard."""
     dau_mau = obter_dau_mau()
     tokens = obter_consumo_tokens(dias=30)
     desempenho = obter_desempenho_provedores()
     top_usuarios = obter_consumo_por_usuario(top_k=5)
+    serie_temporal = obter_serie_temporal_diaria(dias=30)
 
     return {
         "usuarios": dau_mau,
         "tokens": tokens,
         "desempenho_provedores": desempenho,
-        "top_usuarios": top_usuarios
+        "top_usuarios": top_usuarios,
+        "serie_temporal": serie_temporal
     }
