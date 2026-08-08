@@ -17,6 +17,12 @@ function LoginForm() {
   const params = useSearchParams();
   const erroCallback = params.get('erro') === 'callback';
 
+  /* Para onde o aluno estava indo quando o proxy.ts o mandou para cá.
+     Só caminho interno: um "//site.com" ou "https://site.com" aqui viraria um
+     redirecionamento aberto, com o nosso domínio dando credibilidade ao destino. */
+  const pedido = params.get('destino') ?? '';
+  const destino = pedido.startsWith('/') && !pedido.startsWith('//') ? pedido : '/';
+
   // Estado simplificado para credenciais de login
   const [formData, setFormData] = useState({
     email: '',
@@ -37,11 +43,18 @@ function LoginForm() {
     setCarregando(false);
 
     if (error) {
-      setErro('Email ou senha incorretos.');
+      /* Conta criada mas email não confirmado é o erro mais comum aqui, e
+         chamar isso de "senha incorreta" manda a pessoa para a recuperação de
+         senha quando a resposta estava na caixa de entrada dela. */
+      setErro(
+        error.code === 'email_not_confirmed'
+          ? 'Falta confirmar seu email. Abra o link que enviamos para ativar a conta.'
+          : 'Email ou senha incorretos.'
+      );
       return;
     }
 
-    router.push('/');
+    router.push(destino);
     router.refresh();
   };
 

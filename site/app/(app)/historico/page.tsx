@@ -3,9 +3,8 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { listarConversas, apagarConversa, alternarFavorita, renomearConversa, gerarTitulo, buscarConversas, type Conversa } from "@/lib/conversas";
-import { perfil, LIMITES } from "@/lib/limites";
+import { LIMITES } from "@/lib/limites";
 import { MenuConversa } from "@/components/MenuConversa";
-import { useSessao } from '@/lib/useSessao';
 
 type Grupo = { rotulo: string; conversas: Conversa[] };
 
@@ -145,12 +144,6 @@ export default function Historico() {
   
 
   const naoFavoritas = conversas.filter((c) => !c.favorita).length;
-  const {usuario} = useSessao();
-  /* Os tetos de quem está vendo a página: sem conta as conversas ficam no
-     localStorage e cabem menos. Antes o aviso mostrava o número da conta para
-     todo mundo, então quem não estava logado era cortado em 5 lendo que o
-     limite era 20. */
-  const limites = perfil(Boolean(usuario));
 
   return (
     <>
@@ -165,18 +158,15 @@ export default function Historico() {
       </div>
       <p className="text-muted-foreground mb-4">Retome suas perguntas anteriores e continue de onde parou</p>
       <p className="text-faint-foreground text-xs mt-2 mb-5">
-        {usuario
-          ? "Suas conversas ficam salvas na sua conta e sincronizam entre dispositivos."
-          : "Suas conversas ficam salvas apenas neste navegador. Crie uma conta para sincronizar."}
+        Suas conversas ficam salvas na sua conta e sincronizam entre dispositivos.
       </p>
 
-      {naoFavoritas >= limites.conversas * 0.9 && (
+      {naoFavoritas >= LIMITES.conversas * 0.9 && (
         <div className="flex items-start gap-3 p-3 mb-5 rounded-xl glass">
           <span className="text-brand shrink-0">⚠</span>
           <p className="text-muted-foreground text-sm">
-            Você tem {naoFavoritas} de {limites.conversas} conversas salvas. As mais antigas serão
+            Você tem {naoFavoritas} de {LIMITES.conversas} conversas salvas. As mais antigas serão
             removidas automaticamente. Favorite as que quiser manter.
-            {!usuario && " Com uma conta cabem " + LIMITES.conta.conversas + "."}
           </p>
         </div>
       )}
@@ -220,7 +210,7 @@ export default function Historico() {
                 {grupo.rotulo}
                 {grupo.rotulo === "Favoritas" && (
                   <span className="text-faint-foreground text-xs ml-2">
-                    {grupo.conversas.length}/{limites.favoritas}
+                    {grupo.conversas.length}/{LIMITES.favoritas}
                   </span>
                 )}
               </p>
@@ -271,7 +261,7 @@ export default function Historico() {
                               onFavoritar={async () => {
                                 const ok = await alternarFavorita(conversa.id);
                                 if (!ok) {
-                                  mostrarAviso(`Limite de ${limites.favoritas} favoritas atingido. Remova uma para adicionar outra.`);
+                                  mostrarAviso(`Limite de ${LIMITES.favoritas} favoritas atingido. Remova uma para adicionar outra.`);
                                   return;
                                 }
                                 setConversas(await listarConversas());

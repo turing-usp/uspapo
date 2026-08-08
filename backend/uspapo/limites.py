@@ -1,10 +1,14 @@
-"""Rate limit: quantas perguntas cada um pode fazer por janela de tempo.
+"""Rate limit: quantas perguntas cada conta pode fazer por janela de tempo.
 
-Há duas escadas, e a diferença entre elas é o quanto se sabe sobre quem
-pergunta. A conta é provada (o token é conferido em contas.py), vale para a
-pessoa e a segue entre aparelhos; o id de aparelho é gerado pelo próprio
-navegador e trocá-lo custa um clique. Por isso quem tem conta pode mais: não é
-prêmio, é o que dá para sustentar quando a identidade é verificável.
+Uma escada só, porque só existe um tipo de cliente: o login é obrigatório, então
+quem chega até aqui já provou a conta em contas.py. Antes havia uma segunda
+escada, mais apertada, para quem perguntava sem login: identificado pelo
+X-Device-Id, que o próprio navegador gera e trocar custa um clique. Ela existia
+para sustentar o uso anônimo, e foi embora junto com ele.
+
+As quatro janelas valem ao mesmo tempo: a de minuto segura a rajada, a de dia
+segura o uso crônico. Todas em 0 desligam o rate limit, que é a configuração
+esperada quando a whitelist do acesso.py é quem segura a porta.
 
 Limitação conhecida: `_batidas` é um dicionário deste processo. Com mais de um
 worker do gunicorn cada worker conta por si, e reiniciar zera a contagem. Isso
@@ -12,57 +16,35 @@ já valia antes e continua valendo: para segurar uso acidental e abuso casual
 é o suficiente; para um atacante dedicado nunca foi a defesa certa.
 """
 
-import re
 import threading
 import time
 from collections import deque
 
-from flask import request
-
 from uspapo import config
-from uspapo.contas import usuario_do_pedido
 
 _batidas: dict[str, deque[float]] = {}
 _tranca = threading.Lock()
 
-JANELA_MAXIMA = max(
-    segundos
-    for escada in (config.LIMITES_TAXA_ANONIMO, config.LIMITES_TAXA_CONTA)
-    for _, segundos, _ in escada
-)
-FORMATO_ID = re.compile(r"^[A-Za-z0-9-]{8,64}$")
+JANELA_MAXIMA = max(segundos for _, segundos, _ in config.LIMITES_TAXA)
 
 
-def identificar_cliente() -> tuple[str, list]:
-    """Quem está perguntando e qual escada de limite se aplica a ele.
-
-    Na ordem: a conta logada, o aparelho, o IP. A conta vem primeiro porque é a
-    única das três que não dá para inventar. O IP é o último recurso porque a
-    rede da USP é toda NAT: um laboratório inteiro sai pelo mesmo endereço, e
-    limitar por IP puniria a turma por causa de um usuário. Mesmo assim ele
-    precisa existir: sem ele, bastava omitir o header para escapar do limite.
-    """
-    usuario = usuario_do_pedido()
-    if usuario:
-        return f"conta:{usuario}", config.LIMITES_TAXA_CONTA
-
-    dispositivo = (request.headers.get("X-Device-Id") or "").strip()
-    if FORMATO_ID.match(dispositivo):
-        return f"disp:{dispositivo}", config.LIMITES_TAXA_ANONIMO
-
-    # O proxy do Render termina o TLS, então remote_addr é o proxy, não o aluno.
-    encaminhado = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
-    endereco = encaminhado or request.remote_addr or "desconhecido"
-    return f"ip:{endereco}", config.LIMITES_TAXA_ANONIMO
+def desligado() -> bool:
+    """Nenhuma janela ligada — nem vale a pena contar nada."""
+    return not any(maximo > 0 for _, _, maximo in config.LIMITES_TAXA)
 
 
-def verificar_limite(chave: str, escada: list) -> tuple[str, int] | None:
+def verificar_limite(chave: str) -> tuple[str, int] | None:
     """Registra a pergunta, ou devolve (janela estourada, segundos de espera)."""
+    # Sem nenhuma janela ligada, contar batida seria encher `_batidas` de
+    # registro que ninguém vai ler e ainda varrer tudo isso a cada pergunta.
+    if desligado():
+        return None
+
     agora = time.monotonic()
 
     with _tranca:
         # Sem esta limpeza o dicionário cresce para sempre, um registro por
-        # aparelho que passou pelo site.
+        # conta que passou pelo site.
         for antiga in [
             outra for outra, marcas in _batidas.items()
             if not marcas or agora - marcas[-1] > JANELA_MAXIMA
@@ -73,7 +55,7 @@ def verificar_limite(chave: str, escada: list) -> tuple[str, int] | None:
         while marcas and agora - marcas[0] > JANELA_MAXIMA:
             marcas.popleft()
 
-        for nome, segundos, maximo in escada:
+        for nome, segundos, maximo in config.LIMITES_TAXA:
             if maximo <= 0:
                 continue  # janela desligada
 

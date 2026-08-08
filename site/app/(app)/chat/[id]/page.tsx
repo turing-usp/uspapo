@@ -28,6 +28,8 @@ export default function ChatPage() {
     const [streaming, setStreaming] = useState(false);
     /* O que o modelo está fazendo agora */
     const [status, setStatus] = useState<StatusStream>(STATUS_INICIAL);
+    /* A conversa da URL não veio do banco. Ver o efeito de carga logo abaixo. */
+    const [naoCarregou, setNaoCarregou] = useState(false);
     const jaProcessouInicial = useRef(false);
     const fimDasMensagensRef = useRef<HTMLDivElement>(null);
     const composerRef = useRef<HTMLDivElement>(null);
@@ -120,7 +122,16 @@ export default function ChatPage() {
 
         (async () => {
             const conversa = await obterConversa(id as string);
-            if (!conversa) return;
+            /* Sair calado aqui deixava a tela em branco: nem mensagem, nem erro,
+               nem pista. Acontece quando a gravação falhou logo antes (banco sem
+               o esquema, RLS barrando) e também quando a URL é de uma conversa
+               que não existe mais. O motivo exato vai para o console pelo
+               lib/conversas.ts; aqui o que importa é não deixar o aluno olhando
+               para o nada. */
+            if (!conversa) {
+                setNaoCarregou(true);
+                return;
+            }
 
             setHistorico(conversa.mensagens);
 
@@ -186,6 +197,17 @@ export default function ChatPage() {
             </div>
             );
             })}
+            {naoCarregou && turnos === 0 && (
+                <div className="app-container-chat mt-10 text-center">
+                    <p className="text-muted-foreground">
+                        Não consegui carregar esta conversa.
+                    </p>
+                    <p className="mt-2 text-sm text-faint-foreground text-balance">
+                        Ela pode ter sido apagada, ou a pergunta não chegou a ser salva.
+                        Você pode começar outra pelo campo abaixo.
+                    </p>
+                </div>
+            )}
             <div ref={fimDasMensagensRef} />
         </div>
         {/* Dissolve as mensagens que chegam no composer. Fica fora do wrapper

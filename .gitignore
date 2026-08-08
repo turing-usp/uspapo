@@ -255,3 +255,8 @@ data/index/*.tmp
 data/reports/
 # Suíte de testes: roda localmente com pytest, não vai para o repositório.
 tests/
+# Supabase local (`supabase init` / `supabase start`): config.toml, seed.sql e a
+# chave de assinatura são andaime da máquina de cada um, como a suíte acima. O
+# que o backend precisa saber do Supabase vem do .env, e o esquema vem do
+# projeto de produção por `supabase db pull`. Ver o .env.example para montar.
+supabase/

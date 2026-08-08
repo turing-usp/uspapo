@@ -22,7 +22,11 @@ langchain-text-splitters==1.1.2
 # --- Utilitarios ---
 tqdm==4.68.4
 python-dotenv>=1.0.0
-PyJWT>=2.8.0            # valida o token do Supabase no /chat
+# Valida o token do Supabase no /chat. O extra [crypto] traz o `cryptography`,
+# sem o qual nao da para conferir assinatura ES256/RS256 - e e assim que o
+# Supabase assina desde as chaves novas. O >=2.9 e pelo PyJWKClientConnectionError,
+# que separa "JWKS fora do ar" (503) de "token invalido" (401).
+PyJWT[crypto]>=2.9.0
 
 # --- HTTP (cardapio do bandejao) ---
 requests>=2.32.0

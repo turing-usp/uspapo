@@ -1,7 +1,6 @@
-import { novoId } from "./conversas";
 // lib/stream.ts
 import type { Mensagem } from "@/lib/conversas";
-import { perfil } from "./limites";
+import { LIMITES } from "./limites";
 import { criarCliente } from "./supabase";
 
 export type EventoChat =
@@ -63,36 +62,11 @@ export function statusVisivel(estado: StatusStream, semTexto: boolean): boolean 
   return semTexto || !estado.escrevendo;
 }
 
-// ─────────────────────────────────────────────
-// Identidade do aparelho
-// ─────────────────────────────────────────────
-const CHAVE_DISPOSITIVO = "uspapo:dispositivo";
-
-/* ID gerado uma vez por navegador, usado pelo back-end como chave do rate limit */
-let idDispositivo = "";
-
-export function obterIdDispositivo(): string {
-  if (idDispositivo) return idDispositivo;
-
-  try {
-    idDispositivo = localStorage.getItem(CHAVE_DISPOSITIVO) ?? "";
-    if (!idDispositivo) {
-      idDispositivo = novoId();
-      localStorage.setItem(CHAVE_DISPOSITIVO, idDispositivo);
-    }
-  } catch {
-    /* Navegação privada pode bloquear o storage... */
-    idDispositivo = idDispositivo || novoId();
-  }
-
-  return idDispositivo;
-}
-
-/* O access token da sessão, se houver uma. É com ele que o backend sabe que a
-   pergunta vem de uma conta e aplica a cota de conta em vez da de anônimo:
-   o X-Device-Id é falsificável e não serviria para liberar cota maior.
-   Sem sessão (ou com o Supabase fora do ar) devolve string vazia: perguntar
-   sem estar logado tem que continuar funcionando. */
+/* O access token da sessão. Sem ele não há pergunta: o backend exige login no
+   /chat e responde 401. Existia aqui um X-Device-Id, id que o próprio navegador
+   gerava, que servia de chave do rate limit de quem perguntava sem conta. Saiu
+   junto com o modo anônimo, porque um id que qualquer um troca não identifica
+   ninguém. */
 async function tokenDaSessao(): Promise<string> {
   try {
     const { data } = await criarCliente().auth.getSession();
@@ -111,14 +85,17 @@ export async function perguntar(
   aoEvento: (evento: EventoChat) => void
 ): Promise<void> {
   const token = await tokenDaSessao();
-  const { historico: profundidade } = perfil(Boolean(token));
+  /* Falhar aqui em vez de bater no backend para levar 401: a mensagem fica
+     honesta ("sua sessão venceu") e a pergunta não vira uma ida perdida. */
+  if (!token) {
+    throw new Error("Sua sessão expirou. Entre de novo para continuar perguntando.");
+  }
 
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Device-Id": obterIdDispositivo(),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
       pergunta,
@@ -127,7 +104,7 @@ export async function perguntar(
          mas mandar a conversa inteira pela rede a cada pergunta é desperdício
          que cresce sem parar numa conversa longa. */
       historico: anteriores
-        .slice(-profundidade)
+        .slice(-LIMITES.historico)
         .map((m) => ({ pergunta: m.user, resposta: m.bot })),
     }),
   });

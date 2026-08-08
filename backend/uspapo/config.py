@@ -36,34 +36,53 @@ TOP_K_PADRAO = 3
 TOP_K_MAX = 5
 
 # ─────────────────────────────────────────────
-# Portaria: limite de uso e orçamento de contexto
+# Portaria: quem entra, limite de uso e orçamento de contexto
 # ─────────────────────────────────────────────
+# Quem pode usar o USPapo. "todos" libera qualquer conta logada (a whitelist
+# fica efetivamente desligada), "ninguem" fecha para todo mundo, e uma lista
+# separada por vírgula libera só ela. Com a entrada iniciada por @ valendo o
+# domínio inteiro. Quem interpreta isto é o acesso.py.
+WHITELIST_EMAILS = os.getenv("WHITELIST_EMAILS", "todos")
+
 # Duas defesas para o mesmo problema, o custo por pergunta: o rate limit cuida
 # de quantas perguntas cada um faz, o orçamento cuida do tamanho de cada uma.
 
 # Quantas perguntas cada um pode fazer por janela de tempo. As janelas valem
 # todas ao mesmo tempo: a de minuto segura a rajada, a de dia segura o uso
-# crônico. Basta pôr 0 para desligar uma delas.
+# crônico. Basta pôr 0 para desligar uma delas, e as quatro em 0 desligam o rate
+# limit inteiro, o que faz sentido quando é a whitelist que segura a porta.
 #
-# São duas escadas. Quem está logado é identificado pela conta (um token que o
-# backend confere), então a cota vale para a pessoa e acompanha ela entre
-# celular e computador; quem não está é identificado pelo aparelho, um id que o
-# próprio navegador gera e qualquer um pode trocar. Por isso o anônimo é mais
-# apertado: não é castigo, é o que dá para sustentar quando a chave é
-# descartável.
-LIMITES_TAXA_ANONIMO = [
-    ("minuto",     60,    int(os.getenv("RATE_LIMIT_MINUTO", "8"))),
-    ("10 minutos", 600,   int(os.getenv("RATE_LIMIT_10MIN",  "30"))),
-    ("hora",       3600,  int(os.getenv("RATE_LIMIT_HORA",   "100"))),
-    ("dia",        86400, int(os.getenv("RATE_LIMIT_DIA",    "400"))),
+# Uma escada só: o login é obrigatório, então todo mundo que chega aqui já provou
+# a conta. A escada de anônimo (por X-Device-Id e IP) existia para quem
+# perguntava sem login e foi embora junto com essa possibilidade.
+LIMITES_TAXA = [
+    ("minuto",     60,    int(os.getenv("RATE_LIMIT_MINUTO", "15"))),
+    ("10 minutos", 600,   int(os.getenv("RATE_LIMIT_10MIN",  "80"))),
+    ("hora",       3600,  int(os.getenv("RATE_LIMIT_HORA",   "300"))),
+    ("dia",        86400, int(os.getenv("RATE_LIMIT_DIA",    "1200"))),
 ]
 
-LIMITES_TAXA_CONTA = [
-    ("minuto",     60,    int(os.getenv("RATE_LIMIT_CONTA_MINUTO", "15"))),
-    ("10 minutos", 600,   int(os.getenv("RATE_LIMIT_CONTA_10MIN",  "80"))),
-    ("hora",       3600,  int(os.getenv("RATE_LIMIT_CONTA_HORA",   "300"))),
-    ("dia",        86400, int(os.getenv("RATE_LIMIT_CONTA_DIA",    "1200"))),
+# Variáveis que já não são lidas por ninguém. Ficar calado sobre elas é o pior
+# dos mundos: RATE_LIMIT_MINUTO tinha o valor de anônimo (2) e hoje vale para
+# conta logada, então um .env não atualizado aperta o limite em 7x sem avisar.
+_VARIAVEIS_MORTAS = [
+    "SUPABASE_JWT_SECRET",   # a validação agora é por JWKS, ver contas.py
+    "RATE_LIMIT_CONTA_MINUTO",
+    "RATE_LIMIT_CONTA_10MIN",
+    "RATE_LIMIT_CONTA_HORA",
+    "RATE_LIMIT_CONTA_DIA",
 ]
+
+
+def aviso_de_variaveis_mortas() -> str:
+    """Uma linha para o boot listar o que sobrou de configuração antiga."""
+    achadas = [nome for nome in _VARIAVEIS_MORTAS if os.getenv(nome)]
+    if not achadas:
+        return ""
+    return (
+        f"{', '.join(achadas)} não são mais lidas e podem sair do .env "
+        f"(confira os RATE_LIMIT_* novos: eles valem para conta logada agora)."
+    )
 
 # Teto padrão do que vai para o modelo, não importa o tamanho da conversa no
 # frontend. Cada provedor pode ter um teto menor (Provedor.teto_contexto).
@@ -91,7 +110,7 @@ ORIGENS_CORS = [
 
 # X-Device-Id, Authorization e X-Admin-Key são headers customizados: sem eles liberados
 # aqui, o navegador barra a requisição já no preflight OPTIONS.
-HEADERS_CORS = ["Content-Type", "X-Device-Id", "Authorization", "X-Admin-Key"]
+HEADERS_CORS = ["Content-Type", "Authorization", "X-Admin-Key"]
 
 # Chave secreta de administração para a API de Analytics
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "uspapo-admin-secret-key-dev")

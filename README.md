@@ -124,7 +124,8 @@ conjunto de ferramentas** o modelo enxerga. Todo o resto vive em
 | `contexto.py` | orçamento de tokens e poda do histórico |
 | `conteudo.py` | separa `<think>`/`<tool_call>` do texto, token a token |
 | `toolcalls.py` | parsers de tool call inline e o coletor de cada rodada |
-| `limites.py` / `contas.py` | rate limit por aparelho e por conta |
+| `contas.py` / `acesso.py` | quem é (token do Supabase) e quem pode (whitelist) |
+| `limites.py` | rate limit por conta |
 | `saida.py` | os eventos viram SSE ou o JSON legado |
 | `web.py` | `criar_app()`: CORS, `/chat` e `/health` |
 | `ferramentas/` | o registro, a busca no Pinecone e as simuladas |
