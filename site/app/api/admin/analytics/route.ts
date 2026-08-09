@@ -46,7 +46,9 @@ export async function GET() {
       });
 
       if (resp.ok) {
-        data = await resp.json();
+        const json = await resp.json();
+        // O Flask envelopa em {"ok": true, "data": {...}} — desempacota
+        data = json.data || json;
       }
     } catch (e) {
       // Backend Python indisponível no servidor local; fará fallback direto no Supabase abaixo
