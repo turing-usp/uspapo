@@ -6,7 +6,7 @@ mora aqui e é compartilhado.
     config       .env e as constantes de todo mundo
     provedores   cadeia LLM_PROVIDERS -> clientes OpenAI, com fallback
     prompt       prompt de sistema, com a data de hoje
-    limites      rate limit por aparelho (X-Device-Id)
+    limites      rate limit por conta
     contexto     orçamento de tokens e poda do histórico
     conteudo     separa <think>/<tool_call> do texto, token a token
     toolcalls    parsers de tool call inline e o coletor da rodada
