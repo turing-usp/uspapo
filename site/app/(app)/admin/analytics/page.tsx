@@ -89,11 +89,12 @@ export default function AdminAnalyticsPage() {
       const res = await fetch('/api/admin/analytics');
       const json = await res.json();
 
-      if (!json.ok) {
+      if (json.ok === false) {
         throw new Error(json.erro || 'Falha ao carregar dados de analytics.');
       }
 
-      setData(json.data);
+      const payload = json.data || json;
+      setData(payload);
       setLastUpdated(new Date());
     } catch (err: any) {
       setError(err?.message || 'Erro inesperado ao buscar dados.');
@@ -220,14 +221,14 @@ export default function AdminAnalyticsPage() {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-extrabold text-white">
-              {loading ? '-' : formatNumber(data?.tokens?.hoje?.total_tokens)}
+              {loading ? '-' : formatNumber(data?.tokens?.hoje?.total_tokens ?? (data?.tokens as any)?.total_tokens ?? 0)}
             </span>
             <span className="text-xs text-stone-400">hoje</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-stone-400">
             <span>Acumulado 30d:</span>
             <span className="font-semibold text-amber-400">
-              {loading ? '-' : formatNumber(data?.tokens?.acumulado_30d?.total_tokens)}
+              {loading ? '-' : formatNumber(data?.tokens?.acumulado_30d?.total_tokens ?? (data?.tokens as any)?.total_tokens ?? 0)}
             </span>
           </div>
         </div>
