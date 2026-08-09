@@ -10,13 +10,21 @@ export const dominioCookie =
 
    Pública mesmo: vai embutida no bundle e qualquer um lê. Quem protege as
    tabelas é o RLS. */
+const urlEnv = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+const pubKeyEnv = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
+const anonKeyEnv = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+
 export const URL_SUPABASE =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+  (urlEnv && urlEnv !== '' && !urlEnv.includes('placeholder'))
+    ? urlEnv
+    : 'https://zgvbnmovongrigjoviyu.supabase.co';
 
 export const CHAVE_SUPABASE =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-  'placeholder-anon-key';
+  (pubKeyEnv && pubKeyEnv !== '' && !pubKeyEnv.includes('placeholder'))
+    ? pubKeyEnv
+    : ((anonKeyEnv && anonKeyEnv !== '' && !anonKeyEnv.includes('placeholder'))
+        ? anonKeyEnv
+        : 'sb_publishable_ZYlNqNjeRpqRV6pkKzta7A_6QjfYcl2');
 
 export function criarCliente() {
   return createBrowserClient(
