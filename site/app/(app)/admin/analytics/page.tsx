@@ -120,28 +120,50 @@ export default function AdminAnalyticsPage() {
   };
 
   const formatModelName = (modelStr: string) => {
-    if (!modelStr) return 'Modelo Desconhecido';
-    if (modelStr.includes('gpt-oss-120b')) return 'GPT-OSS 120B';
-    if (modelStr.includes('qwen3.6-27b') || modelStr.includes('qwen')) return 'Qwen 3.6 27B';
-    if (modelStr.includes('gpt-oss-20b')) return 'GPT-OSS 20B';
-    if (modelStr.includes('llama-3.3-70b')) return 'Llama 3.3 70B';
-    if (modelStr.includes('llama-3.1-70b') || modelStr.includes('llama70')) return 'Llama 3.1 70B';
-    if (modelStr.includes('llama-3.1-8b') || modelStr.includes('llama8')) return 'Llama 3.1 8B';
-    if (modelStr === 'Outros / Testes' || modelStr === 'Outro') return 'Outros / Testes';
+    if (!modelStr || modelStr === 'Nao informado') return 'Não informado';
+    const str = modelStr.toLowerCase();
+    if (str.includes('gpt-oss-120b') || str.includes('gptoss120')) return 'GPT-OSS 120B';
+    if (str.includes('gpt-oss-20b') || str.includes('gptoss20')) return 'GPT-OSS 20B';
+    if (str.includes('qwen3.6-27b') || str.includes('qwen27') || str.includes('qwen')) return 'Qwen 3.6 27B';
+    if (str.includes('llama-3.3-70b') || str.includes('llama70')) return 'Llama 3.3 70B';
+    if (str.includes('llama-3.1-70b')) return 'Llama 3.1 70B';
+    if (str.includes('llama-3.1-8b') || str.includes('llama8')) return 'Llama 3.1 8B';
+    if (str === 'outros / testes' || str === 'outro') return 'Outros / Testes';
     const parts = modelStr.split('/');
     return parts[parts.length - 1];
   };
 
-  const pieData = data?.tokens.por_modelo && Object.keys(data.tokens.por_modelo).length > 0
-    ? Object.entries(data.tokens.por_modelo).map(([nome, info]) => ({
-        name: formatModelName(nome),
-        value: info.chamadas,
-      }))
-    : (data?.tokens.por_provedor
-      ? Object.entries(data.tokens.por_provedor).map(([nome, info]) => ({
-          name: nome,
-          value: info.chamadas,
-        }))
+  const MODEL_PRIORITY: Record<string, number> = {
+    'GPT-OSS 120B': 1,
+    'Llama 3.3 70B': 2,
+    'GPT-OSS 20B': 3,
+    'Qwen 3.6 27B': 4,
+    'Llama 3.1 8B': 5,
+    'Llama 3.1 70B': 6,
+  };
+
+  const pieData = data?.tokens?.por_modelo && Object.keys(data.tokens.por_modelo).length > 0
+    ? (() => {
+        const mapa = new Map<string, number>();
+        for (const [nome, info] of Object.entries(data.tokens.por_modelo)) {
+          const formatado = formatModelName(nome);
+          mapa.set(formatado, (mapa.get(formatado) || 0) + (info.chamadas || 0));
+        }
+        return Array.from(mapa.entries())
+          .map(([name, value]) => ({ name, value }))
+          .sort((a, b) => b.value - a.value);
+      })()
+    : (data?.tokens?.por_provedor
+      ? (() => {
+          const mapa = new Map<string, number>();
+          for (const [nome, info] of Object.entries(data.tokens.por_provedor)) {
+            const formatado = formatModelName(nome);
+            mapa.set(formatado, (mapa.get(formatado) || 0) + (info.chamadas || 0));
+          }
+          return Array.from(mapa.entries())
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value);
+        })()
       : []);
 
   return (
@@ -434,7 +456,13 @@ export default function AdminAnalyticsPage() {
               </thead>
               <tbody className="divide-y divide-stone-800/60">
                 {data?.tokens?.por_modelo && Object.keys(data.tokens.por_modelo).length > 0 ? (
-                  Object.entries(data.tokens.por_modelo).map(([prov, info]) => {
+                  Object.entries(data.tokens.por_modelo)
+                    .sort(([provA], [provB]) => {
+                      const pA = MODEL_PRIORITY[formatModelName(provA)] ?? 99;
+                      const pB = MODEL_PRIORITY[formatModelName(provB)] ?? 99;
+                      return pA - pB;
+                    })
+                    .map(([prov, info]) => {
                     const modelPerf = data?.desempenho_provedores?.[prov];
                     const avgLat = modelPerf?.latencia_media_ms;
                     const taxaErro = modelPerf ? (modelPerf.taxa_erro * 100).toFixed(1) : '0.0';

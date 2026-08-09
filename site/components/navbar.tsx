@@ -14,12 +14,13 @@ export default function Navbar() {
           {/* O gatilho do menu agora é um item em fluxo daqui, e não uma
               camada fixa flutuando por cima. Ver o comentário em leftmenu. */}
           <Leftmenu />
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center justify-center shrink-0">
             <Image
               src="/logo.svg"
               alt="USPapo Logo"
               width={45}
               height={45}
+              className="shrink-0 self-center translate-y-0.5"
             />
           </Link>
         </div>

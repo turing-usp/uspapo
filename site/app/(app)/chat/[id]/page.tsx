@@ -178,66 +178,66 @@ export default function ChatPage() {
 
     const ferramentasAtivas = Object.values(status.ferramentas);
 
-  return (
-    <>
-        {/* Só as mensagens rolam. Navbar e composer são irmãos fixos do shell,
+    return (
+        <>
+            {/* Só as mensagens rolam. Navbar e composer são irmãos fixos do shell,
             então nada se desloca quando o teclado abre. */}
-        <div className="app-scroll">
-            {historico.map((item, index) => {
-            const streamando = respondendo && streaming && index === historico.length - 1;
-            const semTexto = item.bot === PENDENTE;
-            const mostrarStatus = streamando && statusVisivel(status, semTexto);
+            <div className="app-scroll">
+                {historico.map((item, index) => {
+                    const streamando = respondendo && streaming && index === historico.length - 1;
+                    const semTexto = item.bot === PENDENTE;
+                    const mostrarStatus = streamando && statusVisivel(status, semTexto);
 
-            return (
-            <div key={index}>
-                <div className="app-container-chat flex justify-end mt-6">
-                    <UserBubble text={item.user} />
-                </div>
-                <div className="app-container-chat mt-4 pb-6">
-                    {semTexto && !mostrarStatus && <TypingIndicator />}
-                    {!semTexto && <ChatResponse text={item.bot} streaming={streamando} />}
-                    {item.fontes && <Fontes urls={item.fontes} />}
-                    {mostrarStatus && <StatusBlock ferramentas={ferramentasAtivas} />}
-                    {!semTexto && !streamando && (
-                        <FeedbackBot
-                            conversaId={id as string}
-                            mensagemOrdem={index}
-                            feedbackInicial={feedbacks[index]}
-                            disabled={respondendo}
-                        />
-                    )}
-                </div>
+                    return (
+                        <div key={index}>
+                            <div className="app-container-chat flex justify-end mt-6">
+                                <UserBubble text={item.user} />
+                            </div>
+                            <div className="app-container-chat mt-4 pb-6">
+                                {semTexto && !mostrarStatus && <TypingIndicator />}
+                                {!semTexto && <ChatResponse text={item.bot} streaming={streamando} />}
+                                {item.fontes && <Fontes urls={item.fontes} />}
+                                {mostrarStatus && <StatusBlock ferramentas={ferramentasAtivas} />}
+                                {!semTexto && !streamando && (
+                                    <FeedbackBot
+                                        conversaId={id as string}
+                                        mensagemOrdem={index}
+                                        feedbackInicial={feedbacks[index]}
+                                        disabled={respondendo}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+                {naoCarregou && turnos === 0 && (
+                    <div className="app-container-chat mt-10 text-center">
+                        <p className="text-muted-foreground">
+                            Não consegui carregar esta conversa.
+                        </p>
+                        <p className="mt-2 text-sm text-faint-foreground text-balance">
+                            Ela pode ter sido apagada, ou a pergunta não chegou a ser salva.
+                            Você pode começar outra pelo campo abaixo.
+                        </p>
+                    </div>
+                )}
+                <div ref={fimDasMensagensRef} />
             </div>
-            );
-            })}
-            {naoCarregou && turnos === 0 && (
-                <div className="app-container-chat mt-10 text-center">
-                    <p className="text-muted-foreground">
-                        Não consegui carregar esta conversa.
-                    </p>
-                    <p className="mt-2 text-sm text-faint-foreground text-balance">
-                        Ela pode ter sido apagada, ou a pergunta não chegou a ser salva.
-                        Você pode começar outra pelo campo abaixo.
-                    </p>
-                </div>
-            )}
-            <div ref={fimDasMensagensRef} />
-        </div>
-        {/* Dissolve as mensagens que chegam no composer. Fica fora do wrapper
+            {/* Dissolve as mensagens que chegam no composer. Fica fora do wrapper
             abaixo para compartilhar a caixa da casca; a altura vem do
             --composer-h publicado pelo useAlturaPublicada. */}
-        <div aria-hidden className="page-fade-t" />
-        <div
-            ref={composerRef}
-            className="relative z-30 flex-none pt-8 pb-4"
-        >
-            <div className="app-container-chat">
-                <PromptInput value={pergunta} onChange={setPergunta} onSubmit={lidarComEnvio} />
-                <p className="mt-2 text-center text-sm text-muted-foreground text-balance">
-                    O uspapo é uma IA e pode cometer erros. Sempre confirme as informações com fontes oficiais.
-                </p>
+            <div aria-hidden className="page-fade-t" />
+            <div
+                ref={composerRef}
+                className="relative z-30 flex-none pt-8 pb-4"
+            >
+                <div className="app-container-chat">
+                    <PromptInput value={pergunta} onChange={setPergunta} onSubmit={lidarComEnvio} />
+                    <p className="mt-2 text-center text-sm text-muted-foreground text-balance">
+                        O USPapo é uma IA e pode cometer erros. Sempre confirme as informações com fontes oficiais.
+                    </p>
+                </div>
             </div>
-        </div>
-    </>
-  );
+        </>
+    );
 }
