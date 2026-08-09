@@ -1,13 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { CHAVE_SUPABASE, dominioCookie } from './supabase';
+import { CHAVE_SUPABASE, URL_SUPABASE, dominioCookie } from './supabase';
 
 export async function criarClienteServidor() {
   const cookieStore = await cookies();
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    CHAVE_SUPABASE!,
+    URL_SUPABASE,
+    CHAVE_SUPABASE,
     {
       cookieOptions: { domain: dominioCookie },
       cookies: {

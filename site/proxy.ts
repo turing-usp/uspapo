@@ -17,7 +17,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { CHAVE_SUPABASE, dominioCookie } from './lib/supabase';
+import { CHAVE_SUPABASE, URL_SUPABASE, dominioCookie } from './lib/supabase';
 
 /* Rotas que existem justamente para quem não tem sessão.
  *
@@ -32,8 +32,8 @@ export async function proxy(request: NextRequest) {
   let resposta = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    CHAVE_SUPABASE!,
+    URL_SUPABASE,
+    CHAVE_SUPABASE,
     {
       cookieOptions: { domain: dominioCookie },
       cookies: {

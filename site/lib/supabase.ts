@@ -10,14 +10,18 @@ export const dominioCookie =
 
    Pública mesmo: vai embutida no bundle e qualquer um lê. Quem protege as
    tabelas é o RLS. */
+export const URL_SUPABASE =
+  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+
 export const CHAVE_SUPABASE =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  'placeholder-anon-key';
 
 export function criarCliente() {
   return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    CHAVE_SUPABASE!,
+    URL_SUPABASE,
+    CHAVE_SUPABASE,
     { cookieOptions: { domain: dominioCookie } }
   );
 }
