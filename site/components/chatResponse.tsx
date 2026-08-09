@@ -141,7 +141,7 @@ function ChatResponse({ text, streaming = false }: { text: string; streaming?: b
     const { visivel, sobra, revelando } = useRevelacao(text, streaming);
 
     return (
-        <div className="flex flex-col text-foreground text-lg leading-relaxed">
+        <div className="flex flex-col text-foreground text-lg leading-relaxed [&>p:last-child]:mb-1">
             <ReactMarkdown
                 rehypePlugins={
                     /* rehypeRaw revive o HTML cru; rehypeSanitize corta o que não for

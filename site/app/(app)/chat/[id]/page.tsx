@@ -5,6 +5,8 @@ import PromptInput from "@/components/propmptInput";
 import StatusBlock from "@/components/StatusBlock";
 import TypingIndicator from "@/components/TypingIndicator";
 import { obterConversa, salvarConversa, gerarTitulo, PENDENTE, type Mensagem } from "@/lib/conversas";
+import { obterFeedbacksDaConversa, type FeedbackItem } from "@/lib/feedback";
+import FeedbackBot from "@/components/FeedbackBot";
 import {
     perguntar,
     reduzirStatus,
@@ -30,6 +32,7 @@ export default function ChatPage() {
     const [status, setStatus] = useState<StatusStream>(STATUS_INICIAL);
     /* A conversa da URL não veio do banco. Ver o efeito de carga logo abaixo. */
     const [naoCarregou, setNaoCarregou] = useState(false);
+    const [feedbacks, setFeedbacks] = useState<Record<number, FeedbackItem>>({});
     const jaProcessouInicial = useRef(false);
     const fimDasMensagensRef = useRef<HTMLDivElement>(null);
     const composerRef = useRef<HTMLDivElement>(null);
@@ -134,6 +137,8 @@ export default function ChatPage() {
             }
 
             setHistorico(conversa.mensagens);
+            const mapaFeedbacks = await obterFeedbacksDaConversa(id as string);
+            setFeedbacks(mapaFeedbacks);
 
             const ultima = conversa.mensagens[conversa.mensagens.length - 1];
             if (ultima && ultima.bot === PENDENTE) {
@@ -193,6 +198,14 @@ export default function ChatPage() {
                     {!semTexto && <ChatResponse text={item.bot} streaming={streamando} />}
                     {item.fontes && <Fontes urls={item.fontes} />}
                     {mostrarStatus && <StatusBlock ferramentas={ferramentasAtivas} />}
+                    {!semTexto && !streamando && (
+                        <FeedbackBot
+                            conversaId={id as string}
+                            mensagemOrdem={index}
+                            feedbackInicial={feedbacks[index]}
+                            disabled={respondendo}
+                        />
+                    )}
                 </div>
             </div>
             );

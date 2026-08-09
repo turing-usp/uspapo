@@ -13,9 +13,9 @@ export default function Fontes({ urls }: { urls: string[] }) {
     if (urls.length === 0) return null;
 
     return (
-        <div className="mt-5">
-            <p className="mb-2 font-roboto text-sm text-muted-foreground">Fontes consultadas</p>
-            <ul className="flex flex-wrap gap-2">
+        <div className="mt-4 mb-2">
+            <p className="mb-1.5 font-roboto text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">Fontes consultadas</p>
+            <ul className="flex flex-wrap gap-1.5">
                 {urls.map((url) => (
                     <li key={url} className="min-w-0 max-w-full">
                         <a
@@ -23,7 +23,7 @@ export default function Fontes({ urls }: { urls: string[] }) {
                             target="_blank"
                             rel="noopener noreferrer"
                             title={url}
-                            className="glass flex min-w-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 font-roboto text-sm text-muted-foreground transition-colors hover:text-brand"
+                            className="flex min-w-0 items-center gap-1.5 rounded-full px-3 py-1 font-roboto text-xs text-muted-foreground bg-tint/[0.06] hover:bg-brand/[0.12] border border-line/15 hover:border-brand/35 transition-all duration-150 shadow-none hover:text-brand"
                         >
                             <svg
                                 aria-hidden
@@ -31,7 +31,7 @@ export default function Fontes({ urls }: { urls: string[] }) {
                                 fill="none"
                                 stroke="currentColor"
                                 strokeWidth={2}
-                                className="h-3.5 w-3.5 shrink-0 text-brand"
+                                className="h-3 w-3 shrink-0 text-brand"
                             >
                                 <path
                                     strokeLinecap="round"
