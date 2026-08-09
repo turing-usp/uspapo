@@ -1,16 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { dominioCookie } from './supabase';
+import { CHAVE_SUPABASE, dominioCookie } from './supabase';
 
 export async function criarClienteServidor() {
   const cookieStore = await cookies();
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key';
-
   return createServerClient(
-    url,
-    key,
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    CHAVE_SUPABASE!,
     {
       cookieOptions: { domain: dominioCookie },
       cookies: {

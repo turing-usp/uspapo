@@ -1,6 +1,6 @@
 // lib/conversas.ts
 import { criarCliente } from "./supabase";
-import { LIMITES, perfil } from "./limites";
+import { LIMITES } from "./limites";
 
 export type Mensagem = { user: string; bot: string; fontes?: string[] };
 
@@ -15,33 +15,28 @@ export type Conversa = {
   total?: number;
 };
 
-const CHAVE = "uspapo:conversas";
-
-/* Os números moram em lib/limites.ts, um perfil para quem tem conta e outro
-   para quem não tem. Estes re-exports existem para quem só precisa do teto de
-   anônimo (o caminho do localStorage, que nem consulta a sessão). */
-export const LIMITE = LIMITES.conta.conversas;
-export const LIMITE_LOCAL = LIMITES.anonimo.conversas;
-export const LIMITE_FAVORITAS = LIMITES.conta.favoritas;
-
-/* Sem sessão, tudo cai no localStorage. Uma chamada por operação é
+/* Tudo aqui pressupõe sessão: o proxy.ts não deixa chegar nesta parte do site
+   sem login. Existia um caminho paralelo em localStorage, para quem usava sem
+   conta, e ele saiu junto com essa possibilidade. Uma chamada por operação é
    barato: o cliente lê o cookie, não vai à rede. */
 async function uid(): Promise<string | null> {
   const { data } = await criarCliente().auth.getUser();
   return data.user?.id ?? null;
 }
 
-function ler(): Conversa[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const bruto = localStorage.getItem(CHAVE);
-    return bruto ? (JSON.parse(bruto) as Conversa[]) : [];
-  } catch { return []; }
-}
+/* Toda chamada aqui pode falhar por motivo que não é "não achei": tabela que
+   não existe (esquema não aplicado no banco), RLS barrando, rede fora. Antes o
+   `{ error }` do supabase-js era descartado em todas elas, e o resultado era o
+   pior tipo de bug: a gravação falhava, a tela seguia como se tivesse dado
+   certo, e o aluno acabava numa conversa vazia sem nenhuma pista do motivo.
 
-function escrever(cs: Conversa[]) {
-  if (typeof window === "undefined") return;
-  try { localStorage.setItem(CHAVE, JSON.stringify(cs)); } catch {}
+   Não levanta de propósito. Quase todas as chamadas vêm de handler de UI sem
+   try/catch, e derrubar a tela é pior do que seguir degradado. Quem precisa
+   reagir olha o retorno; o console garante que a causa nunca fique invisível. */
+function falhou(operacao: string, error: { message: string } | null): boolean {
+  if (!error) return false;
+  console.error(`[conversas] ${operacao} falhou: ${error.message}`);
+  return true;
 }
 
 type LinhaConversa = {
@@ -61,17 +56,16 @@ function paraMensagens(linhas: LinhaMensagem[]): Mensagem[] {
 }
 
 export async function obterConversa(id: string): Promise<Conversa | null> {
-  if (!(await uid())) return ler().find((c) => c.id === id) ?? null;
-
   const supabase = criarCliente();
-  const { data: conversa } = await supabase
+  const { data: conversa, error } = await supabase
     .from("conversas").select("id, titulo, favorita, criada_em")
     .eq("id", id).maybeSingle<LinhaConversa>();
-  if (!conversa) return null;
+  if (falhou("obterConversa", error) || !conversa) return null;
 
-  const { data: linhas } = await supabase
+  const { data: linhas, error: erroMensagens } = await supabase
     .from("mensagens").select("ordem, pergunta, resposta, fontes")
     .eq("conversa_id", id).order("ordem");
+  falhou("obterConversa/mensagens", erroMensagens);
 
   return {
     id: conversa.id,
@@ -84,23 +78,20 @@ export async function obterConversa(id: string): Promise<Conversa | null> {
 
 export async function salvarConversa(conversa: Conversa): Promise<void> {
   const usuario = await uid();
-
-  if (!usuario) {
-    const outras = ler().filter((c) => c.id !== conversa.id);
-    const todas = [conversa, ...outras];
-    const favoritas = todas.filter((c) => c.favorita);
-    const resto = todas.filter((c) => !c.favorita);
-    escrever([...favoritas, ...resto.slice(0, LIMITES.anonimo.conversas)]);
-    return;
-  }
+  /* Sessão vencida entre abrir a tela e mandar a pergunta: gravar sem user_id
+     só levaria um erro do RLS. O proxy.ts manda para o login no próximo passo. */
+  if (!usuario) return;
 
   const supabase = criarCliente();
-  await supabase.from("conversas").upsert({
+  const { error } = await supabase.from("conversas").upsert({
     id: conversa.id,
     user_id: usuario,
     titulo: conversa.titulo,
     favorita: conversa.favorita ?? false,
   });
+  /* Sem a conversa gravada, gravar as mensagens só produziria erro de chave
+     estrangeira em cima do erro que já aconteceu. */
+  if (falhou("salvarConversa", error)) return;
 
   /* Grava turno a turno: insere o que é novo, completa o que estava
      sem resposta. Reescrever tudo a cada stream seria caro. */
@@ -114,30 +105,30 @@ export async function salvarConversa(conversa: Conversa): Promise<void> {
     const resposta = m.bot === "..." ? null : m.bot;
 
     if (!salvos.has(i)) {
-      await supabase.from("mensagens").insert({
+      const { error: erroInsercao } = await supabase.from("mensagens").insert({
         conversa_id: conversa.id, ordem: i,
         pergunta: m.user, resposta, fontes: m.fontes ?? null,
       });
+      falhou(`salvarConversa/insert turno ${i}`, erroInsercao);
     } else if (salvos.get(i) === null && resposta !== null) {
-      await supabase.from("mensagens").update({ resposta, fontes: m.fontes ?? null })
+      const { error: erroUpdate } = await supabase
+        .from("mensagens").update({ resposta, fontes: m.fontes ?? null })
         .eq("conversa_id", conversa.id).eq("ordem", i);
+      falhou(`salvarConversa/update turno ${i}`, erroUpdate);
     }
   }
 
   await podarConversas(supabase);
 }
 
-/* O teto da conta também precisa ser aplicado: até aqui só o localStorage
-   cortava, e quem tinha conta acumulava conversa sem limite enquanto lia na
-   tela que o teto era 20. As favoritas nunca entram na conta: é exatamente
-   para isso que elas servem. */
+/* As favoritas nunca entram na conta: é exatamente para isso que elas servem. */
 async function podarConversas(supabase: ReturnType<typeof criarCliente>): Promise<void> {
   const { data } = await supabase
     .from("conversas").select("id")
     .eq("favorita", false)
     .order("atualizada_em", { ascending: false });
 
-  const excedentes = (data ?? []).slice(LIMITES.conta.conversas);
+  const excedentes = (data ?? []).slice(LIMITES.conversas);
   if (!excedentes.length) return;
 
   /* As mensagens vão junto pelo cascade. */
@@ -163,12 +154,6 @@ export function novoId(): string {
 }
 
 export async function listarConversas(): Promise<Conversa[]> {
-  if (!(await uid())) {
-    return ler()
-      .sort((a, b) => b.criadoEm - a.criadoEm)
-      .map((c) => ({ ...c, total: c.mensagens.length }));
-  }
-
   const { data } = await criarCliente()
     .from("conversas")
     .select("id, titulo, favorita, criada_em, mensagens(count)")
@@ -185,24 +170,11 @@ export async function listarConversas(): Promise<Conversa[]> {
 }
 
 export async function apagarConversa(id: string): Promise<void> {
-  if (!(await uid())) return escrever(ler().filter((c) => c.id !== id));
   /* As mensagens vão junto pelo cascade. */
   await criarCliente().from("conversas").delete().eq("id", id);
 }
 
 export async function alternarFavorita(id: string): Promise<boolean> {
-  if (!(await uid())) {
-    const conversas = ler();
-    const alvo = conversas.find((c) => c.id === id);
-    if (!alvo) return false;
-    if (!alvo.favorita && conversas.filter((c) => c.favorita).length >= LIMITES.anonimo.favoritas) {
-      return false;
-    }
-    alvo.favorita = !alvo.favorita;
-    escrever(conversas);
-    return true;
-  }
-
   const supabase = criarCliente();
   const { data: atual } = await supabase
     .from("conversas").select("favorita").eq("id", id).maybeSingle();
@@ -215,8 +187,6 @@ export async function alternarFavorita(id: string): Promise<boolean> {
 }
 
 export async function contarNaoFavoritas(): Promise<number> {
-  if (!(await uid())) return ler().filter((c) => !c.favorita).length;
-
   const { count } = await criarCliente()
     .from("conversas").select("*", { count: "exact", head: true })
     .eq("favorita", false);
@@ -227,32 +197,14 @@ export async function renomearConversa(id: string, novoTitulo: string): Promise<
   const titulo = novoTitulo.trim();
   if (!titulo) return;
 
-  if (!(await uid())) {
-    const conversas = ler();
-    const alvo = conversas.find((c) => c.id === id);
-    if (!alvo) return;
-    alvo.titulo = titulo;
-    return escrever(conversas);
-  }
   await criarCliente().from("conversas").update({ titulo }).eq("id", id);
 }
 
-/* Busca no conteúdo. Local filtra em memória; no banco o ilike roda no
-   Postgres, já que a listagem não traz os textos. */
+/* Busca no conteúdo. O ilike roda no Postgres, já que a listagem não traz os
+   textos das mensagens. */
 export async function buscarConversas(termo: string): Promise<Conversa[]> {
   const t = termo.trim();
   if (!t) return listarConversas();
-
-  if (!(await uid())) {
-    const alvo = t.toLowerCase();
-    return (await listarConversas()).filter(
-      (c) =>
-        c.titulo.toLowerCase().includes(alvo) ||
-        c.mensagens.some(
-          (m) => m.user.toLowerCase().includes(alvo) || m.bot.toLowerCase().includes(alvo)
-        )
-    );
-  }
 
   const supabase = criarCliente();
   const { data: achadas } = await supabase

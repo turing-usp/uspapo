@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useSessao } from '@/lib/useSessao';
 import { sair } from '@/lib/auth';
 import Image from 'next/image';
@@ -30,28 +29,13 @@ export default function MenuUsuario() {
     };
   }, [aberto]);
 
-  // Nada durante a checagem: piscar "Entrar" para quem está logado é pior
-  // que um instante vazio.
-  if (carregando) return <div className="h-9 w-9" />;
-
-  if (!usuario) {
-    return (
-      <>
-        <Link
-          href="/login"
-          className="glass inline-flex items-center text-sm md:text-base text-brand px-4 md:px-8 py-1.5 rounded-[2rem] whitespace-nowrap hover:scale-103 transition-transform duration-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-        >
-          Entrar
-        </Link>
-        <Link
-          href="/cadastro"
-          className="glass glass-brand inline-flex items-center text-sm md:text-base text-brand px-4 md:px-8 py-1.5 rounded-[2rem] whitespace-nowrap hover:scale-103 transition-transform duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-        >
-          Cadastrar
-        </Link>
-      </>
-    );
-  }
+  /* Um espaço vazio, nunca "Entrar"/"Cadastrar".
+     Esta navbar só existe dentro de app/(app), e o proxy.ts não deixa chegar
+     lá sem sessão: oferecer login aqui seria oferecer o que quem está vendo a
+     tela já tem. Sobra a janela em que o cookie vale (o servidor deixou passar)
+     mas o cliente ainda não leu a sessão, ou falhou ao ler, e aí um instante
+     vazio é melhor do que piscar um botão de entrar para quem já entrou. */
+  if (carregando || !usuario) return <div className="h-9 w-9" />;
 
   const nome = perfil?.nome ?? (usuario.user_metadata?.nome as string) ?? usuario.email ?? '';
   const inicial = nome.trim().charAt(0).toUpperCase() || '?';
@@ -95,7 +79,10 @@ export default function MenuUsuario() {
             onClick={async () => {
               await sair();
               setAberto(false);
-              router.push('/');
+              /* Direto para o login: mandar para "/" faria o proxy.ts rebater
+                 para cá de qualquer jeito, e o aluno acabaria numa URL com um
+                 ?destino=%2F pendurado sem motivo. */
+              router.push('/login');
               router.refresh();
             }}
             className="w-full rounded-xl px-3 py-2 text-left text-danger hover:bg-tint/5 transition-colors cursor-pointer"

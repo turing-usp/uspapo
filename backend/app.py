@@ -15,11 +15,13 @@ e a grade curricular no JupiterWeb.
     GET  /health
 
 O corpo do /chat aceita ainda "historico": [{"pergunta", "resposta"}, ...] com os
-turnos anteriores da conversa (o frontend guarda tudo no localStorage). O que não
-couber no orçamento de tokens é descartado, do turno mais antigo para o mais novo.
+turnos anteriores da conversa. O que não couber no orçamento de tokens é
+descartado, do turno mais antigo para o mais novo.
 
-Cada cliente identifica seu aparelho no header X-Device-Id e tem um limite de
-perguntas por janela de tempo; estourar devolve 429.
+O /chat exige login: o site manda o access token do Supabase no Authorization e
+o backend confere a assinatura pelo JWKS do projeto. Sem token válido é 401,
+fora da whitelist de emails é 403, e cada conta tem um limite de perguntas por
+janela de tempo que devolve 429 ao estourar.
 
 No modo stream, cada evento é uma linha `data: {json}` com um campo "tipo":
 provedor, pensando, ferramenta, texto, fontes, erro, fim.
