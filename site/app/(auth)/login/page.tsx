@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import TuringLogo from '../../turing-logo.svg';
-import { entrar } from '@/lib/auth';
+import { entrar, entrarComGoogle } from '@/lib/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {Suspense} from "react";
 
@@ -43,6 +43,16 @@ function LoginForm() {
 
     router.push('/');
     router.refresh();
+  };
+
+  const handleGoogleLogin = async () => {
+    setErro(null);
+    setCarregando(true);
+    const { error } = await entrarComGoogle();
+    if (error) {
+      setErro('Erro ao conectar com o Google.');
+      setCarregando(false);
+    }
   };
 
   return (
@@ -154,6 +164,8 @@ function LoginForm() {
         {/* BOTÃO GOOGLE */}
         <button
           type="button"
+          onClick={handleGoogleLogin}
+          disabled={carregando}
           className="cursor-pointer w-full py-3 px-4 bg-surface-raised hover:bg-surface text-foreground font-medium rounded-full text-sm flex items-center justify-center relative transition-colors duration-200 border border-line/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
           <div className="absolute left-4 flex items-center justify-center">

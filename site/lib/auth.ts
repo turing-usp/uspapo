@@ -42,3 +42,13 @@ export async function sair() {
   const supabase = criarCliente();
   return supabase.auth.signOut();
 }
+
+export async function entrarComGoogle() {
+  const supabase = criarCliente();
+  return supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+    },
+  });
+}

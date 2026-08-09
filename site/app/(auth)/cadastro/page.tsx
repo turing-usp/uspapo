@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import TuringLogo from '../../turing-logo.svg'
-import { validarCadastro, cadastrar } from '@/lib/auth';
+import { validarCadastro, cadastrar, entrarComGoogle } from '@/lib/auth';
 import { checarSenha } from '@/lib/auth';
 
 export default function RegisterPage() {
@@ -46,6 +46,16 @@ export default function RegisterPage() {
     setCarregando(false);
 
     error ? setErro(error.message) : setEnviado(true);
+  };
+
+  const handleGoogleLogin = async () => {
+    setErro(null);
+    setCarregando(true);
+    const { error } = await entrarComGoogle();
+    if (error) {
+      setErro('Erro ao conectar com o Google.');
+      setCarregando(false);
+    }
   };
 
   return (
@@ -275,6 +285,8 @@ export default function RegisterPage() {
               {/* ========================================================= */}
               <button
                 type="button"
+                onClick={handleGoogleLogin}
+                disabled={carregando}
                 className="cursor-pointer w-full py-3 px-4 bg-surface-raised hover:bg-surface text-foreground font-medium rounded-full text-sm flex items-center justify-center relative transition-colors duration-200 border border-line/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
               >
                 {/* Ícone Logo do Google */}
