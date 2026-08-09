@@ -124,7 +124,10 @@ export default function AdminAnalyticsPage() {
     if (modelStr.includes('gpt-oss-120b')) return 'GPT-OSS 120B';
     if (modelStr.includes('qwen3.6-27b') || modelStr.includes('qwen')) return 'Qwen 3.6 27B';
     if (modelStr.includes('gpt-oss-20b')) return 'GPT-OSS 20B';
-    if (modelStr.includes('llama-3.1-70b') || modelStr.includes('llama')) return 'Llama 3.1 70B';
+    if (modelStr.includes('llama-3.3-70b')) return 'Llama 3.3 70B';
+    if (modelStr.includes('llama-3.1-70b') || modelStr.includes('llama70')) return 'Llama 3.1 70B';
+    if (modelStr.includes('llama-3.1-8b') || modelStr.includes('llama8')) return 'Llama 3.1 8B';
+    if (modelStr === 'Outros / Testes' || modelStr === 'Outro') return 'Outros / Testes';
     const parts = modelStr.split('/');
     return parts[parts.length - 1];
   };
@@ -132,16 +135,12 @@ export default function AdminAnalyticsPage() {
   const pieData = data?.tokens.por_modelo && Object.keys(data.tokens.por_modelo).length > 0
     ? Object.entries(data.tokens.por_modelo).map(([nome, info]) => ({
         name: formatModelName(nome),
-        rawName: nome,
         value: info.chamadas,
-        tokens: info.total_tokens,
       }))
     : (data?.tokens.por_provedor
       ? Object.entries(data.tokens.por_provedor).map(([nome, info]) => ({
           name: nome,
-          rawName: nome,
           value: info.chamadas,
-          tokens: info.total_tokens,
         }))
       : []);
 
@@ -189,9 +188,9 @@ export default function AdminAnalyticsPage() {
         </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* DAU & MAU */}
+      {/* Grid de KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Usuários Ativos */}
         <div className="p-5 rounded-2xl bg-stone-900/60 border border-stone-800/80 backdrop-blur-sm space-y-2">
           <div className="flex items-center justify-between text-stone-400 text-xs font-medium">
             <span>Usuários Ativos (DAU / MAU)</span>
@@ -240,22 +239,18 @@ export default function AdminAnalyticsPage() {
             <Clock className="w-4 h-4 text-cyan-400" />
           </div>
           {(() => {
-            const provedores = Object.values(data?.desempenho_provedores || {}).filter(p => p.latencia_media_ms > 0);
-            const avgLat = provedores.length
-              ? Math.round(
-                  provedores.reduce((acc, p) => acc + p.latencia_media_ms, 0) /
-                    provedores.length
-                )
-              : ((data?.serie_temporal && data.serie_temporal.length > 0)
-                  ? (data.serie_temporal.slice().reverse().find(s => s.latencia_media_ms > 0)?.latencia_media_ms || 0)
-                  : 0);
+            const hojeData = data?.serie_temporal && data.serie_temporal.length > 0
+              ? data.serie_temporal[data.serie_temporal.length - 1]
+              : null;
+            const avgLat = hojeData?.latencia_media_ms || 0;
+            const temMedicao = avgLat > 0;
             return (
               <>
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-extrabold text-white">
-                    {loading ? '-' : Math.round(avgLat)}
+                    {loading ? '-' : (temMedicao ? Math.round(avgLat) : '—')}
                   </span>
-                  <span className="text-xs text-stone-400">ms</span>
+                  {temMedicao && <span className="text-xs text-stone-400">ms</span>}
                 </div>
                 <p className="text-[11px] text-stone-400">
                   Tempo médio de processamento dos LLMs.
@@ -403,7 +398,7 @@ export default function AdminAnalyticsPage() {
           {/* Legenda do Pie */}
           <div className="space-y-1.5 pt-2">
             {pieData.map((item, i) => (
-              <div key={item.name} className="flex items-center justify-between text-xs">
+              <div key={`${item.name}-${i}`} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <span
                     className="w-2.5 h-2.5 rounded-full"

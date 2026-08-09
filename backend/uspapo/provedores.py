@@ -32,6 +32,7 @@ class Provedor:
                 self.cfg.get("temperature", config.TEMPERATURA_PADRAO)
             ),
             "stream": True,
+            "stream_options": {"include_usage": True},
         }
 
         if self.cfg.get("max_tokens"):

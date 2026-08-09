@@ -121,8 +121,14 @@ def criar_app(registro, *, rotulo_indice: str) -> Flask:
             return jsonify({"erro": "Sua pergunta chegou vazia. Escreva o que você quer saber!"}), 400
 
         historico = normalizar_historico(dados.get("historico"))
+        # O id da conversa permite relacionar o turno persistido ao log medido.
+        session_id = dados.get("session_id")
+        if not isinstance(session_id, str) or not session_id.strip():
+            session_id = None
         eventos = executar_conversa(
-            provedores, registro, orcamento, pergunta, historico
+            provedores, registro, orcamento, pergunta, historico,
+            user_id=conta.id,
+            session_id=session_id,
         )
 
         if dados.get("stream"):

@@ -82,7 +82,7 @@ export default function ChatPage() {
                         acc.erro = evento.mensagem;
                         break;
                 }
-            });
+            }, id as string);
         } catch (erro) {
             console.error(erro);
             /* O back-end explica o 429 do rate limit na própria mensagem. */

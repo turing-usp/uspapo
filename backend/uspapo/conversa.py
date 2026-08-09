@@ -127,9 +127,17 @@ def conversar_com_provedor(
 
         separador = SeparadorConteudo()
         coletor = ColetorDeChamadas(registro)
+        usage_prompt_tokens = 0
+        usage_completion_tokens = 0
         texto: list[str] = []
 
         for chunk in abrir_stream(provedor, mensagens, registro.schemas):
+            if hasattr(chunk, "usage") and chunk.usage:
+                p_u = getattr(chunk.usage, "prompt_tokens", 0) or 0
+                c_u = getattr(chunk.usage, "completion_tokens", 0) or 0
+                if p_u or c_u:
+                    usage_prompt_tokens += p_u
+                    usage_completion_tokens += c_u
             if not chunk.choices:
                 continue  # chunk só de usage, no fim do stream
 
@@ -149,11 +157,16 @@ def conversar_com_provedor(
 
         yield from _despachar(separador.finalizar(), coletor, texto)
 
+        # Se a API não mandou usage no stream, faz a estimativa baseada em caracteres
+        if not usage_prompt_tokens and not usage_completion_tokens:
+            usage_prompt_tokens = max(1, len(pergunta) // 4)
+            usage_completion_tokens = max(1, len("".join(texto)) // 4)
+
         # Nenhuma ferramenta pedida: esta rodada é a resposta ao aluno.
         if not coletor:
             if not "".join(texto).strip():
                 raise RuntimeError("o provedor terminou o stream sem resposta utilizável")
-            return
+            return usage_prompt_tokens, usage_completion_tokens
 
         chamadas = coletor.fechar(rodada)
 
@@ -212,6 +225,9 @@ def executar_conversa(
     orcamento: Orcamento,
     pergunta: str,
     historico: list[dict],
+    *,
+    user_id: str | None = None,
+    session_id: str | None = None,
 ) -> Iterator[dict]:
     """Percorre a cadeia de provedores até um deles responder.
 
@@ -244,7 +260,14 @@ def executar_conversa(
                     provedor, registro, orcamento, pergunta, historico,
                     urls_turno, memo, teto,
                 )
-                for evento in eventos:
+                # O uso de tokens é o valor de retorno do gerador. Um ``for``
+                # o descarta, fazendo o log da resposta falhar silenciosamente.
+                while True:
+                    try:
+                        evento = next(eventos)
+                    except StopIteration as fim:
+                        usage_prompt_tokens, usage_completion_tokens = fim.value or (0, 0)
+                        break
                     # Só conta como resposta entregue o que o aluno de fato
                     # leria: senão um provedor que cuspiu espaço em branco e
                     # morreu seria tratado como resposta pela metade e não
@@ -270,8 +293,10 @@ def executar_conversa(
                 try:
                     from uspapo.analytics import registrar
                     registrar(
-                        categoria="CHAT",
+                        categoria="SISTEMA",
                         nome_evento="ERRO_PROVEDOR",
+                        session_id=session_id,
+                        user_id=user_id,
                         provedor=provedor.nome,
                         modelo=provedor.cfg.get("model", provedor.nome),
                         metadata={"erro": str(erro)}
@@ -283,21 +308,30 @@ def executar_conversa(
 
         if concluiu:
             saude.marcar_sucesso(provedor.nome)
-            yield {"tipo": "fontes", "urls": sorted(urls_turno)}
-            yield {"tipo": "fim"}
             try:
                 from uspapo.analytics import registrar
                 duracao_ms = int((time.time() - inicio_conversa) * 1000)
+                tot_tok = usage_prompt_tokens + usage_completion_tokens
                 registrar(
                     categoria="CHAT",
                     nome_evento="RESPOSTA_CONCLUIDA",
+                    session_id=session_id,
+                    user_id=user_id,
                     provedor=provedor.nome,
                     modelo=provedor.cfg.get("model", provedor.nome),
+                    prompt_tokens=usage_prompt_tokens,
+                    completion_tokens=usage_completion_tokens,
+                    total_tokens=tot_tok,
                     latencia_ms=duracao_ms,
                     metadata={"urls_fontes": len(urls_turno)}
                 )
-            except Exception:
-                pass
+            except Exception as erro:
+                # Telemetria não derruba a resposta, mas não pode falhar calada.
+                print(f"[ERRO ANALYTICS] Falha ao registrar resposta concluida: {erro}")
+            # Registrar antes do evento terminal evita perder o insert caso o
+            # navegador encerre a conexão logo após receber ``fim``.
+            yield {"tipo": "fontes", "urls": sorted(urls_turno)}
+            yield {"tipo": "fim"}
             return
 
         # Depois que o cliente já começou a receber a resposta não dá para

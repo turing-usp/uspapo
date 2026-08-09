@@ -82,7 +82,8 @@ async function tokenDaSessao(): Promise<string> {
 export async function perguntar(
   pergunta: string,
   anteriores: Mensagem[],
-  aoEvento: (evento: EventoChat) => void
+  aoEvento: (evento: EventoChat) => void,
+  sessionId?: string,
 ): Promise<void> {
   const token = await tokenDaSessao();
   /* Falhar aqui em vez de bater no backend para levar 401: a mensagem fica
@@ -100,6 +101,7 @@ export async function perguntar(
     body: JSON.stringify({
       pergunta,
       stream: true,
+      session_id: sessionId,
       /* Só os últimos turnos: o backend ainda corta pelo orçamento de token,
          mas mandar a conversa inteira pela rede a cada pergunta é desperdício
          que cresce sem parar numa conversa longa. */
