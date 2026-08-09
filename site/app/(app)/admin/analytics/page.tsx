@@ -441,15 +441,14 @@ export default function AdminAnalyticsPage() {
                 {data?.tokens?.por_modelo && Object.keys(data.tokens.por_modelo).length > 0 ? (
                   Object.entries(data.tokens.por_modelo).map(([prov, info]) => {
                     const modelPerf = data?.desempenho_provedores?.[prov];
-                    const avgLat = modelPerf?.latencia_media_ms ?? 
-                                   (data?.serie_temporal && data.serie_temporal.length > 0 ? (data.serie_temporal.slice().reverse().find(s => s.latencia_media_ms > 0)?.latencia_media_ms || 0) : 0);
+                    const avgLat = modelPerf?.latencia_media_ms;
                     const taxaErro = modelPerf ? (modelPerf.taxa_erro * 100).toFixed(1) : '0.0';
                     return (
                       <tr key={prov} className="hover:bg-stone-800/30 transition-colors">
                         <td className="py-3 font-medium text-stone-200">{formatModelName(prov)}</td>
                         <td className="py-3 text-stone-400">{info.chamadas}</td>
                         <td className="py-3 text-stone-300 font-mono">
-                          {Math.round(avgLat)} ms
+                          {avgLat != null && avgLat > 0 ? `${Math.round(avgLat)} ms` : '—'}
                         </td>
                         <td className="py-3">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
