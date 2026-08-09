@@ -23,7 +23,7 @@ export default function Fontes({ urls }: { urls: string[] }) {
                             target="_blank"
                             rel="noopener noreferrer"
                             title={url}
-                            className="flex min-w-0 items-center gap-1.5 rounded-full px-3 py-1 font-roboto text-xs text-muted-foreground bg-tint/[0.06] hover:bg-brand/[0.12] border border-line/15 hover:border-brand/35 transition-all duration-150 shadow-none hover:text-brand"
+                            className="glass flex min-w-0 items-center gap-1.5 rounded-full px-3 py-1 font-roboto text-xs text-muted-foreground transition-colors duration-150 hover:bg-brand/10 hover:text-brand"
                         >
                             <svg
                                 aria-hidden

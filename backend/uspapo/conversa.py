@@ -120,6 +120,13 @@ def conversar_com_provedor(
     mensagens, inicio_turno = orcamento.montar(pergunta, historico, teto)
     rodada = 0
 
+    # Fora do laço: cada rodada de ferramenta é uma chamada cobrada, e é
+    # justamente nas últimas que o prompt engorda com o resultado das buscas.
+    # Zerando aqui dentro, o turno inteiro era reportado como se fosse só a
+    # última rodada.
+    usage_prompt_tokens = 0
+    usage_completion_tokens = 0
+
     while True:
         # Os resultados das ferramentas entraram na lista desde a última volta e
         # podem ter estourado o orçamento; quem paga são os turnos mais velhos.
@@ -127,8 +134,6 @@ def conversar_com_provedor(
 
         separador = SeparadorConteudo()
         coletor = ColetorDeChamadas(registro)
-        usage_prompt_tokens = 0
-        usage_completion_tokens = 0
         texto: list[str] = []
 
         for chunk in abrir_stream(provedor, mensagens, registro.schemas):
@@ -157,10 +162,10 @@ def conversar_com_provedor(
 
         yield from _despachar(separador.finalizar(), coletor, texto)
 
-        # Se a API não mandou usage no stream, faz a estimativa baseada em caracteres
-        if not usage_prompt_tokens and not usage_completion_tokens:
-            usage_prompt_tokens = max(1, len(pergunta) // 4)
-            usage_completion_tokens = max(1, len("".join(texto)) // 4)
+        # Sem usage no stream o turno vale zero token, e não uma estimativa: o
+        # chute anterior media len(pergunta)//4, ignorando prompt de sistema,
+        # histórico e resultado das ferramentas, ou seja, quase todo o prompt.
+        # O painel prefere medir menos a somar número inventado com medição.
 
         # Nenhuma ferramenta pedida: esta rodada é a resposta ao aluno.
         if not coletor:

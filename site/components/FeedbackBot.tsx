@@ -132,7 +132,7 @@ export default function FeedbackBot({
             disabled={disabled}
             title="Resposta ruim (Dislike)"
             className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${likeState === "dislike"
-              ? "bg-red-500/15 text-red-500"
+              ? "bg-danger/15 text-danger"
               : "hover:bg-tint/10 text-muted-foreground hover:text-foreground"
               }`}
           >
@@ -141,8 +141,12 @@ export default function FeedbackBot({
         </div>
       </div>
 
+      {/* A superfície é a lâmina de vidro do resto do site, e não uma borda com
+          véu montada na mão. As classes animate-in/slide-in-from-top-2 que
+          moravam aqui eram no-op: tailwindcss-animate não é dependência do
+          projeto. */}
       {mostrarForm && (
-        <div className="mt-3 w-full max-w-lg p-4 rounded-xl border border-line/20 bg-tint/[0.03] shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="glass mt-3 w-full max-w-lg p-4 rounded-2xl">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-medium text-foreground">
               Como podemos melhorar esta resposta?
@@ -157,7 +161,7 @@ export default function FeedbackBot({
           </div>
 
           {enviado ? (
-            <div className="flex items-center gap-2 py-2 text-emerald-500 text-sm font-medium">
+            <div className="flex items-center gap-2 py-2 text-brand text-sm font-medium">
               <Check className="w-4 h-4" />
               <span>Obrigado pelo seu feedback! Ele nos ajuda a melhorar.</span>
             </div>
@@ -184,13 +188,19 @@ export default function FeedbackBot({
                 })}
               </div>
 
-              <textarea
-                value={comentario}
-                onChange={(e) => setComentario(e.target.value)}
-                placeholder="Conte detalhadamente o que esteve errado (opcional)..."
-                rows={3}
-                className="w-full p-2.5 rounded-lg border border-line/20 bg-background text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand resize-none"
-              />
+              {/* Campo de vidro, como a busca do histórico: o fio neutro que
+                  acende na marca ao focar vem do glass-field. O bg-background
+                  que estava aqui não é token deste projeto (os válidos são
+                  canvas/surface/surface-raised) e não resolvia para nada. */}
+              <div className="glass glass-field w-full rounded-xl">
+                <textarea
+                  value={comentario}
+                  onChange={(e) => setComentario(e.target.value)}
+                  placeholder="Conte detalhadamente o que esteve errado (opcional)..."
+                  rows={3}
+                  className="w-full p-2.5 bg-transparent border-0 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none resize-none"
+                />
+              </div>
 
               <div className="flex justify-end gap-2">
                 <button

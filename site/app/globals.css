@@ -93,6 +93,30 @@
      atrás dele passa a conversa inteira. No escuro o navy é mais fundo: o
      painel separa por ser vidro fumê, não por ser mais claro. */
   --glass-tint-panel: light-dark(rgb(255 255 255 / 0.10), rgb(6 9 42 / 0.18));
+
+  /* ------------------------------------------------------------------
+     Séries dos gráficos (painel de analytics)
+
+     Os dois passos de cada matiz foram escolhidos para a superfície onde a
+     série é lida, o --canvas claro e o escuro, e validados como conjunto:
+     banda de luminosidade, piso de croma, separação para daltonismo e
+     contraste. O escuro não é o claro clareado; é outro passo da mesma matiz.
+
+     Os slots são atribuídos em ordem fixa e nunca ciclados por posição no
+     ranking: cor identifica a entidade, então um filtro que muda a ordem não
+     pode repintar quem sobrou. Passando de seis, o excedente vira "Outros".
+
+     Mexer num hex aqui obriga a revalidar o conjunto inteiro.
+     ------------------------------------------------------------------ */
+  --chart-1: light-dark(#eb6834, #d95926);   /* laranja  */
+  --chart-2: light-dark(#2a78d6, #3987e5);   /* azul     */
+  --chart-3: light-dark(#1baf7a, #199e70);   /* aqua     */
+  --chart-4: light-dark(#4a3aa7, #9085e9);   /* violeta  */
+  --chart-5: light-dark(#eda100, #c98500);   /* amarelo  */
+  --chart-6: light-dark(#e87ba4, #d55181);   /* magenta  */
+
+  /* Grade e eixos ficam recessivos: quem tem que saltar é a marca de dados. */
+  --chart-grid: color-mix(in srgb, var(--line) 12%, transparent);
 }
 
 /* Força um esquema independente do dispositivo */
@@ -151,6 +175,13 @@
     --glass-edge-lo: rgb(255 255 255 / 0.07);
     --glass-shadow-color: rgb(0 0 0 / 0.58);
     --glass-tint-panel: rgb(6 9 42 / 0.18);
+
+    --chart-1: #d95926;
+    --chart-2: #3987e5;
+    --chart-3: #199e70;
+    --chart-4: #9085e9;
+    --chart-5: #c98500;
+    --chart-6: #d55181;
   }
 }
 

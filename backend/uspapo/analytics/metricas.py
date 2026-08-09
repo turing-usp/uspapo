@@ -1,7 +1,7 @@
 """Metricas baseadas exclusivamente nos registros reais do Supabase."""
 
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from .logger import _obter_supabase
 
@@ -40,6 +40,17 @@ def _tokens(log: dict) -> tuple[int, int, int]:
     if not total:
         total = prompt + completion
     return prompt, completion, total
+
+
+def _balde_tokens() -> dict:
+    """Fabrica, nao literal.
+
+    Um dict literal compartilhado com o ``defaultdict`` seria capturado por
+    referencia e so avaliado no primeiro acesso ao balde: como o acumulado
+    global e mutado antes, cada modelo novo nascia ja com o total corrente
+    somado dentro dele.
+    """
+    return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
 
 def _e_resposta_concluida(log: dict) -> bool:
@@ -99,6 +110,35 @@ def _adicionar_atividade(usuarios: set, uid, data, corte_24h, corte_30d):
         usuarios["dau"].add(uid)
 
 
+def _atividade_por_dia(conversas: list[dict], mensagens: list[dict], logs: list[dict]) -> dict:
+    """Mapa ``dia UTC (ISO) -> {user_id}`` com quem deu sinal de vida no dia.
+
+    Le as mesmas tres fontes que ``obter_dau_mau``, de proposito: se o card
+    escalar e a serie do grafico contassem "ativo" de jeitos diferentes, os
+    dois numeros discordariam na tela sem que ninguem soubesse qual esta certo.
+    """
+    mapa = defaultdict(set)
+    conversa_usuario = _mapa_conversa_usuario(conversas)
+
+    def marcar(uid, data):
+        if uid and data:
+            mapa[data.date().isoformat()].add(uid)
+
+    for conversa in conversas:
+        marcar(
+            conversa.get("user_id"),
+            _data_utc(conversa.get("atualizada_em") or conversa.get("criada_em")),
+        )
+    for mensagem in mensagens:
+        marcar(
+            conversa_usuario.get(mensagem.get("conversa_id")),
+            _data_utc(mensagem.get("criada_em") or mensagem.get("created_at")),
+        )
+    for log in logs:
+        marcar(log.get("user_id"), _data_utc(log.get("created_at")))
+    return mapa
+
+
 def obter_dau_mau(dados=None) -> dict:
     """DAU/MAU por atividade real: turnos persistidos e respostas medidas."""
     conversas, mensagens, logs = dados or _buscar_dados_reais_supabase()
@@ -149,10 +189,10 @@ def obter_consumo_tokens(dias: int = 30, dados=None) -> dict:
         and data >= corte_periodo
     ]
 
-    acumulado = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
-    hoje = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
-    por_provedor = defaultdict(lambda: {**acumulado, "chamadas": 0})
-    por_modelo = defaultdict(lambda: {**acumulado, "chamadas": 0})
+    acumulado = _balde_tokens()
+    hoje = _balde_tokens()
+    por_provedor = defaultdict(lambda: {**_balde_tokens(), "chamadas": 0})
+    por_modelo = defaultdict(lambda: {**_balde_tokens(), "chamadas": 0})
 
     for log in periodo:
         prompt, completion, total = _tokens(log)
@@ -252,34 +292,34 @@ def obter_resumo_conversas(dados=None) -> dict:
     }
 
 
-def obter_serie_temporal_diaria(dias: int = 30, dados=None) -> list[dict]:
-    """Serie diária: mensagens reais, tokens e latência medidos."""
+def obter_serie_temporal_diaria(dias: int = 30, janela_mau: int = 30, dados=None) -> list[dict]:
+    """Serie diária: perguntas, DAU/MAU, tokens e latência medidos.
+
+    ``usuarios_unicos`` é o DAU do dia e ``mau`` é a janela móvel de
+    ``janela_mau`` dias terminando nele. Como o MAU olha para trás, o mapa de
+    atividade precisa cobrir ``dias + janela_mau - 1`` dias mesmo que só os
+    ``dias`` finais sejam devolvidos.
+    """
     conversas, mensagens, logs = dados or _buscar_dados_reais_supabase()
     hoje = datetime.now(timezone.utc).date()
     chaves = [(hoje - timedelta(days=indice)).isoformat() for indice in range(dias - 1, -1, -1)]
     serie = {
         chave: {
-            "usuarios": set(), "conversas_iniciadas": 0, "perguntas": 0,
+            "conversas_iniciadas": 0, "perguntas": 0,
             "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
             "latencias": [],
         }
         for chave in chaves
     }
-    conversa_usuario = _mapa_conversa_usuario(conversas)
+    atividade = _atividade_por_dia(conversas, mensagens, logs)
 
     for conversa in conversas:
         data = _data_utc(conversa.get("criada_em"))
         if data and data.date().isoformat() in serie:
             serie[data.date().isoformat()]["conversas_iniciadas"] += 1
-    for mensagem in mensagens:
-        data = _data_utc(mensagem.get("criada_em") or mensagem.get("created_at"))
-        if not data or data.date().isoformat() not in serie:
-            continue
-        item = serie[data.date().isoformat()]
-        item["perguntas"] += 1
-        uid = conversa_usuario.get(mensagem.get("conversa_id"))
-        if uid:
-            item["usuarios"].add(uid)
+    # A contagem de perguntas sai da telemetria, e nao de ``mensagens``: a
+    # tabela de mensagens nao tem coluna de data, entao filtrar por dia ali
+    # descartava todas as linhas e a serie vivia zerada.
     for log in logs:
         if not _e_resposta_concluida(log):
             continue
@@ -287,8 +327,7 @@ def obter_serie_temporal_diaria(dias: int = 30, dados=None) -> list[dict]:
         if not data or data.date().isoformat() not in serie:
             continue
         item = serie[data.date().isoformat()]
-        if log.get("user_id"):
-            item["usuarios"].add(log["user_id"])
+        item["perguntas"] += 1
         prompt, completion, total = _tokens(log)
         item["prompt_tokens"] += prompt
         item["completion_tokens"] += completion
@@ -297,10 +336,18 @@ def obter_serie_temporal_diaria(dias: int = 30, dados=None) -> list[dict]:
         if latencia > 0:
             item["latencias"].append(latencia)
 
+    def mau_em(chave: str) -> int:
+        fim = date.fromisoformat(chave)
+        janela = set()
+        for recuo in range(janela_mau):
+            janela |= atividade.get((fim - timedelta(days=recuo)).isoformat(), set())
+        return len(janela)
+
     return [
         {
             "data": chave,
-            "usuarios_unicos": len(item["usuarios"]),
+            "usuarios_unicos": len(atividade.get(chave, set())),
+            "mau": mau_em(chave),
             "conversas_iniciadas": item["conversas_iniciadas"],
             "perguntas": item["perguntas"],
             "prompt_tokens": item["prompt_tokens"],

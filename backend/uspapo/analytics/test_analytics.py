@@ -55,6 +55,25 @@ class TestAnalytics(unittest.TestCase):
         self.assertEqual(consumo["acumulado_30d"]["total_tokens"], 150)
         self.assertEqual(consumo["por_modelo"]["m1"]["chamadas"], 1)
 
+    def test_balde_por_modelo_nao_herda_o_acumulado_global(self):
+        """O defaultdict semeava cada modelo novo com o total corrente."""
+        recente = self.agora.isoformat()
+        logs = [
+            {"evento": "chat_query_completed", "created_at": recente, "provedor": "Groq", "modelo": "m1", "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            {"evento": "chat_query_completed", "created_at": recente, "provedor": "Groq", "modelo": "m1", "prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30},
+            {"evento": "chat_query_completed", "created_at": recente, "provedor": "Outro", "modelo": "m2", "prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        ]
+
+        with patch(f"{obter_consumo_tokens.__module__}._buscar_dados_reais_supabase", return_value=([], [], logs)):
+            consumo = obter_consumo_tokens()
+
+        m1, m2 = consumo["por_modelo"]["m1"], consumo["por_modelo"]["m2"]
+        self.assertEqual((m1["prompt_tokens"], m1["completion_tokens"], m1["total_tokens"]), (30, 15, 45))
+        self.assertEqual((m2["prompt_tokens"], m2["completion_tokens"], m2["total_tokens"]), (1, 1, 2))
+        # A soma dos baldes tem que fechar com o acumulado geral.
+        self.assertEqual(m1["total_tokens"] + m2["total_tokens"], consumo["acumulado_30d"]["total_tokens"])
+        self.assertEqual(consumo["por_provedor"]["Outro"]["total_tokens"], 2)
+
     def test_dau_mau_e_serie_contam_usuarios_reais_sem_inventar_latencia(self):
         data = self.agora.isoformat()
         conversas = [{"id": "c1", "user_id": "u1", "criada_em": data, "atualizada_em": data}]
@@ -69,9 +88,33 @@ class TestAnalytics(unittest.TestCase):
 
         self.assertEqual((usuarios["dau"], usuarios["mau"]), (1, 1))
         hoje = serie[-1]
-        self.assertEqual(hoje["perguntas"], 1)
+        # Duas respostas concluidas: a pergunta agora vem da telemetria, nao da
+        # tabela de mensagens (que nao tem data para filtrar).
+        self.assertEqual(hoje["perguntas"], 2)
         self.assertEqual(hoje["total_tokens"], 1006)
         self.assertEqual(hoje["latencia_media_ms"], 350.0)
+        self.assertEqual((hoje["usuarios_unicos"], hoje["mau"]), (1, 1))
+
+    def test_serie_de_mau_acumula_a_janela_e_o_dau_so_o_dia(self):
+        hoje = self.agora.isoformat()
+        ha_vinte_dias = (self.agora - timedelta(days=20)).isoformat()
+        ha_cinquenta_dias = (self.agora - timedelta(days=50)).isoformat()
+        logs = [
+            {"evento": "chat_query_completed", "user_id": "u_hoje", "created_at": hoje},
+            {"evento": "chat_query_completed", "user_id": "u_20d", "created_at": ha_vinte_dias},
+            {"evento": "chat_query_completed", "user_id": "u_50d", "created_at": ha_cinquenta_dias},
+        ]
+
+        with patch(f"{obter_serie_temporal_diaria.__module__}._buscar_dados_reais_supabase", return_value=([], [], logs)):
+            serie = obter_serie_temporal_diaria()
+
+        ultimo = serie[-1]
+        # DAU conta so quem apareceu no dia; MAU pega a janela de 30 dias, que
+        # alcanca o usuario de 20 dias atras mas ja deixou o de 50 para tras.
+        self.assertEqual(ultimo["usuarios_unicos"], 1)
+        self.assertEqual(ultimo["mau"], 2)
+        self.assertTrue(all(ponto["mau"] >= ponto["usuarios_unicos"] for ponto in serie))
+        self.assertEqual(len(serie), 30)
 
     def test_ranking_usa_perguntas_persistidas_e_tokens_medidos(self):
         data = self.agora.isoformat()
