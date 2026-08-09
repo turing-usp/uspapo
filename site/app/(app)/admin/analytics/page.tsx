@@ -632,27 +632,34 @@ export default function AdminAnalyticsPage() {
                     <Tooltip cursor={{ stroke: 'var(--chart-grid)' }} content={<TooltipGlass />} />
                     <Legend content={<LegendaGlass />} />
                     {/* Empilhado: as duas parcelas somam o total consumido.
-                        O stroke da cor da superfície é o respiro de 2px que
-                        separa um segmento do outro. */}
+                        O stroke tem que ser a cor da série, e não a da
+                        superfície: o recharts tira dele a cor do ponto da
+                        legenda e do tooltip (getLegendItemColor só cai no fill
+                        quando não há stroke), então pintá-lo de --canvas
+                        apagava a identidade das duas nos dois lugares. A borda
+                        de 2px na própria cor é o que separa um segmento do
+                        outro. */}
                     <Area
                       type="monotone"
                       stackId="tokens"
                       dataKey="prompt_tokens"
                       name="Processados"
-                      stroke="var(--canvas)"
+                      stroke="var(--chart-2)"
                       strokeWidth={2}
                       fill="var(--chart-2)"
-                      fillOpacity={0.75}
+                      fillOpacity={0.55}
+                      activeDot={{ r: 4, strokeWidth: 2 }}
                     />
                     <Area
                       type="monotone"
                       stackId="tokens"
                       dataKey="completion_tokens"
                       name="Gerados"
-                      stroke="var(--canvas)"
+                      stroke="var(--chart-1)"
                       strokeWidth={2}
                       fill="var(--chart-1)"
-                      fillOpacity={0.75}
+                      fillOpacity={0.55}
+                      activeDot={{ r: 4, strokeWidth: 2 }}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
