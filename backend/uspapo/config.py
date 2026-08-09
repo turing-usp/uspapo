@@ -63,8 +63,9 @@ LIMITES_TAXA = [
 ]
 
 # Variáveis que já não são lidas por ninguém. Ficar calado sobre elas é o pior
-# dos mundos: RATE_LIMIT_MINUTO tinha o valor de anônimo (2) e hoje vale para
-# conta logada, então um .env não atualizado aperta o limite em 7x sem avisar.
+# dos mundos: os RATE_LIMIT_* sem CONTA no nome eram a escada de anônimo e hoje
+# valem para conta logada, então um .env que ainda traga os valores antigos
+# (8 por minuto, 400 por dia) aperta o limite quase pela metade sem avisar.
 _VARIAVEIS_MORTAS = [
     "SUPABASE_JWT_SECRET",   # a validação agora é por JWKS, ver contas.py
     "RATE_LIMIT_CONTA_MINUTO",
@@ -83,6 +84,7 @@ def aviso_de_variaveis_mortas() -> str:
         f"{', '.join(achadas)} não são mais lidas e podem sair do .env "
         f"(confira os RATE_LIMIT_* novos: eles valem para conta logada agora)."
     )
+
 
 # Teto padrão do que vai para o modelo, não importa o tamanho da conversa no
 # frontend. Cada provedor pode ter um teto menor (Provedor.teto_contexto).
@@ -108,8 +110,10 @@ ORIGENS_CORS = [
     "https://www.uspapo.turingusp.com",
 ]
 
-# X-Device-Id, Authorization e X-Admin-Key são headers customizados: sem eles liberados
-# aqui, o navegador barra a requisição já no preflight OPTIONS.
+# Authorization e X-Admin-Key são headers customizados: sem eles liberados aqui,
+# o navegador barra a requisição já no preflight OPTIONS, e aí o login não
+# chegaria nem a ser conferido. (O X-Device-Id saiu junto com o tier de anônimo:
+# sem ele para identificar ninguém, o site parou de mandar o header.)
 HEADERS_CORS = ["Content-Type", "Authorization", "X-Admin-Key"]
 
 # Chave secreta de administração para a API de Analytics
