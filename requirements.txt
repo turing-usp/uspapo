@@ -14,6 +14,7 @@ pypdf==6.14.2
 
 # --- Banco de Dados Vetorial & IA (Cloud-Native) ---
 pinecone>=3.0.0
+supabase>=2.0.0
 openai>=1.40.0
 groq>=0.4.0
 # Usado pelo embeddings/chunking.py para fatiar bloco grande sem cortar palavra.
