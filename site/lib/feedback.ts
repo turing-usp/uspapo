@@ -78,3 +78,20 @@ export async function obterFeedbacksDaConversa(
 
   return mapa;
 }
+
+export async function removerFeedback(params: {
+  conversaId: string;
+  mensagemOrdem: number;
+}): Promise<boolean> {
+  const usuario = (await uid()) ?? "anonimo";
+  const supabase = criarCliente();
+
+  const { error } = await supabase
+    .from("mensagem_feedbacks")
+    .delete()
+    .eq("conversa_id", params.conversaId)
+    .eq("mensagem_ordem", params.mensagemOrdem)
+    .eq("user_id", usuario);
+
+  return !falhou("removerFeedback", error);
+}

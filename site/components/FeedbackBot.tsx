@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ThumbsUp, ThumbsDown, Check, X } from "lucide-react";
-import { salvarFeedback, type FeedbackItem } from "@/lib/feedback";
+import { salvarFeedback, removerFeedback, type FeedbackItem } from "@/lib/feedback";
 
 const MOTIVOS_SUGERIDOS = [
   "Informação incorreta",
@@ -44,15 +44,20 @@ export default function FeedbackBot({
     setMostrarForm(false);
     setEnviado(false);
 
+    setSalvando(true);
     if (novoTipo === "like") {
-      setSalvando(true);
       await salvarFeedback({
         conversaId,
         mensagemOrdem,
         tipo: "like",
       });
-      setSalvando(false);
+    } else {
+      await removerFeedback({
+        conversaId,
+        mensagemOrdem,
+      });
     }
+    setSalvando(false);
   };
 
   const lidarComDislike = async () => {
@@ -61,9 +66,9 @@ export default function FeedbackBot({
     setLikeState(novoTipo);
     setEnviado(false);
 
+    setSalvando(true);
     if (novoTipo === "dislike") {
       setMostrarForm(true);
-      setSalvando(true);
       // Registra o dislike no banco imediatamente
       await salvarFeedback({
         conversaId,
@@ -72,10 +77,14 @@ export default function FeedbackBot({
         motivo: motivoSelecionado || undefined,
         comentario: comentario || undefined,
       });
-      setSalvando(false);
     } else {
       setMostrarForm(false);
+      await removerFeedback({
+        conversaId,
+        mensagemOrdem,
+      });
     }
+    setSalvando(false);
   };
 
   const enviarComentario = async (e: React.FormEvent) => {
