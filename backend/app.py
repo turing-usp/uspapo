@@ -8,7 +8,9 @@ automaticamente para o próximo. Veja o .env.example na raiz.
 A busca vetorial no Pinecone é uma toolcall que o modelo aciona
 quando a pergunta exige um fato sobre a USP. As outras vão buscar o dado ao vivo
 na fonte oficial: o cardápio dos bandejões no RUCard, e a disciplina, as turmas
-e a grade curricular no JupiterWeb.
+e a grade curricular no JupiterWeb. A exceção é a de avaliação de professor, que
+lê o USP Avalia: site de alunos, não da USP, e o resultado dela sai marcado
+como opinião.
 
     POST /chat  {"pergunta": "..."}                  -> {"resposta", "fontes"}
     POST /chat  {"pergunta": "...", "stream": true}  -> text/event-stream
@@ -33,16 +35,18 @@ no pacote uspapo/ e é o mesmo que o app_stub.py usa.
     gunicorn --chdir backend app:app       # produção (Render)
 """
 
-from uspapo.ferramentas import bandejao, busca, curriculo, disciplinas
+from uspapo.ferramentas import bandejao, busca, curriculo, disciplinas, uspavalia
 from uspapo.web import criar_app, rodar
 
-# Cardápio, disciplinas e grade curricular são iguais nos dois backends: vêm do
-# RUCard e do JupiterWeb ao vivo, não do Pinecone, então as mesmas ferramentas
-# entram nos dois registros. Antes do criar_app: é dele que sai o orçamento de
-# tokens, calculado sobre os schemas já registrados.
+# Cardápio, disciplinas, grade curricular e avaliações são iguais nos dois
+# backends: vêm do RUCard, do JupiterWeb e do USP Avalia ao vivo, não do
+# Pinecone, então as mesmas ferramentas entram nos dois registros. Antes do
+# criar_app: é dele que sai o orçamento de tokens, calculado sobre os schemas já
+# registrados.
 bandejao.registrar(busca.registro)
 disciplinas.registrar(busca.registro)
 curriculo.registrar(busca.registro)
+uspavalia.registrar(busca.registro)
 
 # `app` no escopo do módulo é o que o gunicorn importa: não renomeie.
 app = criar_app(busca.registro, rotulo_indice=busca.PINECONE_INDEX)

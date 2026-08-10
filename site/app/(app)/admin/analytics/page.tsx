@@ -92,6 +92,21 @@ const EIXO = {
   axisLine: false,
 } as const;
 
+/**
+ * Número curto para eixo e card.
+ *
+ * Em pt-BR o ponto é separador de milhar, então o "12.3k" que estava aqui antes
+ * se lia como doze mil e trezentos bem ao lado de um tooltip escrevendo
+ * "12.345", dois números diferentes para o mesmo valor. A notação compacta do
+ * Intl resolve na própria língua: "12,3 mil", "1,2 mi".
+ */
+const COMPACTO = new Intl.NumberFormat('pt-BR', {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
+const formatNumber = (num: number = 0) =>
+  num >= 1000 ? COMPACTO.format(num) : num.toLocaleString('pt-BR');
+
 /** Rótulo curto no eixo: "2026-08-09" ocuparia a largura de três dias. */
 const rotuloDia = (iso: string) => {
   const partes = String(iso).split('-');
@@ -236,12 +251,6 @@ export default function AdminAnalyticsPage() {
   useEffect(() => {
     fetchAnalytics();
   }, [fetchAnalytics]);
-
-  const formatNumber = (num: number = 0) => {
-    if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + 'M';
-    if (num >= 1_000) return (num / 1_000).toFixed(1) + 'k';
-    return num.toLocaleString('pt-BR');
-  };
 
   const formatUserId = (id: string) => {
     if (!id || id === 'anonymo' || id === 'anonimo') return 'Usuário Anônimo';
@@ -619,46 +628,78 @@ export default function AdminAnalyticsPage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <CardGrafico
             titulo="Tokens Processados e Gerados (30 Dias)"
-            descricao="Processados são o prompt enviado; gerados, a resposta da Groq."
+            descricao="Processados são o prompt enviado (eixo da esquerda); gerados, a resposta da Groq (eixo da direita). As escalas são diferentes: compare cada curva com o eixo da cor dela, nunca uma com a outra."
             icone={<BarChart3 className="h-4 w-4 text-brand" />}
           >
             <div className="h-64 w-full pt-4">
               {temSerie ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={serie} margin={{ top: 4, right: 8, left: -4, bottom: 0 }}>
+                  {/* `left: -4`, e não o `-12` dos gráficos irmãos: os rótulos
+                      daqui são os mais largos do painel ("12,3 mil" contra o
+                      "10" do volume de perguntas) e não sobra folga na largura
+                      do eixo para puxá-los mais para fora. À direita a margem é
+                      zero porque o segundo eixo ocupa o lugar dela. */}
+                  <AreaChart data={serie} margin={{ top: 4, right: 0, left: -4, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                     <XAxis dataKey="data" tickFormatter={rotuloDia} minTickGap={24} {...EIXO} />
-                    <YAxis tickFormatter={formatNumber} {...EIXO} />
+                    {/* Um eixo para cada série, e não um só compartilhado: o
+                        prompt carrega sistema + histórico + resultado de
+                        ferramenta e cada rodada de ferramenta é uma chamada
+                        cobrada, então "Processados" roda de 10x a 50x acima de
+                        "Gerados". Num eixo comum a resposta do modelo vira uma
+                        linha colada no zero.
+
+                        O `stroke` vem DEPOIS do {...EIXO}, senão o
+                        --muted-foreground de lá sobrescreve: é a cor do tick
+                        que diz de quem é cada eixo. */}
+                    <YAxis
+                      yAxisId="processados"
+                      tickFormatter={formatNumber}
+                      allowDecimals={false}
+                      {...EIXO}
+                      stroke="var(--chart-2)"
+                    />
+                    <YAxis
+                      yAxisId="gerados"
+                      orientation="right"
+                      tickFormatter={formatNumber}
+                      allowDecimals={false}
+                      {...EIXO}
+                      stroke="var(--chart-1)"
+                    />
                     <Tooltip cursor={{ stroke: 'var(--chart-grid)' }} content={<TooltipGlass />} />
                     <Legend content={<LegendaGlass />} />
-                    {/* Empilhado: as duas parcelas somam o total consumido.
+                    {/* Sem stackId. Empilhado, a curva de cima era desenhada na
+                        altura de prompt+completion enquanto o tooltip mostrava
+                        o valor cru do dataKey: "Gerados" aparecia na casa dos
+                        40 mil e o tooltip dizia 1.980. Desempilhado, a altura
+                        da curva é o próprio número.
+
                         O stroke tem que ser a cor da série, e não a da
                         superfície: o recharts tira dele a cor do ponto da
                         legenda e do tooltip (getLegendItemColor só cai no fill
                         quando não há stroke), então pintá-lo de --canvas
-                        apagava a identidade das duas nos dois lugares. A borda
-                        de 2px na própria cor é o que separa um segmento do
-                        outro. */}
+                        apagava a identidade das duas nos dois lugares. */}
                     <Area
                       type="monotone"
-                      stackId="tokens"
+                      yAxisId="processados"
                       dataKey="prompt_tokens"
                       name="Processados"
                       stroke="var(--chart-2)"
                       strokeWidth={2}
                       fill="var(--chart-2)"
-                      fillOpacity={0.55}
+                      fillOpacity={0.28}
                       activeDot={{ r: 4, strokeWidth: 2 }}
                     />
                     <Area
                       type="monotone"
-                      stackId="tokens"
+                      yAxisId="gerados"
                       dataKey="completion_tokens"
                       name="Gerados"
                       stroke="var(--chart-1)"
                       strokeWidth={2}
                       fill="var(--chart-1)"
-                      fillOpacity={0.55}
+                      fillOpacity={0.28}
                       activeDot={{ r: 4, strokeWidth: 2 }}
                     />
                   </AreaChart>

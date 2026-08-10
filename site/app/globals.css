@@ -565,6 +565,24 @@
 }
 
 /* ==========================================================================
+   Matemática (KaTeX)
+   ========================================================================== */
+
+/* Fórmula em bloco rola dentro de si, como a tabela do chatResponse.tsx: uma
+   integral comprida alargando a bolha empurraria a conversa inteira. */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 0.25rem;
+}
+
+/* O KaTeX herda currentColor, então acompanha o tema sozinho. O que ele não
+   herda é o corpo do texto: sem isto a fórmula sai menor que a frase em volta. */
+.katex {
+  font-size: 1.05em;
+}
+
+/* ==========================================================================
    Documento
    ========================================================================== */
 

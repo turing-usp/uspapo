@@ -6,10 +6,11 @@ que devolve documentos canned. A LLM é de verdade: vem da mesma cadeia
 LLM_PROVIDERS do .env — para dar para testar o streaming, os blocos de
 "Pensando" e o de "Usando ferramenta" com tokens reais.
 
-Nem tudo aqui é falso: só a busca é simulada. A `consultar_bandejao` e as
+Nem tudo aqui é falso: só a busca é simulada. A `consultar_bandejao`, as
 ferramentas do JupiterWeb (`buscar_disciplina`, `consultar_turmas`,
-`consultar_grade_curricular`) são as MESMAS do app.py e consultam o RUCard e o
-JupiterWeb de verdade: nenhuma delas tem versão simulada.
+`consultar_grade_curricular`) e a `consultar_avaliacoes_professor` são as MESMAS
+do app.py e consultam o RUCard, o JupiterWeb e o USP Avalia de verdade: nenhuma
+delas tem versão simulada.
 
     python backend/app_stub.py
 
@@ -22,7 +23,7 @@ Variáveis de ambiente:
 Não precisa de PINECONE_API_KEY.
 """
 
-from uspapo.ferramentas import bandejao, curriculo, disciplinas, simuladas
+from uspapo.ferramentas import bandejao, curriculo, disciplinas, simuladas, uspavalia
 from uspapo.web import criar_app, rodar
 
 # As mesmas ferramentas de produção do app.py, registradas antes do criar_app,
@@ -30,6 +31,7 @@ from uspapo.web import criar_app, rodar
 bandejao.registrar(simuladas.registro)
 disciplinas.registrar(simuladas.registro)
 curriculo.registrar(simuladas.registro)
+uspavalia.registrar(simuladas.registro)
 
 app = criar_app(simuladas.registro, rotulo_indice="STUB (documentos falsos)")
 
