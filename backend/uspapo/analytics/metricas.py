@@ -7,6 +7,10 @@ from .logger import _obter_supabase
 
 EVENTO_RESPOSTA_CONCLUIDA = "chat_query_completed"
 TAMANHO_PAGINA = 1000
+# Dislike sem motivo e um balde legitimo, nao um buraco: o formulario grava a
+# linha assim que o polegar desce, antes de o aluno escolher (ou desistir de
+# escolher) o motivo.
+MOTIVO_AUSENTE = "Sem motivo informado"
 
 
 def _data_utc(valor) -> datetime | None:
@@ -78,19 +82,41 @@ def _buscar_tabela(client, tabela: str) -> list[dict]:
 
 
 def _buscar_dados_reais_supabase():
-    """Le conversas, mensagens e telemetria sem truncamento silencioso."""
+    """Le conversas, mensagens, telemetria e feedback sem truncamento silencioso.
+
+    ``mensagem_feedbacks`` nao existe em ``supabase/migrations``, so no SQL que
+    e colado a mao no painel do Supabase: num banco local recem-resetado a
+    tabela pode faltar. O ``except`` do laco cobre esse caso devolvendo lista
+    vazia, entao o painel mostra "sem feedback ainda" em vez de derrubar o
+    endpoint inteiro por causa de uma tabela.
+    """
     client = _obter_supabase()
     if not client:
-        return [], [], []
+        return [], [], [], []
 
     dados = []
-    for tabela in ("conversas", "mensagens", "analytics_logs"):
+    for tabela in ("conversas", "mensagens", "analytics_logs", "mensagem_feedbacks"):
         try:
             dados.append(_buscar_tabela(client, tabela))
         except Exception as erro:
             print(f"[ANALYTICS] Aviso ao buscar {tabela}: {erro}")
             dados.append([])
     return tuple(dados)
+
+
+def _chave_turno(conversa_id, ordem) -> tuple[str, int] | None:
+    """Chave que liga um feedback ao turno que ele avalia.
+
+    ``mensagem_feedbacks.conversa_id`` e TEXT e ``mensagens.conversa_id`` e
+    uuid, sem chave estrangeira entre as duas; o PostgREST entrega ambos como
+    string, e o ``lower`` cobre uma eventual diferenca de caixa.
+
+    ``ordem`` ausente derruba a linha em vez de virar zero: ``_numero(None)``
+    devolve 0 e a mensagem colidiria com o primeiro turno da conversa.
+    """
+    if conversa_id is None or ordem is None:
+        return None
+    return str(conversa_id).strip().lower(), _numero(ordem)
 
 
 def _mapa_conversa_usuario(conversas: list[dict]) -> dict:
@@ -141,7 +167,7 @@ def _atividade_por_dia(conversas: list[dict], mensagens: list[dict], logs: list[
 
 def obter_dau_mau(dados=None) -> dict:
     """DAU/MAU por atividade real: turnos persistidos e respostas medidas."""
-    conversas, mensagens, logs = dados or _buscar_dados_reais_supabase()
+    conversas, mensagens, logs, _ = dados or _buscar_dados_reais_supabase()
     agora = datetime.now(timezone.utc)
     corte_24h = agora - timedelta(days=1)
     corte_30d = agora - timedelta(days=30)
@@ -178,7 +204,7 @@ def obter_dau_mau(dados=None) -> dict:
 
 def obter_consumo_tokens(dias: int = 30, dados=None) -> dict:
     """Tokens realmente reportados pelo provedor em respostas concluídas."""
-    _, _, logs = dados or _buscar_dados_reais_supabase()
+    _, _, logs, _ = dados or _buscar_dados_reais_supabase()
     agora = datetime.now(timezone.utc)
     corte_periodo = agora - timedelta(days=dias)
     inicio_hoje = agora.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -220,7 +246,7 @@ def obter_consumo_tokens(dias: int = 30, dados=None) -> dict:
 
 def obter_consumo_por_usuario(top_k: int = 20, dados=None) -> list[dict]:
     """Ranking com perguntas persistidas e tokens medidos, sem estimativas."""
-    conversas, mensagens, logs = dados or _buscar_dados_reais_supabase()
+    conversas, mensagens, logs, _ = dados or _buscar_dados_reais_supabase()
     conversa_usuario = _mapa_conversa_usuario(conversas)
     usuarios = defaultdict(lambda: {"total_tokens": 0, "perguntas": 0, "ultima_atividade": None})
 
@@ -254,7 +280,7 @@ def obter_consumo_por_usuario(top_k: int = 20, dados=None) -> list[dict]:
 
 def obter_desempenho_provedores(dias: int = 30, dados=None) -> dict:
     """Chamadas, falhas e latência das telemetrias dos últimos ``dias``."""
-    _, _, logs = dados or _buscar_dados_reais_supabase()
+    _, _, logs, _ = dados or _buscar_dados_reais_supabase()
     corte = datetime.now(timezone.utc) - timedelta(days=dias)
     grupos = defaultdict(lambda: {"total_chamadas": 0, "erros": 0, "latencias": []})
 
@@ -282,7 +308,7 @@ def obter_desempenho_provedores(dias: int = 30, dados=None) -> dict:
 
 
 def obter_resumo_conversas(dados=None) -> dict:
-    conversas, mensagens, _ = dados or _buscar_dados_reais_supabase()
+    conversas, mensagens, _, _ = dados or _buscar_dados_reais_supabase()
     total_conversas = len(conversas)
     total_mensagens = len(mensagens)
     return {
@@ -300,7 +326,7 @@ def obter_serie_temporal_diaria(dias: int = 30, janela_mau: int = 30, dados=None
     atividade precisa cobrir ``dias + janela_mau - 1`` dias mesmo que só os
     ``dias`` finais sejam devolvidos.
     """
-    conversas, mensagens, logs = dados or _buscar_dados_reais_supabase()
+    conversas, mensagens, logs, _ = dados or _buscar_dados_reais_supabase()
     hoje = datetime.now(timezone.utc).date()
     chaves = [(hoje - timedelta(days=indice)).isoformat() for indice in range(dias - 1, -1, -1)]
     serie = {
@@ -359,6 +385,94 @@ def obter_serie_temporal_diaria(dias: int = 30, janela_mau: int = 30, dados=None
     ]
 
 
+def obter_feedback_respostas(limite_itens: int = 50, dias: int = 30, dados=None) -> dict:
+    """Feedback dos alunos junto do turno que ele avalia.
+
+    A linha de ``mensagem_feedbacks`` guarda so um ponteiro (``conversa_id`` +
+    ``mensagem_ordem``), sem texto nenhum: quem sabe o que foi perguntado e o
+    que foi respondido e a tabela ``mensagens``, cuja chave primaria e
+    exatamente esse par. Sem essa juncao o painel mostraria "tres dislikes" sem
+    ter como dizer em que.
+
+    Os totais sao historicos, e nao da janela de ``dias``. Feedback e sinal
+    raro: num recorte de 30 dias o card viveria zerado, e zero por falta de
+    dado e indistinguivel de zero por defeito. So a ``serie`` usa a janela,
+    porque grafico precisa de eixo.
+    """
+    conversas, mensagens, _, feedbacks = dados or _buscar_dados_reais_supabase()
+
+    turnos = {}
+    for mensagem in mensagens:
+        chave = _chave_turno(mensagem.get("conversa_id"), mensagem.get("ordem"))
+        if chave:
+            turnos[chave] = mensagem
+    titulos = {
+        str(conversa["id"]).strip().lower(): conversa.get("titulo")
+        for conversa in conversas
+        if conversa.get("id")
+    }
+
+    hoje = datetime.now(timezone.utc).date()
+    serie = {
+        (hoje - timedelta(days=indice)).isoformat(): {"likes": 0, "dislikes": 0}
+        for indice in range(dias - 1, -1, -1)
+    }
+
+    likes = 0
+    por_motivo = defaultdict(int)
+    itens = []
+
+    for feedback in feedbacks:
+        positivo = str(feedback.get("tipo") or "") == "like"
+        if positivo:
+            likes += 1
+        else:
+            por_motivo[(feedback.get("motivo") or "").strip() or MOTIVO_AUSENTE] += 1
+
+        data = _data_utc(feedback.get("created_at"))
+        dia = data.date().isoformat() if data else ""
+        if dia in serie:
+            serie[dia]["likes" if positivo else "dislikes"] += 1
+
+        chave = _chave_turno(feedback.get("conversa_id"), feedback.get("mensagem_ordem"))
+        turno = turnos.get(chave) if chave else None
+        itens.append({
+            "id": feedback.get("id"),
+            "tipo": "like" if positivo else "dislike",
+            "motivo": feedback.get("motivo") or None,
+            "comentario": feedback.get("comentario") or None,
+            "created_at": data.isoformat() if data else None,
+            "conversa_id": feedback.get("conversa_id"),
+            "mensagem_ordem": feedback.get("mensagem_ordem"),
+            "user_id": feedback.get("user_id"),
+            "titulo_conversa": titulos.get(chave[0]) if chave else None,
+            # Nulos quando a conversa ja foi apagada: apagarConversa nao remove
+            # o feedback (nao ha cascade), entao o ponteiro sobrevive ao turno.
+            # O item continua na lista mesmo assim, senao a contagem do card ao
+            # lado passaria a contradizer o que da para ler embaixo dele.
+            "pergunta": (turno or {}).get("pergunta"),
+            "resposta": (turno or {}).get("resposta"),
+            "fontes": (turno or {}).get("fontes"),
+        })
+
+    # Sem data valida vai para o fim: e a unica ordem que nao inventa recencia.
+    itens.sort(key=lambda item: item["created_at"] or "", reverse=True)
+
+    total = len(feedbacks)
+    respondidas = sum(1 for mensagem in mensagens if mensagem.get("resposta"))
+    return {
+        "total": total,
+        "likes": likes,
+        "dislikes": total - likes,
+        "respostas_avaliaveis": respondidas,
+        "taxa_satisfacao": round(likes / max(total, 1), 4),
+        "cobertura": round(total / max(respondidas, 1), 4),
+        "por_motivo": dict(por_motivo),
+        "serie": [{"data": chave, **valores} for chave, valores in serie.items()],
+        "itens": itens[:limite_itens],
+    }
+
+
 def obter_resumo_executivo() -> dict:
     # Todos os cards vêm da mesma leitura paginada, evitando que uma mensagem
     # criada entre consultas deixe o painel internamente inconsistente.
@@ -373,4 +487,5 @@ def obter_resumo_executivo() -> dict:
         "desempenho_provedores": obter_desempenho_provedores(dias=30, dados=dados),
         "top_usuarios": obter_consumo_por_usuario(top_k=5, dados=dados),
         "serie_temporal": obter_serie_temporal_diaria(dias=30, dados=dados),
+        "feedback": obter_feedback_respostas(limite_itens=50, dados=dados),
     }

@@ -37,6 +37,28 @@ export default function FeedbackBot({
   const [salvando, setSalvando] = useState(false);
   const [enviado, setEnviado] = useState(false);
 
+  /* Os useState acima só leem a prop no primeiro render, e no chat ela ainda
+     não existe nesse instante: a página faz setHistorico e SÓ DEPOIS aguarda
+     obterFeedbacksDaConversa, então o componente monta com feedbackInicial
+     indefinido e trava em "none". O setFeedbacks que chega em seguida não
+     ressuscitava nada, porque o key={index} do wrapper não força remontagem —
+     e o aluno reabria a conversa com os botões apagados, avaliando de novo a
+     mesma resposta e duplicando justamente o dado que o painel de analytics
+     exibe.
+
+     Ajuste durante o render, e não useEffect: o React reexecuta a função na
+     hora, antes de tocar o DOM, então não há o frame com o estado errado nem a
+     renderização em cascata que o lint (com razão) barra. A identidade da prop
+     só muda quando o pai troca o mapa de feedbacks, então um joinha dado agora
+     não é sobrescrito. */
+  const [feedbackAplicado, setFeedbackAplicado] = useState(feedbackInicial);
+  if (feedbackInicial !== feedbackAplicado) {
+    setFeedbackAplicado(feedbackInicial);
+    setLikeState(feedbackInicial?.tipo ?? "none");
+    setMotivoSelecionado(feedbackInicial?.motivo ?? "");
+    setComentario(feedbackInicial?.comentario ?? "");
+  }
+
   const lidarComLike = async () => {
     if (disabled || salvando) return;
     const novoTipo = likeState === "like" ? "none" : "like";

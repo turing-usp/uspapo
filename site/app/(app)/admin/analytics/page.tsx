@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Users,
   Zap,
@@ -11,6 +11,8 @@ import {
   Server,
   BarChart3,
   Activity,
+  ThumbsUp,
+  MessageSquareQuote,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -27,6 +29,21 @@ import {
   Cell,
   CartesianGrid,
 } from 'recharts';
+import {
+  CORES_SERIE,
+  MAX_FATIAS,
+  COR_NEGATIVO,
+  COR_POSITIVO,
+  EIXO,
+  CardGrafico,
+  LegendaGlass,
+  TooltipGlass,
+  Vazio,
+  formatNumber,
+  formatUserId,
+  rotuloDia,
+} from '@/components/analytics/primitivos';
+import RevisaoFeedback, { type FeedbackAnalytics } from '@/components/analytics/RevisaoFeedback';
 
 interface BaldeTokens {
   prompt_tokens: number;
@@ -72,154 +89,15 @@ interface AnalyticsData {
     total_tokens: number;
     ultima_atividade: string;
   }>;
+  /* Opcional: um backend ainda sem `obter_feedback_respostas` no ar não manda
+     a chave, e a tela precisa degradar para "sem feedback" em vez de quebrar. */
+  feedback?: FeedbackAnalytics;
 }
 
-/** Ordem fixa. Um sétimo modelo vira "Outros", não uma cor gerada. */
-const CORES_SERIE = [
-  'var(--chart-1)',
-  'var(--chart-2)',
-  'var(--chart-3)',
-  'var(--chart-4)',
-  'var(--chart-5)',
-  'var(--chart-6)',
-];
-const MAX_FATIAS = CORES_SERIE.length;
-
-const EIXO = {
-  stroke: 'var(--muted-foreground)',
-  fontSize: 11,
-  tickLine: false,
-  axisLine: false,
-} as const;
-
-/**
- * Número curto para eixo e card.
- *
- * Em pt-BR o ponto é separador de milhar, então o "12.3k" que estava aqui antes
- * se lia como doze mil e trezentos bem ao lado de um tooltip escrevendo
- * "12.345", dois números diferentes para o mesmo valor. A notação compacta do
- * Intl resolve na própria língua: "12,3 mil", "1,2 mi".
- */
-const COMPACTO = new Intl.NumberFormat('pt-BR', {
-  notation: 'compact',
-  maximumFractionDigits: 1,
+const PERCENTUAL = new Intl.NumberFormat('pt-BR', {
+  style: 'percent',
+  maximumFractionDigits: 0,
 });
-const formatNumber = (num: number = 0) =>
-  num >= 1000 ? COMPACTO.format(num) : num.toLocaleString('pt-BR');
-
-/** Rótulo curto no eixo: "2026-08-09" ocuparia a largura de três dias. */
-const rotuloDia = (iso: string) => {
-  const partes = String(iso).split('-');
-  return partes.length === 3 ? `${partes[2]}/${partes[1]}` : iso;
-};
-
-type ItemTooltip = {
-  name?: string | number;
-  value?: number | string;
-  color?: string;
-  dataKey?: string | number;
-};
-
-/**
- * Tooltip de vidro.
- *
- * O `contentStyle` do recharts é style inline e não alcança pseudo-elemento,
- * então não há como fazer a lâmina por ali: o jeito de o tooltip ser vidro de
- * verdade é substituir o conteúdo inteiro.
- *
- * O texto usa tinta de texto, nunca a cor da série — quem carrega a identidade
- * é o ponto ao lado do rótulo.
- */
-function TooltipGlass({
-  active,
-  payload,
-  label,
-  sufixo = '',
-}: {
-  active?: boolean;
-  payload?: ItemTooltip[];
-  label?: string | number;
-  sufixo?: string;
-}) {
-  if (!active || !payload?.length) return null;
-
-  return (
-    <div className="glass rounded-xl px-3 py-2 font-roboto text-xs">
-      <p className="text-muted-foreground mb-1.5">{rotuloDia(String(label))}</p>
-      <div className="space-y-1">
-        {payload.map((item, i) => (
-          <div key={`${item.dataKey ?? i}`} className="flex items-center justify-between gap-4">
-            <span className="flex items-center gap-1.5 text-muted-foreground">
-              <span
-                aria-hidden
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ background: item.color }}
-              />
-              {item.name}
-            </span>
-            <span className="font-mono text-foreground">
-              {typeof item.value === 'number' ? item.value.toLocaleString('pt-BR') : item.value}
-              {sufixo}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function LegendaGlass({ payload }: { payload?: ItemTooltip[] }) {
-  if (!payload?.length) return null;
-  return (
-    <div className="flex flex-wrap items-center justify-center gap-4 pt-2 font-roboto text-xs">
-      {payload.map((item, i) => (
-        <span key={`${item.dataKey ?? i}`} className="flex items-center gap-1.5 text-muted-foreground">
-          <span
-            aria-hidden
-            className="h-2 w-2 shrink-0 rounded-full"
-            style={{ background: item.color }}
-          />
-          {item.value}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function CardGrafico({
-  titulo,
-  descricao,
-  icone,
-  className = '',
-  children,
-}: {
-  titulo: string;
-  descricao?: string;
-  icone: React.ReactNode;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={`glass rounded-2xl p-6 space-y-4 ${className}`}>
-      <div>
-        <h2 className="flex items-center gap-2 font-roboto text-base font-semibold text-foreground">
-          {icone}
-          {titulo}
-        </h2>
-        {descricao && <p className="font-roboto text-xs text-muted-foreground">{descricao}</p>}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Vazio({ carregando, mensagem }: { carregando: boolean; mensagem: string }) {
-  return (
-    <div className="flex h-full items-center justify-center font-roboto text-xs text-muted-foreground">
-      {carregando ? 'Carregando...' : mensagem}
-    </div>
-  );
-}
 
 export default function AdminAnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -251,12 +129,6 @@ export default function AdminAnalyticsPage() {
   useEffect(() => {
     fetchAnalytics();
   }, [fetchAnalytics]);
-
-  const formatUserId = (id: string) => {
-    if (!id || id === 'anonymo' || id === 'anonimo') return 'Usuário Anônimo';
-    if (id.length > 12) return `${id.substring(0, 6)}...${id.substring(id.length - 4)}`;
-    return id;
-  };
 
   const formatModelName = (modelStr: string) => {
     if (!modelStr || modelStr === 'Nao informado') return 'Não informado';
@@ -319,6 +191,14 @@ export default function AdminAnalyticsPage() {
   const tokens30d = data?.tokens?.acumulado_30d;
   const ultimoDia = temSerie ? serie[serie.length - 1] : null;
   const latenciaHoje = ultimoDia?.latencia_media_ms ?? 0;
+
+  const feedback = data?.feedback;
+  const serieFeedback = feedback?.serie ?? [];
+  const temFeedback = (feedback?.total ?? 0) > 0;
+  // Ordena por volume: quem mais reprovou aparece primeiro, que é a leitura
+  // útil aqui, a ordem fixa da paleta vale para identidade de modelo, não
+  // para uma lista de motivos que não carrega cor.
+  const motivos = Object.entries(feedback?.por_motivo ?? {}).sort((a, b) => b[1] - a[1]);
 
   return (
     <>
@@ -860,6 +740,122 @@ export default function AdminAnalyticsPage() {
             </div>
           </CardGrafico>
         </div>
+
+        {/* Qualidade das respostas. Fecha o painel de propósito: as seções
+            acima medem quanto o USPapo foi usado e quanto custou; esta é a
+            única que diz se o que ele respondeu prestou. */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <CardGrafico
+            className="lg:col-span-2"
+            titulo="Feedback das Respostas (30 Dias)"
+            descricao="Joinhas dados pelos alunos, por dia. Mesma unidade nas duas séries, então um eixo só."
+            icone={<ThumbsUp className="h-4 w-4 text-brand" />}
+          >
+            <div className="h-64 w-full pt-4">
+              {temFeedback ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={serieFeedback} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="fillUtil" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COR_POSITIVO} stopOpacity={0.35} />
+                        <stop offset="95%" stopColor={COR_POSITIVO} stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="fillNaoUtil" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COR_NEGATIVO} stopOpacity={0.35} />
+                        <stop offset="95%" stopColor={COR_NEGATIVO} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                    <XAxis dataKey="data" tickFormatter={rotuloDia} minTickGap={24} {...EIXO} />
+                    <YAxis allowDecimals={false} {...EIXO} />
+                    <Tooltip cursor={{ stroke: 'var(--chart-grid)' }} content={<TooltipGlass />} />
+                    <Legend content={<LegendaGlass />} />
+                    {/* As cores aqui são polaridade, não identidade: ver a nota
+                        em COR_POSITIVO/COR_NEGATIVO nos primitivos. */}
+                    <Area
+                      type="monotone"
+                      dataKey="likes"
+                      name="Útil"
+                      stroke={COR_POSITIVO}
+                      strokeWidth={2}
+                      fill="url(#fillUtil)"
+                      activeDot={{ r: 4, strokeWidth: 2 }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="dislikes"
+                      name="Não útil"
+                      stroke={COR_NEGATIVO}
+                      strokeWidth={2}
+                      fill="url(#fillNaoUtil)"
+                      activeDot={{ r: 4, strokeWidth: 2 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <Vazio carregando={loading} mensagem="Nenhum feedback registrado ainda." />
+              )}
+            </div>
+          </CardGrafico>
+
+          <CardGrafico
+            titulo="Satisfação"
+            descricao="Totais desde o início, e não da janela de 30 dias: feedback é raro, e um recorte curto viveria zerado."
+            icone={<MessageSquareQuote className="h-4 w-4 text-brand" />}
+          >
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-foreground">
+                {loading ? '-' : temFeedback ? PERCENTUAL.format(feedback?.taxa_satisfacao ?? 0) : '—'}
+              </span>
+              <span className="font-roboto text-xs text-muted-foreground">de aprovação</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-roboto text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: COR_POSITIVO }} />
+                Útil <span className="font-mono text-foreground">{feedback?.likes ?? 0}</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: COR_NEGATIVO }} />
+                Não útil <span className="font-mono text-foreground">{feedback?.dislikes ?? 0}</span>
+              </span>
+            </div>
+
+            <p className="font-roboto text-[11px] text-faint-foreground">
+              {/* Cobertura em números absolutos, e não só em porcentagem: "2 de
+                  40" avisa que a amostra é pequena, "5%" não. */}
+              <span className="font-mono text-muted-foreground">{feedback?.total ?? 0}</span> de{' '}
+              <span className="font-mono text-muted-foreground">
+                {feedback?.respostas_avaliaveis ?? 0}
+              </span>{' '}
+              respostas avaliadas ({loading ? '-' : PERCENTUAL.format(feedback?.cobertura ?? 0)}).
+            </p>
+
+            <div className="space-y-1.5 border-t border-line/15 pt-3">
+              <p className="font-roboto text-[11px] uppercase tracking-wider text-muted-foreground/70">
+                Motivos de rejeição
+              </p>
+              {motivos.length > 0 ? (
+                motivos.map(([motivo, quantos]) => (
+                  <div key={motivo} className="flex items-center justify-between font-roboto text-xs">
+                    <span className="min-w-0 truncate text-foreground">{motivo}</span>
+                    <span className="ml-2 shrink-0 font-mono text-muted-foreground">{quantos}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="font-roboto text-xs text-muted-foreground">Nenhuma resposta reprovada.</p>
+              )}
+            </div>
+          </CardGrafico>
+        </div>
+
+        <CardGrafico
+          titulo="Revisão de Respostas"
+          descricao="Os 50 feedbacks mais recentes, com a pergunta e a resposta que foram avaliadas. Clique para abrir."
+          icone={<MessageSquareQuote className="h-4 w-4 text-brand" />}
+        >
+          <RevisaoFeedback feedback={feedback} carregando={loading} />
+        </CardGrafico>
       </div>
     </div>
 
