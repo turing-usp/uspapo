@@ -72,6 +72,7 @@ class Conta(NamedTuple):
 
     id: str     # o `sub` do JWT: estável, é a chave do rate limit
     email: str  # normalizado (minúsculas); é por ele que a whitelist decide
+    role: str = "" # role exclusiva do USPapo extraída de app_metadata.uspapo.role
 
 
 _cliente_jwks = None
@@ -161,4 +162,8 @@ def conta_do_pedido() -> Conta | None:
         return None
 
     email = str(conteudo.get("email") or "").strip().lower()
-    return Conta(sub, email)
+    app_meta = conteudo.get("app_metadata") or {}
+    uspapo_meta = app_meta.get("uspapo") or {}
+    role = str(uspapo_meta.get("role") or app_meta.get("role") or "").strip().lower()
+
+    return Conta(sub, email, role)

@@ -103,12 +103,23 @@ class Whitelist:
         return aviso
 
 
-WHITELIST = Whitelist(config.WHITELIST_EMAILS)
+ROLES_AUTORIZADAS = {"admin", "membro", "early_access"}
 
 
-def liberado(email: str) -> bool:
-    """Atalho para a whitelist desta instância."""
-    return WHITELIST.liberado(email)
+def liberado(email: str, role: str = "") -> bool:
+    """Valida se o usuário pode perguntar no chat.
+    
+    Liberado EXCLUSIVAMENTE para contas que possuam role autorizada:
+    - 'admin'
+    - 'membro'
+    - 'early_access'
+    
+    Contas sem uma dessas roles são bloqueadas por padrão.
+    """
+    role = (role or "").strip().lower()
+    if role in ROLES_AUTORIZADAS:
+        return True
+    return False
 
 
 def panorama() -> str:
