@@ -1,27 +1,26 @@
-"""Gerenciador de cargos do USPapo no Supabase Auth.
+"""Gerenciador de cargos do USPapo na tabela Perfis no Supabase.
 
 Subcomandos:
-    listar                       Mostra todos os usuarios e seus cargos
-    definir <email> <cargo>      Atribui um cargo a um usuario
+    listar                       Mostra todos os usuarios e seus cargos do USPapo
+    definir <email> <cargo>      Atribui um cargo a um usuario na tabela Perfis
     lote <cargo> <email> ...     Atribui o mesmo cargo a varios usuarios de uma vez
 
-Cargos validos: admin, membro, early_access, usuario_normal, ex_membro
+Cargos validos: admin, early_access (ou 'remover' para limpar)
 
 Exemplos:
     python scripts/cargos.py listar
     python scripts/cargos.py definir aluno@usp.br early_access
-    python scripts/cargos.py lote early_access aluno1@usp.br aluno2@usp.br aluno3@usp.br
+    python scripts/cargos.py lote early_access aluno1@usp.br aluno2@usp.br
 """
 
 import os
 import sys
-from datetime import datetime, timezone
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "backend"))
 from uspapo import config  # noqa: E402  (carrega .env)
 from supabase import create_client  # noqa: E402
 
-CARGOS = {"admin", "membro", "early_access"}
+CARGOS = {"admin", "early_access", "remover"}
 
 
 def _cliente():
@@ -33,132 +32,95 @@ def _cliente():
     return create_client(url, key)
 
 
-def _todos_usuarios(sb):
-    """Busca paginada de todos os usuarios do Supabase Auth."""
-    usuarios = []
-    pagina = 1
-    while True:
-        lote = sb.auth.admin.list_users(page=pagina, per_page=50)
-        if not lote:
-            break
-        usuarios.extend(lote)
-        if len(lote) < 50:
-            break
-        pagina += 1
-    return usuarios
-
-
-def _cargo_uspapo(user) -> str:
-    meta = (user.app_metadata or {}).get("uspapo") or {}
-    return meta.get("role", "")
+def _todos_perfis(sb):
+    """Busca todas as linhas da tabela Perfis."""
+    res = sb.table("Perfis").select("id, email, nome, uspapo_role").execute()
+    return res.data or []
 
 
 # ── Subcomando: listar ────────────────────────────────────────────────
 
 def cmd_listar():
     sb = _cliente()
-    usuarios = _todos_usuarios(sb)
+    perfis = _todos_perfis(sb)
 
-    # Agrupa por cargo
     por_cargo = {}
     sem_cargo = []
-    for u in usuarios:
-        cargo = _cargo_uspapo(u)
+
+    for p in perfis:
+        cargo = (p.get("uspapo_role") or "").strip().lower()
         if cargo:
-            por_cargo.setdefault(cargo, []).append(u)
+            por_cargo.setdefault(cargo, []).append(p)
         else:
-            sem_cargo.append(u)
+            sem_cargo.append(p)
 
     print(f"\n{'='*60}")
-    print(f"  USPapo - Cargos de {len(usuarios)} contas registradas")
+    print(f"  USPapo - Cargos na tabela Perfis ({len(perfis)} contas)")
     print(f"{'='*60}\n")
 
     for cargo in sorted(por_cargo):
-        lista = sorted(por_cargo[cargo], key=lambda u: u.email or "")
+        lista = sorted(por_cargo[cargo], key=lambda x: x.get("email") or "")
         print(f"  [{cargo.upper()}] ({len(lista)} usuario(s))")
         for u in lista:
-            print(f"    - {u.email}")
+            print(f"    - {u.get('email')} ({u.get('nome') or 'Sem nome'})")
         print()
 
     if sem_cargo:
-        sem_cargo.sort(key=lambda u: u.email or "")
-        print(f"  [SEM CARGO] ({len(sem_cargo)} usuario(s))")
+        sem_cargo.sort(key=lambda x: x.get("email") or "")
+        print(f"  [SEM CARGO / BLOQUEADO] ({len(sem_cargo)} usuario(s))")
         for u in sem_cargo:
-            print(f"    - {u.email or '(sem email)'}")
+            print(f"    - {u.get('email') or '(sem email)'}")
         print()
 
 
 # ── Subcomando: definir ───────────────────────────────────────────────
 
-def _encontrar_por_email(usuarios, email):
-    email = email.strip().lower()
-    for u in usuarios:
-        if (u.email or "").strip().lower() == email:
-            return u
-    return None
-
-
-def _aplicar_cargo(sb, user, cargo):
-    app_meta = dict(user.app_metadata or {})
-    uspapo_meta = dict(app_meta.get("uspapo") or {})
-
-    antigo = uspapo_meta.get("role", "(nenhum)")
-    uspapo_meta["role"] = cargo
-    uspapo_meta["updated_at"] = datetime.now(timezone.utc).isoformat()
-    app_meta["uspapo"] = uspapo_meta
-
-    sb.auth.admin.update_user_by_id(
-        user.id,
-        attributes={"app_metadata": app_meta},
-    )
-    return antigo
-
-
-def cmd_definir(email, cargo):
+def cmd_definir(email: str, cargo: str):
     cargo = cargo.strip().lower()
     if cargo not in CARGOS:
         print(f"[ERRO] Cargo '{cargo}' invalido. Use: {', '.join(sorted(CARGOS))}")
         sys.exit(1)
 
+    valor_role = None if cargo == "remover" else cargo
+
     sb = _cliente()
-    usuarios = _todos_usuarios(sb)
-    user = _encontrar_por_email(usuarios, email)
+    email_clean = email.strip().lower()
 
-    if not user:
-        print(f"[ERRO] Nenhuma conta com email '{email}' encontrada.")
-        sys.exit(1)
+    # Atualiza na tabela Perfis
+    res = sb.table("Perfis").update({"uspapo_role": valor_role}).eq("email", email_clean).execute()
 
-    antigo = _aplicar_cargo(sb, user, cargo)
-    print(f"[OK] {email}: {antigo} -> {cargo}")
+    if res.data:
+        print(f"[OK] {email_clean} -> {cargo}")
+    else:
+        print(f"[FALHA] {email_clean} nao foi encontrado na tabela Perfis.")
 
 
 # ── Subcomando: lote ──────────────────────────────────────────────────
 
-def cmd_lote(cargo, emails):
+def cmd_lote(cargo: str, emails: list[str]):
     cargo = cargo.strip().lower()
     if cargo not in CARGOS:
         print(f"[ERRO] Cargo '{cargo}' invalido. Use: {', '.join(sorted(CARGOS))}")
         sys.exit(1)
 
+    valor_role = None if cargo == "remover" else cargo
     sb = _cliente()
-    usuarios = _todos_usuarios(sb)
 
     ok, falhas = 0, 0
     for email in emails:
-        email = email.strip().lower()
-        if not email:
-            continue
-        user = _encontrar_por_email(usuarios, email)
-        if not user:
-            print(f"[FALHA] {email} -- conta nao encontrada")
-            falhas += 1
+        email_clean = email.strip().lower()
+        if not email_clean:
             continue
         try:
-            antigo = _aplicar_cargo(sb, user, cargo)
-            print(f"[OK] {email}: {antigo} -> {cargo}")
-            ok += 1
+            res = sb.table("Perfis").update({"uspapo_role": valor_role}).eq("email", email_clean).execute()
+            if res.data:
+                print(f"[OK] {email_clean} -> {cargo}")
+                ok += 1
+            else:
+                print(f"[FALHA] {email_clean} -- conta nao encontrada na tabela Perfis")
+                falhas += 1
         except Exception as e:
-            print(f"[FALHA] {email} -- {e}")
+            print(f"[FALHA] {email_clean} -- {e}")
             falhas += 1
 
     print(f"\nResultado: {ok} atualizados, {falhas} falhas.")
@@ -172,7 +134,7 @@ Uso:
     python scripts/cargos.py definir <email> <cargo>
     python scripts/cargos.py lote <cargo> <email1> <email2> ...
 
-Cargos: admin, membro, early_access, usuario_normal, ex_membro
+Cargos validos: admin, early_access, remover
 """.strip()
 
 if __name__ == "__main__":

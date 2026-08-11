@@ -90,7 +90,7 @@ def criar_app(registro, *, rotulo_indice: str) -> Flask:
                 "erro": "Entre com sua conta para conversar com o USPapo."
             }), 401
 
-        if not acesso.liberado(conta.email, conta.role):
+        if not acesso.liberado(conta.id):
             return jsonify({
                 "erro": "O USPapo ainda está em teste fechado e esta conta não "
                         "está na lista de acesso."
@@ -176,7 +176,7 @@ def criar_app(registro, *, rotulo_indice: str) -> Flask:
         except Exception:
             pass
 
-        e_admin = (conta and conta.role == "admin") or (chave_admin and chave_admin == config.ADMIN_API_KEY)
+        e_admin = (conta and acesso.e_admin(conta.id)) or (chave_admin and chave_admin == config.ADMIN_API_KEY)
         if not e_admin:
             return jsonify({"ok": False, "erro": "Acesso não autorizado ao painel de analytics."}), 403
 
