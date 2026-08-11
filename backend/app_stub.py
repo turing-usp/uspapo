@@ -23,7 +23,7 @@ Variáveis de ambiente:
 Não precisa de PINECONE_API_KEY.
 """
 
-from uspapo.ferramentas import bandejao, curriculo, disciplinas, simuladas, uspavalia
+from uspapo.ferramentas import bandejao, curriculo, disciplinas, salas, simuladas, uspavalia
 from uspapo.web import criar_app, rodar
 
 # As mesmas ferramentas de produção do app.py, registradas antes do criar_app,
@@ -32,6 +32,7 @@ bandejao.registrar(simuladas.registro)
 disciplinas.registrar(simuladas.registro)
 curriculo.registrar(simuladas.registro)
 uspavalia.registrar(simuladas.registro)
+salas.registrar(simuladas.registro)
 
 app = criar_app(simuladas.registro, rotulo_indice="STUB (documentos falsos)")
 

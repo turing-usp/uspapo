@@ -187,9 +187,12 @@ export default function ChatPage() {
                     const streamando = respondendo && streaming && index === historico.length - 1;
                     const semTexto = item.bot === PENDENTE;
                     const mostrarStatus = streamando && statusVisivel(status, semTexto);
+                    /* O último turno fica de fora do content-visibility: é ele que
+                       cresce a cada quadro do stream e que o scrollIntoView persegue. */
+                    const assentado = index < historico.length - 1;
 
                     return (
-                        <div key={index}>
+                        <div key={index} className={assentado ? "turno-assentado" : undefined}>
                             <div className="app-container-chat flex justify-end mt-6">
                                 <UserBubble text={item.user} />
                             </div>

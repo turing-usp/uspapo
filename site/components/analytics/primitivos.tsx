@@ -93,7 +93,7 @@ export function TooltipGlass({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="glass rounded-xl px-3 py-2 font-roboto text-xs">
+    <div className="glass glass-solid rounded-xl px-3 py-2 font-roboto text-xs">
       <p className="text-muted-foreground mb-1.5">{rotuloDia(String(label))}</p>
       <div className="space-y-1">
         {payload.map((item, i) => (

@@ -292,7 +292,7 @@ export default function Historico() {
         contexto de empilhamento (z-10), o `fixed` ficava preso nele e o
         page-fade-t (z-20) pintava por cima; irmão dele, o z-50 vence. */}
     {pendente && (
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl glass overflow-hidden">
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl glass glass-solid overflow-hidden">
         <div
           key={pendente.id}
           className="h-1 w-full bg-brand origin-left animate-[encolher_6s_linear_forwards]"
@@ -307,7 +307,7 @@ export default function Historico() {
     )}
 
     {aviso && !pendente && (
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl glass">
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl glass glass-solid">
         <span className="text-foreground text-sm">{aviso}</span>
       </div>
     )}

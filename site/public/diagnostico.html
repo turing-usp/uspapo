@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>USPapo — diagnóstico de renderização</title>
+<!--
+  Página solta de propósito: HTML estático em /public, fora do Next, fora do
+  Tailwind, sem nada compilado. Ela existe para responder no aparelho o que não
+  dá para responder da máquina de desenvolvimento, qual navegador é, o que ele
+  suporta e como ele pinta o que o site usa.
+
+  Regra ao mexer aqui: nenhum recurso testado pode ser usado na própria página.
+  Nada de color-mix(), light-dark(), :has(), backdrop-filter no layout. Só o
+  que funciona em qualquer navegador, senão a página quebra justamente onde
+  precisava funcionar.
+
+  Uso: abrir /diagnostico.html no navegador do aparelho e mandar o print.
+-->
+<style>
+  html { background: #03042c; }
+  body {
+    margin: 0; padding: 16px 14px 48px;
+    background: #03042c; color: #fff;
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 {
+    font-size: 15px; text-transform: uppercase; letter-spacing: .08em;
+    color: #96afff; margin: 28px 0 8px;
+    border-bottom: 1px solid rgba(255,255,255,.18); padding-bottom: 5px;
+  }
+  p.nota { color: #aeb8cf; font-size: 13px; margin: 0 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td { padding: 5px 0; vertical-align: top; border-bottom: 1px solid rgba(255,255,255,.08); }
+  td.k { color: #aeb8cf; padding-right: 10px; }
+  td.v { text-align: right; font-weight: 700; word-break: break-word; }
+  .sim { color: #57d9a3; }
+  .nao { color: #ff8080; }
+  #ua { font-size: 12px; line-height: 1.4; word-break: break-all; color: #dbe2f5;
+        background: rgba(255,255,255,.06); padding: 8px; border-radius: 8px; }
+
+  /* Prova 1: alfa literal contra alfa por color-mix. Os dois pintam 15% de
+     branco sobre o mesmo fundo. Se saírem diferentes, o color-mix falhou e
+     todos os /NN do Tailwind estão chapando no site. */
+  .par { display: flex; gap: 0; margin: 10px 0 6px; border-radius: 10px; overflow: hidden; }
+  .par > div { flex: 1 1 0; height: 76px; display: flex; align-items: flex-end;
+               justify-content: center; padding-bottom: 6px; font-size: 11px; }
+  .fundo { background: #0a0d3c; }
+  .a-literal  { background: rgb(255 255 255 / 0.15); }
+  .a-colormix { background: color-mix(in oklab, #fff 15%, transparent); }
+  .b-literal  { background: rgb(255 255 255 / 0.07); }
+  .b-colormix { background: color-mix(in oklab, #fff 7%, transparent); }
+
+  /* Prova 2: o vidro do site, com e sem a lente, sobre o mesmo fundo. */
+  .cena {
+    position: relative; height: 254px; border-radius: 14px; overflow: hidden;
+    background-color: #03042c;
+    background-image:
+      radial-gradient(circle at 90% 10%, rgba(29,44,135,.85) 0%, rgba(29,44,135,0) 65%),
+      radial-gradient(circle at 10% 90%, rgba(20,31,98,.70) 0%, rgba(20,31,98,0) 55%),
+      linear-gradient(135deg, #050833 0%, #010214 100%);
+  }
+  .cena b { position: absolute; top: 12px; left: 14px; font-size: 34px; color: #f1863d; }
+  .lamina {
+    position: absolute; left: 12px; right: 12px; height: 62px;
+    border-radius: 18px; padding: 8px 12px; font-size: 12px;
+    background-color: rgb(226 234 255 / 0.012);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.07), inset 0 1px 0 rgb(255 255 255 / 0.38);
+  }
+  .com { top: 46px;
+    -webkit-backdrop-filter: blur(44px) saturate(1.7) brightness(1.14);
+            backdrop-filter: blur(44px) saturate(1.7) brightness(1.14); }
+  /* O véu translúcido do perfil leve: deixa a cena passar crua e devolve na
+     cor o ganho de saturação e brilho que a lente dava. */
+  .leve { top: 112px; background-color: rgb(0 21 241 / 0.25); }
+  /* O opaco, que é o que o perfil leve fazia antes — e o que ele ainda faz nos
+     poucos vidros que têm conteúdo passando por trás. */
+  .opaco { top: 178px; background-color: #0a0d3c; }
+</style>
+</head>
+<body>
+
+<h1>USPapo — diagnóstico</h1>
+<p class="nota">Tire um print da página inteira (role até o fim) e mande.</p>
+
+<h2>Navegador</h2>
+<div id="ua"></div>
+
+<h2>Prova 1 — alfa literal × color-mix</h2>
+<p class="nota">
+  Cada par pinta o MESMO branco translúcido de dois jeitos. As duas metades
+  precisam ficar idênticas, sem emenda visível no meio. Se a metade da direita
+  sair mais clara ou branca sólida, é o defeito: todas as bordas e fundos
+  sutis do site estão chapando.
+</p>
+<div class="par">
+  <div class="fundo a-literal">15% literal</div>
+  <div class="fundo a-colormix">15% color-mix</div>
+</div>
+<div class="par">
+  <div class="fundo b-literal">7% literal</div>
+  <div class="fundo b-colormix">7% color-mix</div>
+</div>
+
+<h2>Prova 2 — o vidro</h2>
+<p class="nota">
+  As três lâminas, sobre a mesma cena. A 1ª é o vidro pesado, com
+  backdrop-filter. A 2ª é o vidro leve: sem filtro nenhum, só um véu fino
+  deixando a cena passar. A 3ª é o opaco. As duas primeiras têm que ficar
+  parecidas; a terceira é a que destoa, e é por isso que ela ficou só onde
+  passa conteúdo por trás.
+</p>
+<div class="cena">
+  <b>USPapo</b>
+  <div class="lamina com">1. pesado — backdrop-filter</div>
+  <div class="lamina leve">2. leve — véu translúcido</div>
+  <div class="lamina opaco">3. opaco — superfície chapada</div>
+</div>
+
+<h2>Suporte a CSS</h2>
+<table id="css"></table>
+
+<h2>Preferências do sistema</h2>
+<table id="mq"></table>
+
+<h2>Aparelho</h2>
+<table id="dev"></table>
+
+<script>
+(function () {
+  function linha(tabela, chave, valor, booleano) {
+    var tr = document.createElement("tr");
+    var k = document.createElement("td"); k.className = "k"; k.textContent = chave;
+    var v = document.createElement("td"); v.className = "v";
+    if (booleano) {
+      v.className += valor ? " sim" : " nao";
+      v.textContent = valor ? "sim" : "NÃO";
+    } else {
+      v.textContent = String(valor);
+    }
+    tr.appendChild(k); tr.appendChild(v); tabela.appendChild(tr);
+  }
+
+  document.getElementById("ua").textContent = navigator.userAgent;
+
+  var css = document.getElementById("css");
+  var suporta = function (p, v) {
+    try { return !!(window.CSS && CSS.supports && CSS.supports(p, v)); }
+    catch (e) { return false; }
+  };
+  [
+    ["color-mix(in lab)",        "color", "color-mix(in lab, red, red)"],
+    ["color-mix(in oklab)",      "color", "color-mix(in oklab, red, red)"],
+    ["light-dark()",             "color", "light-dark(#000, #fff)"],
+    ["oklch()",                  "color", "oklch(50% 0.1 200)"],
+    ["backdrop-filter",          "backdrop-filter", "blur(1px)"],
+    ["mask-composite",           "mask-composite", "exclude"],
+    ["content-visibility",       "content-visibility", "auto"],
+    [":has()",                   "selector(:has(*))", null]
+  ].forEach(function (t) {
+    var ok = t[2] === null
+      ? (function () { try { return CSS.supports(t[1]); } catch (e) { return false; } })()
+      : suporta(t[1], t[2]);
+    linha(css, t[0], ok, true);
+  });
+
+  /* O @property não dá para testar com CSS.supports: "syntax" não é
+     propriedade de elemento, então a checagem sempre responde não e assusta à
+     toa. O jeito certo é registrar um de mentira e ver se pega.
+     O -webkit-backdrop-filter saiu da lista pelo mesmo motivo: o prefixo é da
+     Apple, o Chromium nunca o reconheceu, e o "NÃO" dele não quer dizer nada,
+     o que vale é a linha sem prefixo acima. */
+  var temProperty = false;
+  try {
+    CSS.registerProperty({ name: "--diag-sonda", syntax: "<color>", inherits: false, initialValue: "red" });
+    temProperty = true;
+  } catch (e) {
+    temProperty = typeof CSS !== "undefined" && typeof CSS.registerProperty === "function";
+  }
+  linha(css, "@property", temProperty, true);
+
+  var mq = document.getElementById("mq");
+  [
+    "prefers-color-scheme: dark",
+    "prefers-color-scheme: light",
+    "prefers-reduced-transparency: reduce",
+    "prefers-reduced-motion: reduce",
+    "prefers-contrast: more",
+    "forced-colors: active",
+    "inverted-colors: inverted",
+    "update: slow",
+    "dynamic-range: high"
+  ].forEach(function (q) {
+    var r;
+    try { r = matchMedia("(" + q + ")"); } catch (e) { r = null; }
+    linha(mq, q, r ? (r.media === "not all" ? "não reconhece" : (r.matches ? "sim" : "não"))
+                  : "erro", false);
+  });
+
+  var dev = document.getElementById("dev");
+  linha(dev, "deviceMemory (GB)", navigator.deviceMemory === undefined ? "não informa" : navigator.deviceMemory, false);
+  linha(dev, "hardwareConcurrency", navigator.hardwareConcurrency === undefined ? "não informa" : navigator.hardwareConcurrency, false);
+  linha(dev, "devicePixelRatio", window.devicePixelRatio, false);
+  linha(dev, "tela (CSS px)", window.screen.width + " x " + window.screen.height, false);
+  linha(dev, "viewport (CSS px)", window.innerWidth + " x " + window.innerHeight, false);
+  linha(dev, "saveData", navigator.connection && navigator.connection.saveData ? "sim" : "não", false);
+  linha(dev, "connection", navigator.connection ? (navigator.connection.effectiveType || "?") : "não informa", false);
+
+  /* O mesmo veredito que o layout.tsx aplica, para dar de conferir qual perfil
+     este aparelho recebe no site. */
+  var leve =
+    (navigator.deviceMemory || 8) <= 4 ||
+    (navigator.hardwareConcurrency || 8) <= 4 ||
+    matchMedia("(update: slow)").matches ||
+    !!(navigator.connection && navigator.connection.saveData);
+  linha(dev, "perfil do vidro", leve ? "LEVE (sem blur)" : "pesado (com blur)", false);
+})();
+</script>
+
+</body>
+</html>

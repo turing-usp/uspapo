@@ -35,18 +35,19 @@ no pacote uspapo/ e é o mesmo que o app_stub.py usa.
     gunicorn --chdir backend app:app       # produção (Render)
 """
 
-from uspapo.ferramentas import bandejao, busca, curriculo, disciplinas, uspavalia
+from uspapo.ferramentas import bandejao, busca, curriculo, disciplinas, salas, uspavalia
 from uspapo.web import criar_app, rodar
 
-# Cardápio, disciplinas, grade curricular e avaliações são iguais nos dois
-# backends: vêm do RUCard, do JupiterWeb e do USP Avalia ao vivo, não do
-# Pinecone, então as mesmas ferramentas entram nos dois registros. Antes do
+# Cardápio, disciplinas, grade curricular, avaliações e salas são iguais nos dois
+# backends: vêm do RUCard, do JupiterWeb, do USP Avalia e do USPolis ao vivo, não
+# do Pinecone, então as mesmas ferramentas entram nos dois registros. Antes do
 # criar_app: é dele que sai o orçamento de tokens, calculado sobre os schemas já
 # registrados.
 bandejao.registrar(busca.registro)
 disciplinas.registrar(busca.registro)
 curriculo.registrar(busca.registro)
 uspavalia.registrar(busca.registro)
+salas.registrar(busca.registro)
 
 # `app` no escopo do módulo é o que o gunicorn importa: não renomeie.
 app = criar_app(busca.registro, rotulo_indice=busca.PINECONE_INDEX)

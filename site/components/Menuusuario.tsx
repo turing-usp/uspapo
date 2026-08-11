@@ -65,7 +65,7 @@ export default function MenuUsuario() {
       {aberto && (
         <div
           role="menu"
-          className="glass absolute right-0 top-11 z-50 w-56 rounded-2xl p-1 text-sm"
+          className="glass glass-solid absolute right-0 top-11 z-50 w-56 rounded-2xl p-1 text-sm"
         >
           <div className="px-3 py-2">
             <p className="truncate text-foreground">{nome}</p>

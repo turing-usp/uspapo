@@ -197,12 +197,112 @@
   }
 }
 
+/* Navegador sem color-mix().
+
+   Todo modificador de opacidade do Tailwind v4 (bg-tint/5, border-line/15,
+   bg-scrim/25 …) compila para
+
+       .border-line\/10 { border-color: var(--line) }
+       @supports (color: color-mix(in lab, red, red)) {
+         .border-line\/10 { border-color: color-mix(in oklab, var(--line) 10%, transparent) }
+       }
+
+   ou seja: onde falta o color-mix, o alfa some e sobra a cor cheia. No escuro
+   --line e --tint são branco, então o fio de 15% vira borda BRANCA sólida, o
+   fundo de 5% vira bloco branco (code, pre, cabeçalho de tabela) e o scrim
+   vira preto chapado sobre a tela toda. É o Chromium < 111, que é o Samsung
+   Internet <= 21 ainda comum em aparelho de entrada.
+
+   O fallback é gerado pelo Lightning CSS, então não há utilitário para
+   corrigir um a um. A saída é a cor-base já nascer com o alfa dentro: cada
+   /NN colapsa num único valor razoável em vez de chapar.
+
+   --brand, --danger e --muted-foreground ficam de fora de propósito: são
+   usados sem modificador na maioria dos casos (text-brand, text-danger), e
+   embutir alfa neles apagaria o texto.
+
+   Sem light-dark() aqui, e não por descuido: em toda engine o color-mix()
+   chegou ANTES do light-dark() (Chromium 111 vs 123, Firefox 113 vs 120,
+   Safari 16.2 vs 17.5), então quem cai neste bloco caiu antes no fallback
+   escuro lá de cima e já está com color-scheme: dark. Usar light-dark()
+   justamente aqui produziria um var() irresolvível e apagaria a borda em vez
+   de suavizá-la. Os valores são os do escuro, para casarem com aquele bloco. */
+@supports not (color: color-mix(in lab, red, red)) {
+  :root {
+    --line:  rgb(255 255 255 / 0.15);
+    --tint:  rgb(255 255 255 / 0.07);
+    --scrim: rgb(0 0 0 / 0.20);
+  }
+}
+
 /* Quem pediu menos transparência recebe a mesma superfície, sem blur. */
 @media (prefers-reduced-transparency: reduce) {
   :root {
     --glass-blur: 0px;
     --glass-tint:       var(--surface-raised);
     --glass-tint-panel: var(--surface);
+  }
+}
+
+/* Vidro leve: a mesma lâmina, sem a lente.
+
+   Quem escolhe é o script inline do layout.tsx, que mede o aparelho antes do
+   primeiro quadro e marca <html data-vidro="leve">. O véu vira superfície
+   opaca; o fio da borda, a sombra e o raio continuam iguais, então a forma da
+   lâmina não muda, muda o que se vê ATRAVÉS dela.
+
+   O `--glass-blur: 0px` do bloco acima não bastava, e é por isso que a regra
+   do ::before existe: blur(0px) continua sendo um backdrop-filter, e um
+   backdrop-filter continua criando superfície de composição e pagando a
+   leitura do framebuffer a cada quadro. O custo que se quer evitar é esse, não
+   o raio. Por isso o filtro tem que SAIR, e por isso o reduced-transparency
+   entra junto: quem pediu menos transparência estava pagando o preço cheio.
+
+   O véu NÃO vira superfície opaca, que é o caminho óbvio e o errado: quem faz
+   o vidro parecer vidro é a cena atrás dele, e a cena atrás dele é um gradiente
+   liso. Borrar um gradiente liso com 44px quase não o muda, o que o blur
+   entrega ali é quase só o que já estava lá. Então basta deixar a cena passar
+   crua por baixo de um véu fino e devolver, na cor do véu, o ganho de saturação
+   e de brilho que a lente dava.
+
+   Os números saíram de conta, não de olho: amostrando o --page-backdrop numa
+   grade 7x7 e comparando com o resultado do saturate(1.7) brightness(1.14), o
+   véu opaco errava a cor em 122 (distância RGB, pior ponto) no escuro e 57 no
+   claro. Com estes, erra 39 e 13 — três a quatro vezes mais perto. O alfa 0.25
+   é o fundo da curva nos dois esquemas: abaixo dele falta o ganho de brilho,
+   acima o véu começa a cobrir a cena que era para mostrar.
+
+   Fora do @utility de propósito: `:root[data-vidro] .glass::before` precisa
+   ganhar do `.glass::before` que o utilitário gera, e ganha por
+   especificidade, sem !important. */
+:root[data-vidro="leve"] {
+  --glass-tint: light-dark(rgb(238 239 255 / 0.25), rgb(0 21 241 / 0.25));
+
+  /* O painel de navegação é a exceção: atrás dele passa a conversa inteira, e
+     sem o blur um véu de 0.25 deixaria o texto legível por baixo (contraste
+     ~11:1 na conta acima). Aqui o opaco não é preguiça, é a única saída. */
+  --glass-tint-panel: var(--surface);
+}
+
+:root[data-vidro="leve"] .glass::before {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Marca "atrás de mim passa conteúdo, não o fundo da página".
+
+   Sem efeito no vidro pesado, onde o blur já embaralha o que está atrás; no
+   leve, é o que impede o menu do usuário e os avisos do histórico virarem
+   janela para o texto que deveriam cobrir. Regra de CSS simples, e não
+   @utility: ela não gera variação nenhuma, só marca o elemento. */
+:root[data-vidro="leve"] .glass-solid {
+  --glass-tint: var(--surface-raised);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass::before {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 
@@ -380,6 +480,25 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--line) 22%, transparent) transparent;
+}
+
+/* Um turno da conversa que já saiu da tela.
+
+   Sem isto, cada turno antigo continua custando: o .glass do balão do aluno é
+   um backdrop-filter, e backdrop-filter fora da viewport continua sendo
+   composto a cada quadro de rolagem. Numa conversa de vinte turnos são vinte
+   lentes vivas para duas visíveis. Com content-visibility o navegador pula
+   layout, pintura e composição do que não está à vista.
+
+   O `auto` do contain-intrinsic-size é o que impede a rolagem de pular: a
+   altura de 24rem é só o palpite do primeiro encontro, e depois o navegador
+   guarda a altura real de cada turno e passa a usar a dele.
+
+   Não vai no turno que está respondendo: ali o scrollIntoView corre a cada
+   quadro do stream e brigaria com a altura estimada. Ver o chat/[id]/page.tsx. */
+@utility turno-assentado {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 24rem;
 }
 
 /* Container de conteúdo */
