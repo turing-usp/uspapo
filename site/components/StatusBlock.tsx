@@ -11,7 +11,8 @@ const ROTULOS: Record<string, string> = {
     consultar_bandejao: "Consultando cardápio",
     consultar_grade_curricular: "Consultando grade curricular",
     consultar_turmas: "Consultando turmas",
-    buscar_disciplina: "Buscando disciplina"
+    buscar_disciplina: "Buscando disciplina",
+    consultar_avaliacoes_professor: "Buscando avaliações do professor"
 };
 
 export default function StatusBlock({ ferramentas }: { ferramentas: string[] }) {

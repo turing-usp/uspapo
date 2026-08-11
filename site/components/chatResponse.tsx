@@ -1,10 +1,13 @@
 "use client";
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm'; 
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 import { memo, useEffect, useRef, useState } from 'react';
 import type { Root, Element, Text, ElementContent } from 'hast';
+import type { PluggableList } from 'unified';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
+import rehypeKatex from 'rehype-katex';
 
 /* Largura do rastro de gradiente atrás da frente de revelação, em caracteres. */
 const RASTRO = 120;
@@ -136,7 +139,63 @@ function palavrasReveladas(sobra: number) {
         marcar(arvore);
     };
 }
-const remarkPlugins = [remarkGfm];
+/* ─────────────────────────────────────────────
+   Matemática
+   ───────────────────────────────────────────── */
+
+/* Um trecho de código: cerca de três crases (aberta em pedaço ainda não
+   fechado, durante o stream) ou crase simples. Vira grupo de captura para o
+   `split` devolver o código junto e a conversão passar longe dele. */
+const CODIGO = /(```[\s\S]*?(?:```|$)|`[^`\n]*`)/g;
+const DISPLAY = /\\\[([\s\S]+?)\\\]/g;
+const INLINE = /\\\(([\s\S]+?)\\\)/g;
+
+/**
+ * Converte os delimitadores `\(…\)` e `\[…\]` do modelo para os `$$` que o
+ * remark-math entende.
+ *
+ * Tem que ser na string, e não num plugin: o CommonMark trata `\(` como escape
+ * de `(` e come a barra antes de qualquer plugin ver a árvore. Quando o remark
+ * roda, o delimitador já não existe mais.
+ *
+ * O cifrão sozinho fica DESLIGADO (`singleDollarTextMath: false`) porque em
+ * português ele é dinheiro: "custa R$ 2 e o outro R$ 3" viraria fórmula com o
+ * padrão do remark-math. Por isso a conversão sempre gera `$$`, que não colide.
+ *
+ * Fórmula pela metade no meio do stream não casa e segue como texto até o
+ * fechamento chegar, que é exatamente o que se quer.
+ */
+function normalizarMatematica(texto: string): string {
+    if (!texto.includes('\\(') && !texto.includes('\\[')) return texto;
+
+    return texto
+        .split(CODIGO)
+        .map((trecho, indice) =>
+            indice % 2 === 1        // ímpar é o próprio código, intocado
+                ? trecho
+                : trecho
+                    .replace(DISPLAY, (_, corpo: string) => `\n\n$$\n${corpo.trim()}\n$$\n\n`)
+                    .replace(INLINE, (_, corpo: string) => `$$${corpo.trim()}$$`)
+        )
+        .join('');
+}
+
+const remarkPlugins: PluggableList = [remarkGfm, [remarkMath, { singleDollarTextMath: false }]];
+
+/* O KaTeX vem por último de propósito, depois do sanitize e da revelação.
+   Depois do sanitize porque o que ele produz é span com style e MathML, que o
+   esquema padrão apagaria, e não precisa passar por lá: a fonte da fórmula já
+   veio higienizada. Depois da revelação porque `palavrasReveladas` reescreve
+   TODO nó de texto da árvore, e picotar os spans internos do KaTeX destrói o
+   layout da fórmula. Rodando por último, ele descarta os spans de revelação que
+   caíram dentro da fórmula: ela aparece inteira, e não letra a letra.
+
+   `errorColor` neutro porque a cada 33 ms o stream reparseia uma fórmula ainda
+   pela metade; no vermelho padrão (#cc0000) a resposta pisca em erro enquanto o
+   modelo digita. */
+const OPCOES_KATEX = { errorColor: 'currentColor' };
+const REHYPE_PRONTO: PluggableList = [rehypeRaw, rehypeSanitize, [rehypeKatex, OPCOES_KATEX]];
+
 function ChatResponse({ text, streaming = false }: { text: string; streaming?: boolean }) {
     const { visivel, sobra, revelando } = useRevelacao(text, streaming);
 
@@ -146,11 +205,12 @@ function ChatResponse({ text, streaming = false }: { text: string; streaming?: b
                 rehypePlugins={
                     /* rehypeRaw revive o HTML cru; rehypeSanitize corta o que não for
                     seguro logo em seguida (o conteúdo vem do modelo). A revelação
-                    vem por último: ela injeta spans com style que o sanitize
-                    removeria se rodasse depois. */
+                    vem depois: ela injeta spans com style que o sanitize
+                    removeria se rodasse antes. Por que o KaTeX fecha a fila:
+                    ver a nota em REHYPE_PRONTO. */
                     revelando
-                        ? [rehypeRaw, rehypeSanitize, [palavrasReveladas, sobra]]
-                        : [rehypeRaw, rehypeSanitize]
+                        ? [rehypeRaw, rehypeSanitize, [palavrasReveladas, sobra], [rehypeKatex, OPCOES_KATEX]]
+                        : REHYPE_PRONTO
                 }
                 remarkPlugins={remarkPlugins}
                 components={{
@@ -217,7 +277,7 @@ function ChatResponse({ text, streaming = false }: { text: string; streaming?: b
                     br: () => <br className="my-2" />,
                 }}
             >
-                {visivel}
+                {normalizarMatematica(visivel)}
             </ReactMarkdown>
         </div>
     );

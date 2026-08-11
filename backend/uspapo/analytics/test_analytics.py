@@ -7,6 +7,7 @@ from . import (
     obter_consumo_tokens,
     obter_dau_mau,
     obter_desempenho_provedores,
+    obter_feedback_respostas,
     obter_resumo_executivo,
     obter_serie_temporal_diaria,
     registrar,
@@ -48,7 +49,7 @@ class TestAnalytics(unittest.TestCase):
         ]
         mensagens = [{"pergunta": "texto muito longo", "resposta": "resposta longa", "criada_em": recente}]
 
-        with patch(f"{obter_consumo_tokens.__module__}._buscar_dados_reais_supabase", return_value=([], mensagens, logs)):
+        with patch(f"{obter_consumo_tokens.__module__}._buscar_dados_reais_supabase", return_value=([], mensagens, logs, [])):
             consumo = obter_consumo_tokens()
 
         self.assertEqual(consumo["hoje"]["total_tokens"], 150)
@@ -64,7 +65,7 @@ class TestAnalytics(unittest.TestCase):
             {"evento": "chat_query_completed", "created_at": recente, "provedor": "Outro", "modelo": "m2", "prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
         ]
 
-        with patch(f"{obter_consumo_tokens.__module__}._buscar_dados_reais_supabase", return_value=([], [], logs)):
+        with patch(f"{obter_consumo_tokens.__module__}._buscar_dados_reais_supabase", return_value=([], [], logs, [])):
             consumo = obter_consumo_tokens()
 
         m1, m2 = consumo["por_modelo"]["m1"], consumo["por_modelo"]["m2"]
@@ -82,7 +83,7 @@ class TestAnalytics(unittest.TestCase):
             {"evento": "chat_query_completed", "session_id": "c1", "user_id": "u1", "created_at": data, "prompt_tokens": 3, "completion_tokens": 4, "total_tokens": 7, "latencia_ms": 200},
             {"evento": "chat_query_completed", "session_id": "c2", "created_at": data, "total_tokens": 999, "latencia_ms": 500},
         ]
-        with patch(f"{obter_dau_mau.__module__}._buscar_dados_reais_supabase", return_value=(conversas, mensagens, logs)):
+        with patch(f"{obter_dau_mau.__module__}._buscar_dados_reais_supabase", return_value=(conversas, mensagens, logs, [])):
             usuarios = obter_dau_mau()
             serie = obter_serie_temporal_diaria()
 
@@ -105,7 +106,7 @@ class TestAnalytics(unittest.TestCase):
             {"evento": "chat_query_completed", "user_id": "u_50d", "created_at": ha_cinquenta_dias},
         ]
 
-        with patch(f"{obter_serie_temporal_diaria.__module__}._buscar_dados_reais_supabase", return_value=([], [], logs)):
+        with patch(f"{obter_serie_temporal_diaria.__module__}._buscar_dados_reais_supabase", return_value=([], [], logs, [])):
             serie = obter_serie_temporal_diaria()
 
         ultimo = serie[-1]
@@ -124,7 +125,7 @@ class TestAnalytics(unittest.TestCase):
             {"evento": "chat_query_completed", "user_id": "u2", "created_at": data, "total_tokens": 100},
             {"evento": "chat_query_completed", "user_id": "u1", "created_at": data, "total_tokens": 40},
         ]
-        with patch(f"{obter_consumo_por_usuario.__module__}._buscar_dados_reais_supabase", return_value=(conversas, mensagens, logs)):
+        with patch(f"{obter_consumo_por_usuario.__module__}._buscar_dados_reais_supabase", return_value=(conversas, mensagens, logs, [])):
             ranking = obter_consumo_por_usuario()
 
         self.assertEqual(ranking[0]["user_id"], "u2")
@@ -138,12 +139,64 @@ class TestAnalytics(unittest.TestCase):
             {"evento": "sys_provider_error", "created_at": data, "modelo": "m1"},
             {"evento": "auth_user_login", "created_at": data, "modelo": "m1", "latencia_ms": 900},
         ]
-        with patch(f"{obter_desempenho_provedores.__module__}._buscar_dados_reais_supabase", return_value=([], [], logs)):
+        with patch(f"{obter_desempenho_provedores.__module__}._buscar_dados_reais_supabase", return_value=([], [], logs, [])):
             desempenho = obter_desempenho_provedores()
 
         self.assertEqual(desempenho["m1"]["total_chamadas"], 2)
         self.assertEqual(desempenho["m1"]["erros"], 1)
         self.assertEqual(desempenho["m1"]["latencia_media_ms"], 100.0)
+
+    def test_feedback_junta_pergunta_e_resposta_do_turno(self):
+        data = self.agora.isoformat()
+        conversas = [{"id": "C1", "user_id": "u1", "titulo": "Bandejao"}]
+        mensagens = [
+            {"conversa_id": "c1", "ordem": 0, "pergunta": "Que horas abre?", "resposta": "As 11h.", "fontes": ["a.usp.br"]},
+            {"conversa_id": "c1", "ordem": 1, "pergunta": "E no domingo?", "resposta": "Fechado.", "fontes": None},
+        ]
+        feedbacks = [
+            {"id": "f1", "conversa_id": "c1", "mensagem_ordem": 0, "tipo": "like", "created_at": data},
+            {"id": "f2", "conversa_id": "c1", "mensagem_ordem": 1, "tipo": "dislike",
+             "motivo": "Resposta incompleta", "comentario": "Faltou o feriado", "created_at": data},
+        ]
+
+        with patch(f"{obter_feedback_respostas.__module__}._buscar_dados_reais_supabase",
+                   return_value=(conversas, mensagens, [], feedbacks)):
+            feedback = obter_feedback_respostas()
+
+        self.assertEqual((feedback["total"], feedback["likes"], feedback["dislikes"]), (2, 1, 1))
+        self.assertEqual(feedback["taxa_satisfacao"], 0.5)
+        # Duas respostas persistidas, duas avaliadas.
+        self.assertEqual(feedback["cobertura"], 1.0)
+        self.assertEqual(feedback["por_motivo"], {"Resposta incompleta": 1})
+        self.assertEqual(feedback["serie"][-1], {"data": self.agora.date().isoformat(), "likes": 1, "dislikes": 1})
+
+        # A juncao tem que casar o turno certo, e nao so a conversa certa. O id
+        # da conversa vem em caixa diferente de proposito: as duas colunas tem
+        # tipos distintos e nao ha chave estrangeira normalizando isso.
+        por_id = {item["id"]: item for item in feedback["itens"]}
+        self.assertEqual(por_id["f1"]["pergunta"], "Que horas abre?")
+        self.assertEqual(por_id["f2"]["resposta"], "Fechado.")
+        self.assertEqual(por_id["f2"]["comentario"], "Faltou o feriado")
+        self.assertEqual(por_id["f1"]["fontes"], ["a.usp.br"])
+        self.assertEqual(por_id["f1"]["titulo_conversa"], "Bandejao")
+
+    def test_feedback_orfao_continua_na_lista(self):
+        """Conversa apagada nao leva o feedback junto: nao ha cascade."""
+        data = self.agora.isoformat()
+        feedbacks = [
+            {"id": "f1", "conversa_id": "sumiu", "mensagem_ordem": 3, "tipo": "dislike", "created_at": data},
+        ]
+
+        with patch(f"{obter_feedback_respostas.__module__}._buscar_dados_reais_supabase",
+                   return_value=([], [], [], feedbacks)):
+            feedback = obter_feedback_respostas()
+
+        # Descartar o orfao faria a lista contradizer o total exibido ao lado.
+        self.assertEqual(feedback["total"], 1)
+        self.assertEqual(len(feedback["itens"]), 1)
+        self.assertIsNone(feedback["itens"][0]["pergunta"])
+        self.assertIsNone(feedback["itens"][0]["resposta"])
+        self.assertEqual(feedback["por_motivo"], {"Sem motivo informado": 1})
 
     def test_busca_paginada_le_todos_os_registros(self):
         primeira = [{"id": indice} for indice in range(1000)]
@@ -162,7 +215,7 @@ class TestAnalytics(unittest.TestCase):
         self.assertEqual(consulta.range.call_args_list[1].args, (1000, 1999))
 
     def test_resumo_usa_uma_unica_leitura_coerente(self):
-        dados = ([], [], [])
+        dados = ([], [], [], [])
         with patch(f"{obter_resumo_executivo.__module__}._buscar_dados_reais_supabase", return_value=dados) as buscar:
             resumo = obter_resumo_executivo()
 

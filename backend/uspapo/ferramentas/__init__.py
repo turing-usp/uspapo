@@ -7,6 +7,7 @@ motor sem uma linha de código duplicada.
 """
 
 import json
+import time
 import unicodedata
 from dataclasses import dataclass
 from typing import Callable
@@ -82,6 +83,34 @@ def em_lista(valor, padrao: list[str]) -> list[str]:
 
     limpos = [item.strip() for item in itens if str(item).strip()]
     return limpos or list(padrao)
+
+
+# ─────────────────────────────────────────────
+# Memo por TTL, entre perguntas
+# ─────────────────────────────────────────────
+# O `memo` do `Registro.rodar` só vale dentro de uma pergunta. Site externo é
+# lento e o dado dele muda em dias, não em segundos: sem isto, cada aluno paga
+# uma ida à rede pelo mesmo fato. Mora aqui, e não num módulo de ferramenta,
+# porque toda ferramenta que sai para a rede precisa da mesma coisa.
+_CACHE: dict[tuple, tuple[float, object]] = {}
+
+
+def cache(chave: tuple, ttl: int, produzir):
+    """Memo por TTL, compartilhado por todas as ferramentas.
+
+    A `chave` é uma tupla e o primeiro elemento deve identificar quem está
+    guardando: o dicionário é um só para o backend inteiro.
+
+    Sem lock: atribuição em dict é atômica e dois workers produzindo o mesmo
+    valor ao mesmo tempo é desperdício, não erro.
+    """
+    guardado = _CACHE.get(chave)
+    if guardado and (time.monotonic() - guardado[0]) < ttl:
+        return guardado[1]
+
+    valor = produzir()
+    _CACHE[chave] = (time.monotonic(), valor)
+    return valor
 
 
 @dataclass(frozen=True)

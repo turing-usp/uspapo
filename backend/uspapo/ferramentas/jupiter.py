@@ -27,9 +27,10 @@ pubObterInfoCurso, que é HTML cheio de `:` e `,`, quebraria tudo.
 import html
 import json
 import re
-import time
 
 import requests
+
+from uspapo.ferramentas import cache  # noqa: F401  (reexportado: ver a nota abaixo)
 
 BASE = "https://uspdigital.usp.br/jupiterweb/"
 URL_DWR = BASE + "dwr/call/plaincall/ControlePublicoDWR.{metodo}.dwr"
@@ -59,27 +60,10 @@ _TAG = re.compile(r"<[^>]+>")
 # Um par `chave:valor` da resposta do DWR. Ver a nota no topo do módulo.
 _PAR = re.compile(r'(\w+):(null|"(?:[^"\\]|\\.)*")')
 
-_CACHE: dict[tuple, tuple[float, object]] = {}
-
-
-# ─────────────────────────────────────────────
-# Cache
-# ─────────────────────────────────────────────
-def cache(chave: tuple, ttl: int, produzir):
-    """Memo por TTL, compartilhado entre as ferramentas do JupiterWeb.
-
-    Sem lock, pelo mesmo motivo do bandejão: atribuição em dict é atômica e dois
-    workers produzindo o mesmo valor ao mesmo tempo é desperdício, não erro.
-    """
-    guardado = _CACHE.get(chave)
-    if guardado and (time.monotonic() - guardado[0]) < ttl:
-        return guardado[1]
-
-    valor = produzir()
-    _CACHE[chave] = (time.monotonic(), valor)
-    return valor
-
-
+# O `cache` mora no pacote (ferramentas/__init__.py) desde que deixou de ser só
+# do JupiterWeb: o uspavalia.py também memoiza por TTL, e uma terceira cópia da
+# mesma dúzia de linhas não se justificava. Fica reexportado aqui porque
+# disciplinas.py e curriculo.py o chamam como `jupiter.cache`.
 # ─────────────────────────────────────────────
 # Páginas HTML
 # ─────────────────────────────────────────────

@@ -1,6 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Orbitron, Geom, Roboto} from "next/font/google";
 import "./globals.css";
+/* Estilo das fórmulas do chat. Aqui, e não dentro do chatResponse.tsx, para a
+   ordem ser determinística: o KaTeX precisa cair DEPOIS do globals.css, senão o
+   preflight do Tailwind ganha dele. As fontes .woff2 vêm do próprio pacote. */
+import "katex/dist/katex.min.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

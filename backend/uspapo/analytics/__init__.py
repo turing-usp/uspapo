@@ -4,6 +4,7 @@ from .metricas import (
     obter_consumo_tokens,
     obter_consumo_por_usuario,
     obter_desempenho_provedores,
+    obter_feedback_respostas,
     obter_serie_temporal_diaria,
     obter_resumo_executivo,
 )
@@ -14,6 +15,7 @@ __all__ = [
     "obter_consumo_tokens",
     "obter_consumo_por_usuario",
     "obter_desempenho_provedores",
+    "obter_feedback_respostas",
     "obter_serie_temporal_diaria",
     "obter_resumo_executivo",
 ]
