@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   AlertTriangle,
   ArrowLeft,
-  BarChart3,
   CheckCircle2,
   MessageSquareQuote,
   RefreshCw,
@@ -89,14 +88,6 @@ export default function AdminFeedbackPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              <Link
-                href="/admin/analytics"
-                className="glass flex items-center gap-2 rounded-lg px-3 py-2 font-roboto text-xs text-muted-foreground transition-colors hover:bg-scrim/20 hover:text-foreground"
-              >
-                <BarChart3 className="h-3.5 w-3.5" />
-                Ver Métrica Analytics
-              </Link>
-
               {lastUpdated && (
                 <span className="hidden font-roboto text-xs text-faint-foreground sm:inline">
                   Atualizado às {lastUpdated.toLocaleTimeString('pt-BR')}
