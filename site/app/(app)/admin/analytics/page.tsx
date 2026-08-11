@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import {
   Users,
   Zap,
@@ -13,6 +14,7 @@ import {
   Activity,
   ThumbsUp,
   MessageSquareQuote,
+  ArrowRight,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -846,16 +848,21 @@ export default function AdminAnalyticsPage() {
                 <p className="font-roboto text-xs text-muted-foreground">Nenhuma resposta reprovada.</p>
               )}
             </div>
+
+            <div className="pt-3 border-t border-line/15">
+              <Link
+                href="/admin/feedback"
+                className="glass flex items-center justify-between rounded-xl p-3 font-roboto text-xs font-medium text-brand transition-colors hover:bg-brand/10"
+              >
+                <span className="flex items-center gap-2">
+                  <MessageSquareQuote className="h-4 w-4" />
+                  Abrir Central de Revisão de Respostas
+                </span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           </CardGrafico>
         </div>
-
-        <CardGrafico
-          titulo="Revisão de Respostas"
-          descricao="Os 50 feedbacks mais recentes, com a pergunta e a resposta que foram avaliadas. Clique para abrir."
-          icone={<MessageSquareQuote className="h-4 w-4 text-brand" />}
-        >
-          <RevisaoFeedback feedback={feedback} carregando={loading} />
-        </CardGrafico>
       </div>
     </div>
 
