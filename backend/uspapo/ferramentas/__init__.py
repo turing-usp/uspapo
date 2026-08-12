@@ -198,6 +198,17 @@ class Registro:
         ferr = self._ferramentas.get(nome)
         return (ferr.parametros.get("properties") if ferr else None) or {}
 
+    def executar_direto(self, nome: str, **args) -> tuple[str, list[str]]:
+        """Executa uma ferramenta conhecida sem passar pela escolha do modelo.
+
+        É usado apenas pelo roteador determinístico para intenções inequívocas.
+        Mantém a mesma implementação e o mesmo contrato da tool call normal.
+        """
+        ferr = self._ferramentas.get(nome)
+        if ferr is None:
+            raise KeyError(nome)
+        return ferr.executar(**args)
+
     # ─────────────────────────────────────────────
     # Execução
     # ─────────────────────────────────────────────

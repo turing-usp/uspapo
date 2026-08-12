@@ -78,7 +78,9 @@ def buscar_documentos(
     resultados = index.query(
         namespace=PINECONE_NAMESPACE,
         vector=embed_result[0].values,
-        top_k=limite,
+        # Pedimos candidatos extras para poder deduplicar páginas que possuem
+        # vários chunks próximos sem terminar com três links iguais.
+        top_k=min(limite * 3, 15),
         include_metadata=True,
     )
 
@@ -87,7 +89,8 @@ def buscar_documentos(
     blocos: list[str] = []
     urls: list[str] = []
 
-    for posicao, match in enumerate(resultados.matches, 1):
+    urls_vistas: set[str] = set()
+    for match in resultados.matches:
         meta = match.metadata or {}
         # A ingestão grava "passage: {chunk}" (convenção do e5), mas talvez não
         # precise do remove prefix
@@ -97,8 +100,14 @@ def buscar_documentos(
 
         titulo = meta.get("titulo") or "Sem título"
         url = meta.get("url") or "URL desconhecida"
+        if url in urls_vistas:
+            continue
+        urls_vistas.add(url)
+        posicao = len(blocos) + 1
         blocos.append(f"[{posicao}] {titulo}\n{texto}")
         urls.append(url)
+        if len(blocos) >= limite:
+            break
 
     if not blocos:
         return "Nenhum documento encontrado para esta consulta.", []

@@ -13,6 +13,7 @@ from uspapo.conteudo import ROTULOS_FERRAMENTA, SeparadorConteudo, extrair_racio
 from uspapo.contexto import Orcamento, cortar
 from uspapo.erros import MAX_TENTATIVAS, classificar, descrever
 from uspapo.provedores import Provedor
+from uspapo.roteamento import preconsultar
 from uspapo.toolcalls import ColetorDeChamadas
 
 # O que o aluno lê quando a coisa dá errado. Nada de "provedor", "LLM" ou
@@ -119,6 +120,29 @@ def conversar_com_provedor(
     """
     mensagens, inicio_turno = orcamento.montar(pergunta, historico, teto)
     rodada = 0
+
+    # Intenções inequívocas chegam ao modelo já acompanhadas da fonte oficial.
+    # Além de não depender da tool choice probabilística, isso elimina a rodada
+    # de LLM que serviria apenas para pedir a ferramenta.
+    preconsulta = preconsultar(registro, pergunta)
+    if preconsulta:
+        resultado, urls, nome = preconsulta
+        urls_turno.update(urls)
+        yield {"tipo": "ferramenta", "estado": "inicio", "indice": -1, "nome": nome}
+        yield {
+            "tipo": "ferramenta", "estado": "fim", "indice": -1, "nome": nome,
+            "args": {}, "resultados": len(urls),
+        }
+        mensagens[-1]["content"] = (
+            pergunta
+            + "\n\n[CONTEXTO OFICIAL PRÉ-CONSULTADO PELO BACKEND]\n"
+            + cortar(resultado, orcamento.reserva_para(teto))
+            + "\n[FIM DO CONTEXTO OFICIAL]\n"
+            + "Responda diretamente usando somente esse contexto. Não chame outra "
+              "ferramenta para repetir a mesma consulta. Se o contexto contiver uma "
+              "lista ou uma contagem, preserve todos os itens e o total exatamente; "
+              "não resuma nem omita elementos."
+        )
 
     # Fora do laço: cada rodada de ferramenta é uma chamada cobrada, e é
     # justamente nas últimas que o prompt engorda com o resultado das buscas.
