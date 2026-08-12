@@ -8,9 +8,9 @@ LLM_PROVIDERS do .env — para dar para testar o streaming, os blocos de
 
 Nem tudo aqui é falso: só a busca é simulada. A `consultar_bandejao`, as
 ferramentas do JupiterWeb (`buscar_disciplina`, `consultar_turmas`,
-`consultar_grade_curricular`) e a `consultar_avaliacoes_professor` são as MESMAS
-do app.py e consultam o RUCard, o JupiterWeb e o USP Avalia de verdade: nenhuma
-delas tem versão simulada.
+`consultar_grade_curricular`), `consultar_avaliacoes_professor` e
+`consultar_wikipedia` são as MESMAS do app.py e consultam suas fontes de
+verdade: nenhuma delas tem versão simulada.
 
     python backend/app_stub.py
 
@@ -23,7 +23,7 @@ Variáveis de ambiente:
 Não precisa de PINECONE_API_KEY.
 """
 
-from uspapo.ferramentas import bandejao, circulares, curriculo, disciplinas, salas, simuladas, uspavalia
+from uspapo.ferramentas import bandejao, circulares, curriculo, disciplinas, salas, simuladas, uspavalia, wikipedia
 from uspapo.web import criar_app, rodar
 
 # As mesmas ferramentas de produção do app.py, registradas antes do criar_app,
@@ -34,6 +34,7 @@ curriculo.registrar(simuladas.registro)
 uspavalia.registrar(simuladas.registro)
 salas.registrar(simuladas.registro)
 circulares.registrar(simuladas.registro)
+wikipedia.registrar(simuladas.registro)
 
 app = criar_app(simuladas.registro, rotulo_indice="STUB (documentos falsos)")
 

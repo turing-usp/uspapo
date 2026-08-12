@@ -128,7 +128,7 @@ conjunto de ferramentas** o modelo enxerga. Todo o resto vive em
 | `limites.py` | rate limit por conta |
 | `saida.py` | os eventos viram SSE ou o JSON legado |
 | `web.py` | `criar_app()`: CORS, `/chat` e `/health` |
-| `ferramentas/` | o registro, a busca no Pinecone e as simuladas |
+| `ferramentas/` | o registro, a busca no Pinecone, consultas ao vivo (RU, JupiterWeb, Wikipedia etc.) e as simuladas |
 
 **Para adicionar uma ferramenta**, escreva uma função decorada em
 `ferramentas/busca.py` (ou num módulo novo) — o schema fica junto da
