@@ -31,7 +31,7 @@ import requests
 
 from uspapo.ferramentas import Registro, cache, casa, normalizar
 
-BASE_URL = "http://api.olhovivo.sptrans.com.br/v2.1"
+BASE_URL = "https://api.olhovivo.sptrans.com.br/v2.1"
 TIMEOUT = 10
 
 # TTLs do cache:
@@ -215,7 +215,8 @@ def consultar_circulares(linha: str | None = None, destino_ou_ponto: str | None 
     
     for num, info in linhas_casadas[:4]:  # limita em 4 linhas para não estourar tokens
         partes.append(f"### Linha {info['linha']} — {info['nome']}")
-        partes.append(f"**Itinerário e Locais:** {info['descricao']}")
+        partes.append(f"**Itinerário e Principais Paradas:** {info['descricao']}")
+        partes.append(f"**Locais Atendidos:** {', '.join(info['destinos'])}")
 
         if token:
             chave_cache = ("circulares", "posicao", info["codigo_sptrans"])
@@ -231,23 +232,24 @@ def consultar_circulares(linha: str | None = None, destino_ou_ponto: str | None 
                 hr_ref = posicao_dados.get("hr", "")
                 if qtd > 0:
                     partes.append(
-                        f"🚍 **Status em Tempo Real (às {hr_ref}):** {qtd} veículo(s) "
-                        "em circulação neste momento nesta linha."
+                        f"🚍 **Frota em Circulação (às {hr_ref}):** Existem {qtd} veículos "
+                        "operando nesta linha ao longo do trajeto."
                     )
                 else:
                     partes.append(
-                        f"⚠️ **Status em Tempo Real (às {hr_ref}):** Nenhum veículo "
-                        "circulando no momento para esta linha."
+                        f"⚠️ **Frota em Circulação (às {hr_ref}):** Nenhum veículo "
+                        "registrado em circulação nesta linha no momento."
                     )
             else:
                 partes.append(
-                    "⚠️ Não foi possível obter o sinal de GPS em tempo real para esta linha no momento."
+                    "*(Sinal de GPS em tempo real indisponível no momento na SPTrans. "
+                    "Consulte o trajeto completo no link abaixo).* "
                 )
 
-    if destino_ou_ponto:
-        link_maps = _gerar_link_google_maps(destino_ou_ponto)
-        partes.append(f"\n📍 [Clique aqui para abrir a rota ao vivo no Google Maps]({link_maps})")
-        fontes.append(link_maps)
+    alvo_link = destino_ou_ponto or (linhas_casadas[0][1]["destinos"][0] if linhas_casadas else "Cidade Universitária USP")
+    link_maps = _gerar_link_google_maps(alvo_link)
+    partes.append(f"\n📍 [Clique para acompanhar a rota e horários ao vivo no Google Maps]({link_maps})")
+    fontes.append(link_maps)
 
     return "\n\n".join(partes), fontes
 
@@ -257,12 +259,13 @@ def registrar(registro: Registro) -> None:
     registro.ferramenta(
         nome="consultar_circulares",
         descricao=(
-            "Consulta a posição GPS em tempo real e itinerários dos ônibus "
+            "Consulta os itinerários, paradas e frota em tempo real dos ônibus "
             "circulares da USP (Cidade Universitária / Butantã), incluindo as "
             "linhas diurnas (8012-10, 8022-10, 8032-10) e noturnas (8082-10, "
-            "8083-10, 8084-10, 8085-10, 701U-10, 702U-10, 7725-10). Use sempre "
-            "que perguntarem onde está o circular, quanto tempo falta, qual "
-            "ônibus pegar no Metrô Butantã ou como ir para algum instituto."
+            "8083-10, 8084-10, 8085-10, 701U-10, 702U-10, 7725-10). Note que uma "
+            "linha tem MÚLTIPLOS veículos operando ao longo do trajeto. "
+            "Use para informar o itinerário da linha, institutos atendidos, "
+            "quantidade de veículos na frota e o link de rota do Maps."
         ),
         parametros={
             "type": "object",
