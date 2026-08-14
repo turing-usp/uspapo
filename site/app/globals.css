@@ -1,48 +1,99 @@
 @import "tailwindcss";
 
+/* O escuro na própria raiz.
+
+   As variantes `dark` e `light` lá de baixo terminam em combinador descendente
+   (`[data-theme="dark"] *`), então valem para elementos DENTRO da raiz e nunca
+   para ela. Esta vale para ela, que é onde mora o dicionário. A condição é a
+   mesma das outras: o esquema do dispositivo, a menos que o data-theme diga o
+   contrário.
+
+   Definida aqui em cima, e não junto das irmãs, porque `@variant escuro` é
+   usado logo abaixo e definir depois do uso é aposta sobre a ordem de
+   resolução do Tailwind.
+
+   Usar SEMPRE aninhado dentro da regra que tem o valor claro, nunca como bloco
+   solto no fim do arquivo. Aninhado, o par de seletores nasce emparelhado:
+   `:root[data-vidro="leve"]` (0,2,0) contra um `:root:where([data-theme=dark])`
+   (0,1,0) escrito à parte ganharia, e o vidro leve ficaria com a cor clara no
+   escuro. Aninhado vira `:root[data-vidro="leve"]:where([data-theme="dark"])` e
+   a ordem de origem resolve. */
+@custom-variant escuro {
+  @media (prefers-color-scheme: dark) {
+    &:not([data-theme="light"]) { @slot; }
+  }
+  &:where([data-theme="dark"]) { @slot; }
+}
+
 /* ==========================================================================
    Dicionário de cores
 
-   Cada token declara os dois esquemas lado a lado com light-dark(claro, escuro).
+   O claro é o que está escrito na regra; o escuro vem no @variant escuro do
+   fim do bloco.
+
+   Era light-dark(claro, escuro) por token, e a troca não foi estética.
+
+   O light-dark() nunca chegou inteiro no navegador: o Lightning CSS reescreve
+   cada um em var(--lightningcss-light, claro) var(--lightningcss-dark, escuro)
+   e liga os dois pela media query. Quem NÃO tem light-dark(), porém, caía num
+   `@supports not (color: light-dark(...))` que existia logo abaixo e que não
+   olhava preferência nenhuma: fixava `color-scheme: dark` e a paleta escura
+   inteira, para todo mundo. Chromium < 123 — que é o Samsung Internet <= 24
+   ainda comum em aparelho de entrada — recebia o site escuro à força, mesmo
+   com o aparelho no claro.
+
+   E é aí que o force dark do Samsung entra. Ele ignora o ramo
+   `prefers-color-scheme: dark`, renderiza o ramo claro e recolore o resultado
+   com algoritmo próprio, contando que a página seja clara: texto escuro ele
+   clareia, fundo claro ele escurece. Entregando a ele uma página que já era
+   escura à força, o algoritmo inverte o que já estava certo — é o #03042c
+   chegando lavado na tela.
+
+   Sem light-dark() não há aquele bloco, e sem aquele bloco o esquema volta a
+   sair de uma media query só, que todo navegador desde o Chromium 76 entende.
+   O Samsung passa a receber uma página clara inteira e coerente para escurecer,
+   que é o caso em que o algoritmo dele funciona, e quem quer o escuro de
+   verdade liga "Use website dark theme" nos Labs do navegador.
 
    ========================================================================== */
 
 :root {
-  /* Faz o light-dark() resolver e adapta scrollbar/controles nativos. */
+  /* Adapta scrollbar e controles nativos. Não decide mais cor nenhuma daqui:
+     quem decide é o @variant escuro. */
   color-scheme: light dark;
 
-  /* Marca: o laranja do Turing */
-  --brand:            light-dark(#f1863d, #f1863d);
-  --brand-strong:     light-dark(#e07125, #e07125);   /* hover / pressed */
-  --brand-foreground: light-dark(#ffffff, #ffffff);   /* texto sobre o laranja */
+  /* Marca: o laranja do Turing. Um dos três tokens que não mudam de esquema. */
+  --brand:            #f1863d;
+  --brand-strong:     #e07125;   /* hover / pressed */
+  --brand-foreground: #ffffff;   /* texto sobre o laranja */
 
   /* Superfícies. O claro não pode ser quase branco por causa do vidro. */
-  --canvas:         light-dark(#dde4f6, #03042c);     /* fundo da página */
-  --surface:        light-dark(#ccd6ef, #050738);     /* menu lateral */
-  --surface-raised: light-dark(#ffffff, #0a0d3c);     /* menus flutuantes */
+  --canvas:         #dde4f6;     /* fundo da página */
+  --surface:        #ccd6ef;     /* menu lateral */
+  --surface-raised: #ffffff;     /* menus flutuantes */
 
   /* Texto */
-  --foreground:       light-dark(#0b1030, #ffffff);
-  --muted-foreground: light-dark(#55618a, #aeb8cf);
-  --faint-foreground: light-dark(#8790ad, #7b86a3);
+  --foreground:       #0b1030;
+  --muted-foreground: #55618a;
+  --faint-foreground: #8790ad;
 
   /* Interface: será mudada a opacidade nos componentes */
-  --line:   light-dark(#0b1030, #ffffff);   /* bordas:  /10, /15, /25 */
-  --tint:   light-dark(#0b1030, #ffffff);   /* hover:   /5, /10 */
-  --scrim:  light-dark(#0b1030, #000000);   /* overlays:/30, /60 */
-  --danger: light-dark(#c53434, #f87171);
+  --line:   #0b1030;   /* bordas:  /10, /15, /25 */
+  --tint:   #0b1030;   /* hover:   /5, /10 */
+  --scrim:  #0b1030;   /* overlays:/30, /60 */
+  --danger: #c53434;
 
-  /* Backdrop é decomposto em cores para que light-dark() alcance cada parada.
+  /* Backdrop é decomposto em cores para o escuro alcançar cada parada.
      No claro os brilhos são o laranja da marca (241 134 61), e só ele. O alfa
      subiu bastante: vidro é lente, e lente sobre fundo liso não mostra nada.
      O que o vidro tem para borrar e saturar sai daqui.
      No escuro seguem os azuis originais. */
-  --glow-a:        light-dark(rgb(241 134 61 / 0.20), rgb(29 44 135 / 0.85));
-  --glow-a-end:    light-dark(rgb(241 134 61 / 0),    rgb(29 44 135 / 0));
-  --glow-b:        light-dark(rgb(241 134 61 / 0.15), rgb(20 31 98 / 0.70));
-  --glow-b-end:    light-dark(rgb(241 134 61 / 0),    rgb(20 31 98 / 0));
-  --backdrop-from: light-dark(#d3dcf2, #050833);
-  --backdrop-to:   light-dark(#eaeefb, #010214);
+  --glow-a:        rgb(241 134 61 / 0.20);
+  --glow-a-end:    rgb(241 134 61 / 0);
+  --glow-b:        rgb(241 134 61 / 0.15);
+  --glow-b-end:    rgb(241 134 61 / 0);
+  --backdrop-from: #d3dcf2;
+  --backdrop-to:   #eaeefb;
 
   --page-backdrop:
     /* Brilho superior direito */
@@ -62,37 +113,37 @@
      a luz da cena atravessando de leve e um fio de borda.
      ------------------------------------------------------------------ */
 
-  /* Óptica: o que acontece com a cena atrás do vidro.
-     Números não passam pelo light-dark(), que só alcança cores: os valores
-     aqui são os do claro, e o escuro troca logo abaixo, na mão. */
+  /* Óptica: o que acontece com a cena atrás do vidro. Os números moravam à
+     parte, em dois blocos só deles, porque o light-dark() não alcança o que não
+     é cor. Agora entram na fila com o resto. */
   --glass-blur:       44px;
   --glass-saturate:   1.7;
   --glass-brightness: 1.02;
 
   /* Véu. Quase nada: quem faz o vidro aparecer é o blur e a saturação
      mordendo as luzes do fundo, não a tinta. */
-  --glass-tint: light-dark(rgb(255 255 255 / 0.05), rgb(226 234 255 / 0.012));
+  --glass-tint: rgb(255 255 255 / 0.05);
 
   /* A luz da cena atravessando a lâmina: mesmo matiz e mesmas direções dos
      brilhos do --page-backdrop. Larga e fraca: é tônus, não brilho. */
-  --glass-light-a: light-dark(rgb(241 134 61 / 0.06), rgb(150 175 255 / 0.065));
-  --glass-light-b: light-dark(rgb(241 134 61 / 0.03), rgb(150 175 255 / 0.035));
+  --glass-light-a: rgb(241 134 61 / 0.06);
+  --glass-light-b: rgb(241 134 61 / 0.03);
 
   /* Fio da borda: acende de leve no topo e some. Com o véu quase zerado,
      é ele e a sombra que dão a forma da lâmina. */
-  --glass-edge-hi:    light-dark(rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.38));
-  --glass-edge-lo:    light-dark(rgb(11 16 48 / 0.14),    rgb(255 255 255 / 0.07));
+  --glass-edge-hi:    rgb(255 255 255 / 0.95);
+  --glass-edge-lo:    rgb(11 16 48 / 0.14);
   --glass-edge-width: 1px;
 
   /* Sombra: curta e difusa, só para a lâmina descolar do fundo.
-     Decomposta em cor, senão o light-dark() não alcança. */
-  --glass-shadow-color: light-dark(rgb(11 16 48 / 0.20), rgb(0 0 0 / 0.58));
+     Decomposta em cor, senão o escuro não alcança. */
+  --glass-shadow-color: rgb(11 16 48 / 0.20);
   --glass-shadow: 0 6px 20px -3px var(--glass-shadow-color);
 
   /* Painel de navegação: mesmo véu do resto, só com muito mais blur, porque
      atrás dele passa a conversa inteira. No escuro o navy é mais fundo: o
      painel separa por ser vidro fumê, não por ser mais claro. */
-  --glass-tint-panel: light-dark(rgb(255 255 255 / 0.10), rgb(6 9 42 / 0.18));
+  --glass-tint-panel: rgb(255 255 255 / 0.10);
 
   /* ------------------------------------------------------------------
      Séries dos gráficos (painel de analytics)
@@ -108,73 +159,58 @@
 
      Mexer num hex aqui obriga a revalidar o conjunto inteiro.
      ------------------------------------------------------------------ */
-  --chart-1: light-dark(#eb6834, #d95926);   /* laranja  */
-  --chart-2: light-dark(#2a78d6, #3987e5);   /* azul     */
-  --chart-3: light-dark(#1baf7a, #199e70);   /* aqua     */
-  --chart-4: light-dark(#4a3aa7, #9085e9);   /* violeta  */
-  --chart-5: light-dark(#eda100, #c98500);   /* amarelo  */
-  --chart-6: light-dark(#e87ba4, #d55181);   /* magenta  */
+  --chart-1: #eb6834;   /* laranja  */
+  --chart-2: #2a78d6;   /* azul     */
+  --chart-3: #1baf7a;   /* aqua     */
+  --chart-4: #4a3aa7;   /* violeta  */
+  --chart-5: #eda100;   /* amarelo  */
+  --chart-6: #e87ba4;   /* magenta  */
 
-  /* Grade e eixos ficam recessivos: quem tem que saltar é a marca de dados. */
+  /* Grade e eixos ficam recessivos: quem tem que saltar é a marca de dados.
+     Sai dos dois esquemas de graça: é derivado do --line. */
   --chart-grid: color-mix(in srgb, var(--line) 12%, transparent);
-}
 
-/* Força um esquema independente do dispositivo */
-:root[data-theme="light"] { color-scheme: light; }
-:root[data-theme="dark"]  { color-scheme: dark; }
+  /* ------------------------------------------------------------------
+     O escuro.
 
-/* Os dois números do vidro, que o light-dark() não consegue carregar.
-   A condição é a mesma do @custom-variant dark logo abaixo: o esquema do
-   dispositivo, a menos que o data-theme diga o contrário. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --glass-saturate: 1.7;
-    --glass-brightness: 1.14;
-  }
-}
-:root[data-theme="dark"] {
-  --glass-saturate: 1.7;
-  --glass-brightness: 1.14;
-}
-
-/* Se não tiver light-dark() */
-@supports not (color: light-dark(#000, #fff)) {
-  :root {
-    color-scheme: dark;
-
-    --brand: #f1863d;
-    --brand-strong: #e07125;
-    --brand-foreground: #ffffff;
-
-    --canvas: #03042c;
-    --surface: #050738;
+     Mesma ordem do claro acima, para dar de ler os dois lado a lado. Só entra
+     aqui o token que muda: --brand, --brand-strong, --brand-foreground,
+     --glass-blur, --glass-edge-width e --glass-saturate são iguais nos dois
+     esquemas e ficam de fora — repeti-los só criaria dois lugares para
+     desatualizar.
+     ------------------------------------------------------------------ */
+  @variant escuro {
+    --canvas:         #03042c;
+    --surface:        #050738;
     --surface-raised: #0a0d3c;
 
-    --foreground: #ffffff;
+    --foreground:       #ffffff;
     --muted-foreground: #aeb8cf;
     --faint-foreground: #7b86a3;
 
-    --line: #ffffff;
-    --tint: #ffffff;
-    --scrim: #000000;
+    --line:   #ffffff;
+    --tint:   #ffffff;
+    --scrim:  #000000;
     --danger: #f87171;
 
-    --glow-a: rgb(29 44 135 / 0.85);
-    --glow-a-end: rgb(29 44 135 / 0);
-    --glow-b: rgb(20 31 98 / 0.70);
-    --glow-b-end: rgb(20 31 98 / 0);
+    --glow-a:        rgb(29 44 135 / 0.85);
+    --glow-a-end:    rgb(29 44 135 / 0);
+    --glow-b:        rgb(20 31 98 / 0.70);
+    --glow-b-end:    rgb(20 31 98 / 0);
     --backdrop-from: #050833;
-    --backdrop-to: #010214;
+    --backdrop-to:   #010214;
 
-    --glass-saturate: 1.7;
+    /* O escuro precisa de mais ganho de brilho para a lente morder as luzes
+       do fundo: o gradiente de lá é muito mais fundo que o do claro. */
     --glass-brightness: 1.14;
-    --glass-tint: rgb(226 234 255 / 0.012);
-    --glass-light-a: rgb(150 175 255 / 0.065);
-    --glass-light-b: rgb(150 175 255 / 0.035);
-    --glass-edge-hi: rgb(255 255 255 / 0.38);
-    --glass-edge-lo: rgb(255 255 255 / 0.07);
+
+    --glass-tint:         rgb(226 234 255 / 0.012);
+    --glass-light-a:      rgb(150 175 255 / 0.065);
+    --glass-light-b:      rgb(150 175 255 / 0.035);
+    --glass-edge-hi:      rgb(255 255 255 / 0.38);
+    --glass-edge-lo:      rgb(255 255 255 / 0.07);
     --glass-shadow-color: rgb(0 0 0 / 0.58);
-    --glass-tint-panel: rgb(6 9 42 / 0.18);
+    --glass-tint-panel:   rgb(6 9 42 / 0.18);
 
     --chart-1: #d95926;
     --chart-2: #3987e5;
@@ -185,9 +221,13 @@
   }
 }
 
+/* Força um esquema independente do dispositivo. Só o color-scheme, que é o que
+   sobrou para eles decidirem sozinhos: as cores o @variant escuro já cobre. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
+
 /* Sem vidro possível, o véu vira as superfícies opacas do dicionário. Elas
-   já existem nos dois esquemas e sobrevivem ao fallback acima, então nada
-   aqui depende de light-dark(). */
+   já existem nos dois esquemas, então nada aqui precisa saber qual está no ar. */
 
 /* Navegador sem backdrop-filter: sem isso o texto ficaria solto no fundo. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -221,17 +261,26 @@
    usados sem modificador na maioria dos casos (text-brand, text-danger), e
    embutir alfa neles apagaria o texto.
 
-   Sem light-dark() aqui, e não por descuido: em toda engine o color-mix()
-   chegou ANTES do light-dark() (Chromium 111 vs 123, Firefox 113 vs 120,
-   Safari 16.2 vs 17.5), então quem cai neste bloco caiu antes no fallback
-   escuro lá de cima e já está com color-scheme: dark. Usar light-dark()
-   justamente aqui produziria um var() irresolvível e apagaria a borda em vez
-   de suavizá-la. Os valores são os do escuro, para casarem com aquele bloco. */
+   Os dois esquemas, e isto mudou: antes só havia os valores do escuro, porque
+   o fallback de light-dark() lá de cima jogava todo mundo sem color-mix() no
+   escuro à força. Sem aquele bloco, quem não tem color-mix() passou a receber o
+   esquema que pediu, e um Chromium 105 no modo claro levaria borda branca
+   sobre fundo claro, que é invisível. A media query é bem mais velha que as
+   duas funções (Chromium 76), então o @variant escuro alcança este bloco.
+
+   Depois do dicionário de propósito: mesma especificidade que o :root de lá,
+   então quem ganha é a ordem de origem. */
 @supports not (color: color-mix(in lab, red, red)) {
   :root {
-    --line:  rgb(255 255 255 / 0.15);
-    --tint:  rgb(255 255 255 / 0.07);
-    --scrim: rgb(0 0 0 / 0.20);
+    --line:  rgb(11 16 48 / 0.15);
+    --tint:  rgb(11 16 48 / 0.07);
+    --scrim: rgb(11 16 48 / 0.20);
+
+    @variant escuro {
+      --line:  rgb(255 255 255 / 0.15);
+      --tint:  rgb(255 255 255 / 0.07);
+      --scrim: rgb(0 0 0 / 0.20);
+    }
   }
 }
 
@@ -246,10 +295,16 @@
 
 /* Vidro leve: a mesma lâmina, sem a lente.
 
-   Quem escolhe é o script inline do layout.tsx, que mede o aparelho antes do
-   primeiro quadro e marca <html data-vidro="leve">. O véu vira superfície
-   opaca; o fio da borda, a sombra e o raio continuam iguais, então a forma da
-   lâmina não muda, muda o que se vê ATRAVÉS dela.
+   É o perfil PADRÃO, e a direção importa: o <html> sai do servidor já com
+   data-vidro="leve", e o script inline do layout.tsx troca para "pesado" o
+   aparelho que aguenta. Era o contrário, e o contrário errava para o lado caro
+   sem JS, com JS quebrado ou com uma exceção engolida, a lente ficava ligada
+   justamente em quem menos aguenta. O véu vira superfície opaca; o fio da
+   borda, a sombra e o raio continuam iguais, então a forma da lâmina não muda,
+   muda o que se vê ATRAVÉS dela.
+
+   O valor "pesado" não casa com regra nenhuma daqui, e é assim de propósito: o
+   pesado é o que o @utility glass já faz sozinho.
 
    O `--glass-blur: 0px` do bloco acima não bastava, e é por isso que a regra
    do ::before existe: blur(0px) continua sendo um backdrop-filter, e um
@@ -276,7 +331,8 @@
    ganhar do `.glass::before` que o utilitário gera, e ganha por
    especificidade, sem !important. */
 :root[data-vidro="leve"] {
-  --glass-tint: light-dark(rgb(238 239 255 / 0.25), rgb(0 21 241 / 0.25));
+  --glass-tint: rgb(238 239 255 / 0.25);
+  @variant escuro { --glass-tint: rgb(0 21 241 / 0.25); }
 
   /* O painel de navegação é a exceção: atrás dele passa a conversa inteira, e
      sem o blur um véu de 0.25 deixaria o texto legível por baixo (contraste

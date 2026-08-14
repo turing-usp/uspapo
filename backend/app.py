@@ -22,8 +22,8 @@ descartado, do turno mais antigo para o mais novo.
 
 O /chat exige login: o site manda o access token do Supabase no Authorization e
 o backend confere a assinatura pelo JWKS do projeto. Sem token válido é 401,
-fora da whitelist de emails é 403, e cada conta tem um limite de perguntas por
-janela de tempo que devolve 429 ao estourar.
+sem uspapo_role e fora da whitelist de emails é 403, e cada conta tem um limite
+de perguntas por janela de tempo que devolve 429 ao estourar.
 
 No modo stream, cada evento é uma linha `data: {json}` com um campo "tipo":
 provedor, pensando, ferramenta, texto, fontes, erro, fim.

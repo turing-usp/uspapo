@@ -9,8 +9,8 @@ os turnos anteriores da conversa.
 
 O /chat exige login: `Authorization: Bearer <access token do Supabase>`. A
 portaria roda antes de qualquer trabalho e responde 401 (sem token ou token
-inválido), 403 (conta fora da whitelist), 429 (rate limit) ou 503 (não deu para
-falar com o JWKS do Supabase).
+inválido), 403 (conta sem uspapo_role e fora da whitelist), 429 (rate limit) ou
+503 (não deu para falar com o JWKS do Supabase).
 """
 
 from flask import Flask, Response, jsonify, request, stream_with_context
@@ -90,7 +90,7 @@ def criar_app(registro, *, rotulo_indice: str) -> Flask:
                 "erro": "Entre com sua conta para conversar com o USPapo."
             }), 401
 
-        if not acesso.liberado(conta.id):
+        if not acesso.liberado(conta.id, conta.email):
             return jsonify({
                 "erro": "O USPapo ainda está em teste fechado e esta conta não "
                         "está na lista de acesso."

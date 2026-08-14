@@ -39,11 +39,17 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  /* <meta name="color-scheme">. O globals.css já declara o mesmo em CSS, mas
-     o Samsung Internet decide se vai recolorir a página com o algoritmo de
-     modo escuro dele ANTES de aplicar folha de estilo, sem a meta tag, ele
-     conclui que o site não sabe fazer escuro e reescreve as cores por cima,
-     que é como um fundo #03042c chega lavado na tela. */
+  /* <meta name="color-scheme">, que acerta scrollbar, campo de texto e o resto
+     dos controles nativos em todo navegador que se comporta.
+
+     Não é ele que resolve o Samsung Internet, e já foi tentado aqui: o force
+     dark de lá não pergunta se o site sabe fazer escuro. Ele IGNORA o ramo
+     prefers-color-scheme: dark, renderiza o ramo claro e recolore o resultado
+     com algoritmo próprio, sem opt-out nenhum do lado de cá. Quem tinha que
+     mudar era o CSS, que forçava a paleta escura em todo navegador sem
+     light-dark(), o Samsung Internet <= 24 inteiro, e entregava ao algoritmo
+     uma página já escura para ele inverter de novo. Ver o comentário do
+     dicionário de cores no globals.css. */
   colorScheme: "light dark",
 
   /* Espelha --base do globals.css nos dois esquemas. */
@@ -53,31 +59,81 @@ export const viewport: Viewport = {
   ],
 };
 
-/* Escolhe o perfil do vidro antes do primeiro quadro.
+/* Promove ao vidro pesado o aparelho que aguenta, antes do primeiro quadro.
 
-   Tem que ser script inline no <head>: o vidro pesado é a aparência padrão do
-   CSS, então qualquer decisão tomada depois da hidratação apareceria como um
-   piscar de blur na tela de quem justamente não aguenta blur.
+   A direção importa: quem sai do servidor é o LEVE (o data-vidro no <html>
+   abaixo), e este script só promove. Era o contrário, e o contrário errava
+   para o lado caro, script que não roda, navegador com JS desligado ou uma
+   exceção engolida pelo catch deixavam a lente ligada justamente em quem menos
+   aguenta. Agora a falha cai no barato, que é como tem que ser.
 
-   Os sinais são baratos e todos síncronos. deviceMemory e connection não
-   existem fora do Chromium, e é aceitável: fora do Chromium (iOS, Firefox) o
-   backdrop-filter não é o gargalo que é no Android de entrada.
+   Tem que ser script inline no <head> de qualquer jeito: decisão tomada depois
+   da hidratação apareceria como um piscar de blur na tela.
 
-   ?vidro=leve e ?vidro=pesado forçam e gravam a escolha, para dar como
-   comparar os dois no mesmo aparelho — é o que a /diagnostico.html usa. */
+   A regra virou conjunção. O pesado precisa de TODOS os sinais, em vez de o
+   leve precisar de um. E o sinal que manda é o primeiro:
+
+   (hover: hover) and (pointer: fine) quer dizer mouse, e mouse quer dizer
+   computador. O que os quatro sinais antigos não viam é que o gargalo do
+   backdrop-filter não é RAM nem núcleo, é a GPU relendo o framebuffer a cada
+   quadro, coisa que celular de linha média sofre e reporta 8 GB e 8 núcleos
+   assim mesmo, porque o deviceMemory é limitado em 8 e arredondado. Celular,
+   tablet e Chromebook de toque ficam leves; o resto é conferido pelas specs.
+
+   deviceMemory e connection não existem fora do Chromium e caem no padrão
+   generoso de propósito: fora do Chromium (iOS, Firefox) quem decide é o
+   pointer, e lá o backdrop-filter não é o gargalo que é no Android.
+
+   Três fontes mandam mais que a regra, nesta ordem: ?vidro=leve|pesado (que
+   grava), a escolha gravada, e o veredito da sonda. */
 const ESCOLHER_VIDRO = `
+(function () {
 try {
-  var p = new URLSearchParams(location.search).get("vidro");
-  if (p === "leve" || p === "pesado") localStorage.setItem("vidro", p);
-  var g = localStorage.getItem("vidro");
-  var leve = g === "leve" || (g !== "pesado" && (
-    (navigator.deviceMemory || 8) <= 4 ||
-    (navigator.hardwareConcurrency || 8) <= 4 ||
-    matchMedia("(update: slow)").matches ||
-    !!(navigator.connection && navigator.connection.saveData)
-  ));
-  if (leve) document.documentElement.dataset.vidro = "leve";
+  var raiz = document.documentElement;
+
+  var pedido = new URLSearchParams(location.search).get("vidro");
+  if (pedido === "leve" || pedido === "pesado") localStorage.setItem("vidro", pedido);
+
+  var escolhido = localStorage.getItem("vidro");
+  var pesado = escolhido
+    ? escolhido === "pesado"
+    : localStorage.getItem("vidro-medido") !== "leve" && (
+        matchMedia("(hover: hover) and (pointer: fine)").matches &&
+        (navigator.deviceMemory || 8) >= 8 &&
+        (navigator.hardwareConcurrency || 8) >= 8 &&
+        !matchMedia("(update: slow)").matches &&
+        !matchMedia("(prefers-reduced-transparency: reduce)").matches &&
+        !(navigator.connection && navigator.connection.saveData)
+      );
+
+  if (!pesado) return;
+  raiz.dataset.vidro = "pesado";
+
+  /* A sonda de quadros: pega o aparelho que passou na regra e engasga mesmo
+     assim. Só faz sentido aqui dentro (medir o leve não decide nada) e só sem
+     escolha explícita gravada, quem digitou ?vidro=pesado quer o pesado.
+
+     O capture não é enfeite: a conversa rola dentro do .app-scroll, não no
+     documento, e evento de scroll não borbulha. Sem a fase de captura a sonda
+     nunca dispararia na única tela onde o custo aparece. */
+  if (escolhido) return;
+  addEventListener("scroll", function () {
+    var restantes = 90, lentos = 0, anterior = performance.now();
+    requestAnimationFrame(function passo(agora) {
+      if (agora - anterior > 22) lentos++;   // abaixo de ~45 fps
+      anterior = agora;
+      if (--restantes > 0) return requestAnimationFrame(passo);
+      /* Um terço dos quadros perdidos em ~1,5 s de rolagem. Grava em chave
+         própria, e não em "vidro": misturar medição com escolha do usuário
+         tiraria o jeito de reavaliar quando a regra mudar. */
+      if (lentos > 30) {
+        localStorage.setItem("vidro-medido", "leve");
+        raiz.dataset.vidro = "leve";
+      }
+    });
+  }, { once: true, passive: true, capture: true });
 } catch (e) {}
+})();
 `;
 
 export default function RootLayout({
@@ -86,14 +142,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    /* O data-vidro="leve" é o perfil que o servidor manda, e o que fica de pé
+       quando o script do <head> não roda: sem JS, com JS quebrado ou com o
+       catch engolindo, o aparelho fica leve. O script troca o valor para
+       "pesado" quando mede que dá. */
     <html
       lang="pt-BR"
+      data-vidro="leve"
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable} ${geom.variable} ${roboto.variable} h-full antialiased`}
     >
     <head>
-      {/* O data-vidro é escrito aqui, antes do React montar. O <html> já tem
-          suppressHydrationWarning, então o atributo a mais não diverge. */}
+      {/* O data-vidro acima é reescrito aqui, antes do React montar. O <html>
+          já tem suppressHydrationWarning, então o valor trocado não diverge. */}
       <script dangerouslySetInnerHTML={{ __html: ESCOLHER_VIDRO }} />
     </head>
     <body className="h-full">

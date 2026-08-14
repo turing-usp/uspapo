@@ -38,11 +38,17 @@ TOP_K_MAX = 5
 # ─────────────────────────────────────────────
 # Portaria: quem entra, limite de uso e orçamento de contexto
 # ─────────────────────────────────────────────
-# Quem pode usar o USPapo. "todos" libera qualquer conta logada (a whitelist
-# fica efetivamente desligada), "ninguem" fecha para todo mundo, e uma lista
-# separada por vírgula libera só ela. Com a entrada iniciada por @ valendo o
-# domínio inteiro. Quem interpreta isto é o acesso.py.
-WHITELIST_EMAILS = os.getenv("WHITELIST_EMAILS", "todos")
+# A segunda porta do USPapo, ao lado da uspapo_role no Supabase: basta passar
+# por uma das duas. Uma lista JSON (["a@usp.br", "@turingusp.com"]) ou separada
+# por vírgula, com a entrada iniciada por @ valendo o domínio inteiro. "todos"
+# libera qualquer conta logada. Quem interpreta isto é o acesso.py.
+#
+# O padrão é VAZIO, e não "todos" como já foi: vazia, a whitelist não libera
+# ninguém e quem decide é o cargo. Quando ela era a única porta, um branco tinha
+# que valer "todos" para um .env incompleto não derrubar o /chat; hoje um branco
+# valendo "todos" abriria o beta fechado para qualquer conta logada sem ninguém
+# pedir, que é o erro mais caro dos dois.
+WHITELIST_EMAILS = os.getenv("WHITELIST_EMAILS", "")
 
 # Duas defesas para o mesmo problema, o custo por pergunta: o rate limit cuida
 # de quantas perguntas cada um faz, o orçamento cuida do tamanho de cada uma.

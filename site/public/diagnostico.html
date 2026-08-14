@@ -42,6 +42,13 @@
   #ua { font-size: 12px; line-height: 1.4; word-break: break-all; color: #dbe2f5;
         background: rgba(255,255,255,.06); padding: 8px; border-radius: 8px; }
 
+  /* Sonda do esquema: o que o CSS desta página acha que está no ar. O JS
+     pergunta o mesmo pelo matchMedia, e a graça é comparar os dois, o force
+     dark do Samsung Internet ignora a media query no CSS e continua dizendo
+     "escuro" no JS, então a discordância é a assinatura dele. */
+  :root { --sonda-esquema: "claro"; }
+  @media (prefers-color-scheme: dark) { :root { --sonda-esquema: "escuro"; } }
+
   /* Prova 1: alfa literal contra alfa por color-mix. Os dois pintam 15% de
      branco sobre o mesmo fundo. Se saírem diferentes, o color-mix falhou e
      todos os /NN do Tailwind estão chapando no site. */
@@ -126,6 +133,16 @@
 <h2>Preferências do sistema</h2>
 <table id="mq"></table>
 
+<h2>Esquema de cores</h2>
+<p class="nota">
+  As duas primeiras linhas têm que dizer a mesma coisa. Quando o CSS diz "claro"
+  e o JS diz "escuro", quem está no comando é o modo escuro forçado do navegador
+  (o do Samsung Internet), que recolore a página por cima em vez de deixar o
+  site escolher. Para ver o tema de verdade: Samsung Internet → Configurações →
+  Labs → "Use website dark theme".
+</p>
+<table id="esquema"></table>
+
 <h2>Aparelho</h2>
 <table id="dev"></table>
 
@@ -200,6 +217,18 @@
                   : "erro", false);
   });
 
+  /* O que o CSS resolveu contra o que o JS responde. As aspas vêm junto no
+     getPropertyValue, porque o valor declarado é uma string CSS. */
+  var esquema = document.getElementById("esquema");
+  var peloCss = getComputedStyle(document.documentElement)
+    .getPropertyValue("--sonda-esquema").trim().replace(/"/g, "") || "não resolveu";
+  var peloJs = matchMedia("(prefers-color-scheme: dark)").matches ? "escuro" : "claro";
+  linha(esquema, "o CSS aplicou", peloCss, false);
+  linha(esquema, "o JS responde", peloJs, false);
+  linha(esquema, "as duas concordam", peloCss === peloJs, true);
+  var samsung = navigator.userAgent.match(/SamsungBrowser\/([\d.]+)/);
+  linha(esquema, "Samsung Internet", samsung ? "versão " + samsung[1] : "não", false);
+
   var dev = document.getElementById("dev");
   linha(dev, "deviceMemory (GB)", navigator.deviceMemory === undefined ? "não informa" : navigator.deviceMemory, false);
   linha(dev, "hardwareConcurrency", navigator.hardwareConcurrency === undefined ? "não informa" : navigator.hardwareConcurrency, false);
@@ -209,14 +238,37 @@
   linha(dev, "saveData", navigator.connection && navigator.connection.saveData ? "sim" : "não", false);
   linha(dev, "connection", navigator.connection ? (navigator.connection.effectiveType || "?") : "não informa", false);
 
+  /* O sinal que decide o perfil hoje: mouse quer dizer computador, e o gargalo
+     do backdrop-filter é a GPU, não a RAM. */
+  var temMouse = matchMedia("(hover: hover) and (pointer: fine)").matches;
+  linha(dev, "hover: hover + pointer: fine", temMouse, true);
+
+  /* O que ficou gravado neste navegador. Sem isso, um ?vidro=pesado esquecido
+     num teste antigo explicaria um print sem ninguém entender por quê. */
+  var gravado, medido;
+  try {
+    gravado = localStorage.getItem("vidro") || "nada";
+    medido = localStorage.getItem("vidro-medido") || "nada";
+  } catch (e) { gravado = medido = "sem acesso"; }
+  linha(dev, "escolha gravada (vidro)", gravado, false);
+  linha(dev, "veredito da sonda (vidro-medido)", medido, false);
+
   /* O mesmo veredito que o layout.tsx aplica, para dar de conferir qual perfil
-     este aparelho recebe no site. */
-  var leve =
-    (navigator.deviceMemory || 8) <= 4 ||
-    (navigator.hardwareConcurrency || 8) <= 4 ||
-    matchMedia("(update: slow)").matches ||
-    !!(navigator.connection && navigator.connection.saveData);
-  linha(dev, "perfil do vidro", leve ? "LEVE (sem blur)" : "pesado (com blur)", false);
+     este aparelho recebe no site. Mesma ordem de precedência de lá: escolha
+     explícita, depois a sonda, depois a regra. */
+  var pesado;
+  if (gravado === "leve" || gravado === "pesado") {
+    pesado = gravado === "pesado";
+  } else {
+    pesado = medido !== "leve" &&
+      temMouse &&
+      (navigator.deviceMemory || 8) >= 8 &&
+      (navigator.hardwareConcurrency || 8) >= 8 &&
+      !matchMedia("(update: slow)").matches &&
+      !matchMedia("(prefers-reduced-transparency: reduce)").matches &&
+      !(navigator.connection && navigator.connection.saveData);
+  }
+  linha(dev, "perfil do vidro", pesado ? "pesado (com blur)" : "LEVE (sem blur)", false);
 })();
 </script>
 
