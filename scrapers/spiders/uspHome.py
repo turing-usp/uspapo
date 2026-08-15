@@ -9,11 +9,11 @@ class IqNavbarSpider(scrapy.Spider):
     allowed_domains = ["usp.br"]
     
 
-    start_urls = ["https://www5.usp.br"]
+    start_urls = ["https://www5.usp.br/sitemap.xml"]
 
     def parse(self, response):
         # 1. Mapeia todos os links contidos na navbar que você inspecionou
-        links_menu = response.css('#site-navigation a::attr(href)').getall()
+        links_menu = response.css('#content a::attr(href)').getall()
         
         # Filtra links vazios ou âncoras comuns (#)
         links_validos = [link for link in links_menu if link and not link.startswith('#')]

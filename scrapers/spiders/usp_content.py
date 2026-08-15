@@ -9,11 +9,11 @@ class ChatbotContentItem(scrapy.Item):
     titulo = scrapy.Field()
     texto_limpo = scrapy.Field()
 
-class IqContentSpider(scrapy.Spider):
-    name = "iq_content"
+class UspContentSpider(scrapy.Spider):
+    name = "usp_content"
     
     # 1. Definimos o domínio permitido para o Scrapy operar de forma segura
-    allowed_domains = ["iq.usp.br", "www.iq.usp.br", "labiq.iq.usp.br", "lem.iq.usp.br", "memoria.iq.usp.br", "ca.iq.usp.br"]
+    allowed_domains = ["www5.usp.br"]
 
     def start_requests(self):
         # Resolve o arquivo de links a partir do módulo do spider, não do cwd.
