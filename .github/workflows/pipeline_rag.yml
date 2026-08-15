@@ -36,6 +36,32 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: 🚌 Atualizar itinerários oficiais da SPTrans
+        run: python scripts/atualizar_gtfs_sptrans.py
+
+      - name: ✅ Validar roteamento e semântica GTFS
+        env:
+          PYTHONPATH: backend
+          # Testes de unidade não devem consultar a API ao vivo nem depender de
+          # um segredo configurado no ambiente do runner.
+          SPTRANS_TOKEN: ''
+        run: |
+          python -m unittest \
+            backend.uspapo.test_roteamento \
+            backend.uspapo.ferramentas.test_circulares \
+            backend.uspapo.test_preconsulta_conversa \
+            scripts.test_atualizar_gtfs_sptrans -v
+
+      # Publica o transporte antes dos scrapers: uma falha posterior em um site
+      # da USP não deve impedir a atualização diária dos ônibus.
+      - name: 💾 Publicar recorte GTFS validado
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add backend/uspapo/dados_sptrans.json
+          git commit -m "chore(transporte): atualiza GTFS SPTrans [skip ci]" || echo "GTFS sem alteração"
+          git push
+
       - name: 🚀 Executar o Rodar Scrapers (Scraping + Clean + Pinecone)
         env:
           PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}

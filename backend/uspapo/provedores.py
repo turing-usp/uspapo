@@ -77,12 +77,27 @@ def carregar_provedores() -> list[Provedor]:
         raise RuntimeError("LLM_PROVIDERS precisa ser uma lista JSON não vazia.")
 
     provedores: list[Provedor] = []
+    ocorrencias_por_nome: dict[str, int] = {}
 
     for posicao, cfg in enumerate(entradas):
         if not isinstance(cfg, dict):
             raise RuntimeError(f"LLM_PROVIDERS[{posicao}] não é um objeto JSON.")
 
-        nome = cfg.get("nome") or f"provedor-{posicao + 1}"
+        nome_configurado = str(
+            cfg.get("nome") or f"provedor-{posicao + 1}"
+        ).strip()
+        ocorrencia = ocorrencias_por_nome.get(nome_configurado, 0) + 1
+        ocorrencias_por_nome[nome_configurado] = ocorrencia
+        nome = (
+            nome_configurado
+            if ocorrencia == 1
+            else f"{nome_configurado}-{ocorrencia}"
+        )
+        if ocorrencia > 1:
+            print(
+                f"   [!] nome de provedor repetido '{nome_configurado}'; "
+                f"esta instância será identificada como '{nome}'."
+            )
 
         faltando = [campo for campo in ("base_url", "model") if not cfg.get(campo)]
         if faltando:
@@ -106,7 +121,15 @@ def carregar_provedores() -> list[Provedor]:
             timeout=float(cfg.get("timeout", config.TIMEOUT_PADRAO)),
             max_retries=0,
         )
-        provedores.append(Provedor(nome=nome, cfg={**cfg, "nome": nome}, cliente=cliente))
+        provedores.append(Provedor(
+            nome=nome,
+            cfg={
+                **cfg,
+                "nome": nome,
+                "nome_configurado": nome_configurado,
+            },
+            cliente=cliente,
+        ))
 
     if not provedores:
         raise RuntimeError(

@@ -12,6 +12,7 @@ from uspapo import config, saude
 from uspapo.conteudo import ROTULOS_FERRAMENTA, SeparadorConteudo, extrair_raciocinio
 from uspapo.contexto import Orcamento, cortar
 from uspapo.erros import MAX_TENTATIVAS, classificar, descrever
+from uspapo.naturalizador_transporte import naturalizar_resposta_transporte
 from uspapo.provedores import Provedor
 from uspapo.roteamento import preconsultar
 from uspapo.toolcalls import ColetorDeChamadas
@@ -108,6 +109,7 @@ def conversar_com_provedor(
     urls_turno: set[str],
     memo: dict,
     teto: int,
+    naturalizadores: list[Provedor] | None = None,
 ) -> Iterator[dict]:
     """Roda o laço de ferramentas num provedor. Levanta se a API falhar.
 
@@ -120,19 +122,45 @@ def conversar_com_provedor(
     """
     mensagens, inicio_turno = orcamento.montar(pergunta, historico, teto)
     rodada = 0
+    usou_provedor = False
 
     # Intenções inequívocas chegam ao modelo já acompanhadas da fonte oficial.
     # Além de não depender da tool choice probabilística, isso elimina a rodada
     # de LLM que serviria apenas para pedir a ferramenta.
     preconsulta = preconsultar(registro, pergunta)
     if preconsulta:
-        resultado, urls, nome = preconsulta
+        resultado, urls, nome, dados_publicos = preconsulta
         urls_turno.update(urls)
         yield {"tipo": "ferramenta", "estado": "inicio", "indice": -1, "nome": nome}
         yield {
             "tipo": "ferramenta", "estado": "fim", "indice": -1, "nome": nome,
             "args": {}, "resultados": len(urls),
         }
+
+        # O motor entrega fatos públicos estruturados e um texto seguro. Uma
+        # chamada curta, sem tools nem streaming, pode melhorar apenas a prosa;
+        # a resposta inteira é validada antes de chegar ao aluno. Se o modelo
+        # trocar linha, horário, número ou local, usamos o fallback determinístico.
+        if nome == "consultar_circulares":
+            naturalizacao = naturalizar_resposta_transporte(
+                naturalizadores or [provedor],
+                pergunta,
+                dados_publicos,
+                resultado,
+            )
+            yield {"tipo": "texto", "delta": naturalizacao.texto}
+            usou_renderer = bool(
+                naturalizacao.usou_llm or naturalizacao.total_tokens
+            )
+            return (
+                naturalizacao.prompt_tokens,
+                naturalizacao.completion_tokens,
+                usou_renderer,
+                naturalizacao.provedor,
+                naturalizacao.modelo,
+                list(naturalizacao.tentativas),
+            )
+
         mensagens[-1]["content"] = (
             pergunta
             + "\n\n[CONTEXTO OFICIAL PRÉ-CONSULTADO PELO BACKEND]\n"
@@ -160,6 +188,7 @@ def conversar_com_provedor(
         coletor = ColetorDeChamadas(registro)
         texto: list[str] = []
 
+        usou_provedor = True
         for chunk in abrir_stream(provedor, mensagens, registro.schemas):
             if hasattr(chunk, "usage") and chunk.usage:
                 p_u = getattr(chunk.usage, "prompt_tokens", 0) or 0
@@ -195,7 +224,7 @@ def conversar_com_provedor(
         if not coletor:
             if not "".join(texto).strip():
                 raise RuntimeError("o provedor terminou o stream sem resposta utilizável")
-            return usage_prompt_tokens, usage_completion_tokens
+            return usage_prompt_tokens, usage_completion_tokens, usou_provedor
 
         chamadas = coletor.fechar(rodada)
 
@@ -221,8 +250,17 @@ def conversar_com_provedor(
         # mesma rodada, elas dividem a reserva.
         cota = max(orcamento.reserva_para(teto) // len(chamadas), 300)
 
+        resultados_transporte: list[tuple[str, dict | None]] = []
         for chamada in chamadas:
-            resultado, urls, args = registro.rodar(chamada, memo)
+            extras_internos = (
+                {"_pergunta": pergunta}
+                if chamada["nome"] == "consultar_circulares"
+                else None
+            )
+            execucao = registro.rodar(
+                chamada, memo, extras_internos
+            )
+            resultado, urls, args = execucao
             urls_turno.update(urls)
 
             yield {
@@ -234,11 +272,45 @@ def conversar_com_provedor(
                 "resultados": len(urls),
             }
 
+            if (
+                chamada["nome"] == "consultar_circulares"
+                and execucao.sucesso
+            ):
+                resultados_transporte.append(
+                    (resultado, execucao.dados_publicos)
+                )
+
             mensagens.append({
                 "role": "tool",
                 "tool_call_id": chamada["id"],
                 "content": cortar(resultado, cota),
             })
+
+        # A mesma proteção vale quando a intenção não foi reconhecida na
+        # pré-consulta e quem chamou a ferramenta foi o próprio modelo. A
+        # naturalização é bufferizada e validada; não há uma rodada livre que
+        # possa trocar sentido, parada ou converter frequência em ETA.
+        if resultados_transporte:
+            resposta_transporte = "\n\n".join(
+                item[0] for item in resultados_transporte
+            )
+            naturalizacao = None
+            if len(resultados_transporte) == 1 and resultados_transporte[0][1]:
+                naturalizacao = naturalizar_resposta_transporte(
+                    [provedor],
+                    pergunta,
+                    resultados_transporte[0][1],
+                    resposta_transporte,
+                )
+                resposta_transporte = naturalizacao.texto
+            yield {
+                "tipo": "texto",
+                "delta": resposta_transporte,
+            }
+            if naturalizacao is not None:
+                usage_prompt_tokens += naturalizacao.prompt_tokens
+                usage_completion_tokens += naturalizacao.completion_tokens
+            return usage_prompt_tokens, usage_completion_tokens, usou_provedor
 
         rodada += 1
         if config.TETO_RODADAS_FERRAMENTA and rodada >= config.TETO_RODADAS_FERRAMENTA:
@@ -283,11 +355,15 @@ def executar_conversa(
             # Cada tentativa tem suas próprias fontes: as do provedor que falhou
             # não correspondem à resposta que o aluno vai ler.
             urls_turno: set[str] = set()
+            usou_provedor = False
+            provedor_resposta = provedor.nome
+            modelo_resposta = provedor.cfg.get("model", provedor.nome)
+            metadata_resposta: dict = {}
 
             try:
                 eventos = conversar_com_provedor(
                     provedor, registro, orcamento, pergunta, historico,
-                    urls_turno, memo, teto,
+                    urls_turno, memo, teto, naturalizadores=cadeia,
                 )
                 # O uso de tokens é o valor de retorno do gerador. Um ``for``
                 # o descarta, fazendo o log da resposta falhar silenciosamente.
@@ -295,7 +371,26 @@ def executar_conversa(
                     try:
                         evento = next(eventos)
                     except StopIteration as fim:
-                        usage_prompt_tokens, usage_completion_tokens = fim.value or (0, 0)
+                        retorno = fim.value or (0, 0, False)
+                        if len(retorno) == 2:  # compatibilidade defensiva
+                            usage_prompt_tokens, usage_completion_tokens = retorno
+                            usou_provedor = True
+                        elif len(retorno) >= 5:
+                            (
+                                usage_prompt_tokens,
+                                usage_completion_tokens,
+                                usou_provedor,
+                                provedor_resposta,
+                                modelo_resposta,
+                            ) = retorno[:5]
+                            if len(retorno) >= 6 and retorno[5]:
+                                metadata_resposta["naturalizador_tentativas"] = retorno[5]
+                        else:
+                            (
+                                usage_prompt_tokens,
+                                usage_completion_tokens,
+                                usou_provedor,
+                            ) = retorno
                         break
                     # Só conta como resposta entregue o que o aluno de fato
                     # leria: senão um provedor que cuspiu espaço em branco e
@@ -336,7 +431,8 @@ def executar_conversa(
             break
 
         if concluiu:
-            saude.marcar_sucesso(provedor.nome)
+            if usou_provedor:
+                saude.marcar_sucesso(provedor_resposta)
             try:
                 from uspapo.analytics import registrar
                 duracao_ms = int((time.time() - inicio_conversa) * 1000)
@@ -346,13 +442,21 @@ def executar_conversa(
                     nome_evento="RESPOSTA_CONCLUIDA",
                     session_id=session_id,
                     user_id=user_id,
-                    provedor=provedor.nome,
-                    modelo=provedor.cfg.get("model", provedor.nome),
+                    provedor=(
+                        provedor_resposta if usou_provedor else "backend-deterministico"
+                    ),
+                    modelo=(
+                        modelo_resposta
+                        if usou_provedor else "consultar_circulares"
+                    ),
                     prompt_tokens=usage_prompt_tokens,
                     completion_tokens=usage_completion_tokens,
                     total_tokens=tot_tok,
                     latencia_ms=duracao_ms,
-                    metadata={"urls_fontes": len(urls_turno)}
+                    metadata={
+                        "urls_fontes": len(urls_turno),
+                        **metadata_resposta,
+                    }
                 )
             except Exception as erro:
                 # Telemetria não derruba a resposta, mas não pode falhar calada.

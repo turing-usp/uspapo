@@ -14,6 +14,7 @@ import re
 from functools import lru_cache
 
 from uspapo.ferramentas import normalizar, palavras
+from uspapo.locais_usp import _mencoes_com_posicao
 
 RAIZ = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 PASTA_PROCESSADOS = os.path.join(RAIZ, "data", "processed")
@@ -28,30 +29,32 @@ TERMOS_ONIBUS = frozenset(
     "onibus circular circulares linha linhas ponto pontos parada paradas chega "
     "chegada horario horarios previsao previsoes busp".split()
 )
+TERMOS_TRAJETO = frozenset(
+    "caminho chegar demora demorar distancia ir leva levar melhor onibus rota "
+    "trajeto tempo transporte vou circular circulares".split()
+)
 PADROES_PONTO = (
     re.compile(r"\b(?:no|na|ao|a)\s+(?:ponto\s+(?:do|da|de)\s+)?(.+?)(?:\?|$)", re.I),
     re.compile(r"\b(?:ponto|parada)\s+(?:do|da|de)?\s*(.+?)(?:\?|$)", re.I),
 )
-PADROES_LOCAIS = (
-    ("p1", re.compile(
-        r"\bp\s*1\b|\bport(?:ao|aria)\s*(?:1|um)\b|"
-        r"entrada\s+de\s+pedestres\s+da\s+cidade\s+universitaria"
-    )),
-    ("bienio", re.compile(r"\bbienio\b")),
-    ("quimica", re.compile(r"\binstituto\s+de\s+quimica\b|\ba\s+quimica\b")),
-    ("mecanica", re.compile(r"\b(?:predio\s+da\s+)?engenharia\s+mecanica\b|\bmecanica\b")),
-    ("metro_butanta", re.compile(r"\b(?:metro|estacao)\s+butanta\b")),
-    ("poli", re.compile(r"\bescola\s+politecnica\b|\bpoli\b")),
-    ("fflch", re.compile(r"\bfflch\b|faculdade\s+de\s+filosofia\s+letras")),
-    ("fea", re.compile(r"\bfea\b|faculdade\s+de\s+economia")),
-    ("ime", re.compile(r"\bime\b|instituto\s+de\s+matematica")),
-    ("if", re.compile(r"\binstituto\s+de\s+fisica\b")),
-    ("reitoria", re.compile(r"\breitoria\b")),
-    ("crusp", re.compile(r"\bcrusp\b")),
-    ("letras", re.compile(r"(?<!filosofia )\bletras\b")),
-    ("educacao", re.compile(r"\b(?:faculdade\s+de\s+)?educacao\b")),
-    ("geociencias", re.compile(r"\bgeociencias\b")),
-)
+
+
+def _pediu_detalhes_transporte(pergunta: str) -> bool:
+    texto = normalizar(pergunta)
+    return any(
+        trecho in texto
+        for trecho in (
+            "por que",
+            "porque",
+            "calcul",
+            "de onde vem",
+            "qual a fonte",
+            "quais dados",
+            "explique o tempo",
+            "explique esse horario",
+            "mais detalhes",
+        )
+    )
 
 
 def _termo_principal(pergunta: str) -> str:
@@ -116,13 +119,13 @@ def pagina_por_titulo(pergunta: str) -> dict[str, str] | None:
 def pedido_trajeto(pergunta: str) -> dict[str, str] | None:
     """Extrai dois locais conhecidos e seus papéis de origem/destino."""
     texto = normalizar(pergunta)
-    if not any(termo in set(palavras(texto)) for termo in ("melhor", "chegar", "ir")):
+    mencoes = _mencoes_com_posicao(texto)
+    tem_intencao = bool(set(palavras(texto)) & TERMOS_TRAJETO)
+    if len(mencoes) >= 2 and not tem_intencao:
+        entre_locais = texto[mencoes[0][1]:mencoes[1][0]]
+        tem_intencao = bool(re.search(r"\b(?:ate|para|pra)\b", entre_locais))
+    if not tem_intencao:
         return None
-    mencoes: list[tuple[int, int, str]] = []
-    for chave, padrao in PADROES_LOCAIS:
-        for match in padrao.finditer(texto):
-            mencoes.append((match.start(), match.end(), chave))
-    mencoes.sort()
     unicas: list[tuple[int, int, str]] = []
     chaves_vistas: set[str] = set()
     for mencao in mencoes:
@@ -143,8 +146,9 @@ def pedido_trajeto(pergunta: str) -> dict[str, str] | None:
 
     destino = None
     marcador_destino = re.compile(
-        r"(?:\bate(?:\s+[ao])?|\bpara(?:\s+[ao])?|"
-        r"\bchegar\s+(?:ao|a|no|na))\s*$"
+        r"(?:\bate(?:\s+[ao])?|\b(?:para|pra)(?:\s+[ao])?|"
+        r"\b(?:chegar|chego|ir|vou)\s+(?:ate\s+|para\s+|pra\s+)?"
+        r"(?:ao|a|no|na))\s*$"
     )
     for mencao in unicas:
         antes = texto[max(0, mencao[0] - 45):mencao[0]]
@@ -176,13 +180,20 @@ def pedido_circular(pergunta: str) -> dict[str, str] | None:
     }
 
 
-def preconsultar(registro, pergunta: str) -> tuple[str, list[str], str] | None:
+def preconsultar(
+    registro, pergunta: str
+) -> tuple[str, list[str], str, dict | None] | None:
     trajeto = pedido_trajeto(pergunta)
     if trajeto and "consultar_circulares" in registro.nomes:
         try:
-            texto, fontes = registro.executar_direto(
-                "consultar_circulares", linha="", **trajeto
+            resposta = registro.executar_direto(
+                "consultar_circulares",
+                linha="",
+                detalhes=_pediu_detalhes_transporte(pergunta),
+                _pergunta=pergunta,
+                **trajeto,
             )
+            texto, fontes = resposta
         except Exception as erro:
             print(f"[roteamento] pré-consulta de trajeto falhou: {type(erro).__name__}: {erro}")
             return None
@@ -190,17 +201,33 @@ def preconsultar(registro, pergunta: str) -> tuple[str, list[str], str] | None:
             f"[roteamento] trajeto: origem={trajeto['origem']!r}, "
             f"destino={trajeto['destino_ou_ponto']!r}"
         )
-        return texto, fontes, "consultar_circulares"
+        return (
+            texto,
+            fontes,
+            "consultar_circulares",
+            getattr(resposta, "dados_publicos", None),
+        )
 
     circular = pedido_circular(pergunta)
     if circular and "consultar_circulares" in registro.nomes:
         try:
-            texto, fontes = registro.executar_direto("consultar_circulares", **circular)
+            resposta = registro.executar_direto(
+                "consultar_circulares",
+                detalhes=_pediu_detalhes_transporte(pergunta),
+                _pergunta=pergunta,
+                **circular,
+            )
+            texto, fontes = resposta
         except Exception as erro:
             print(f"[roteamento] pré-consulta de circular falhou: {type(erro).__name__}: {erro}")
             return None
         print(f"[roteamento] consultar_circulares: linha={circular['linha']}, ponto={circular['destino_ou_ponto']!r}")
-        return texto, fontes, "consultar_circulares"
+        return (
+            texto,
+            fontes,
+            "consultar_circulares",
+            getattr(resposta, "dados_publicos", None),
+        )
 
     pagina = pagina_por_titulo(pergunta)
     if pagina:
@@ -211,5 +238,5 @@ def preconsultar(registro, pergunta: str) -> tuple[str, list[str], str] | None:
             f"### {pagina['titulo']}\n{pagina['texto'][:4500]}"
         )
         print(f"[roteamento] título oficial exato: {pagina['titulo']!r}")
-        return texto, [pagina["url"]], "buscar_documentos"
+        return texto, [pagina["url"]], "buscar_documentos", None
     return None

@@ -6,11 +6,13 @@ o backend real (Pinecone) e o backend falso (documentos canned) usarem o MESMO
 motor sem uma linha de código duplicada.
 """
 
+from __future__ import annotations
+
 import json
 import time
 import unicodedata
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable
 
 
 # ─────────────────────────────────────────────
@@ -130,7 +132,48 @@ class Ferramenta:
     nome: str
     descricao: str
     parametros: dict  # JSON Schema dos argumentos
-    executar: Callable[..., tuple[str, list[str]]]
+    executar: Callable[..., tuple[str, list[str]] | "RespostaFerramenta"]
+
+
+@dataclass(frozen=True)
+class RespostaFerramenta:
+    """Resposta pública e, opcionalmente, fatos estruturados para apresentação.
+
+    O desempacotamento em ``texto, fontes`` continua funcionando em todo o
+    código existente. ``dados_publicos`` é um canal interno: ele permite que a
+    camada de conversa peça a uma LLM para verbalizar os fatos sem precisar
+    reconstruí-los a partir da prosa de fallback.
+    """
+
+    texto: str
+    fontes: list[str]
+    dados_publicos: dict[str, Any] | None = None
+
+    def __iter__(self):
+        yield self.texto
+        yield self.fontes
+
+
+@dataclass(frozen=True)
+class ResultadoExecucao:
+    """Resultado de uma tool call com status fora do conteúdo textual.
+
+    O objeto continua desempacotável como ``resultado, fontes, args`` para não
+    quebrar os chamadores existentes. ``sucesso`` fica separado porque inferir
+    falha pelo texto faria uma mensagem de validação parecer uma resposta de
+    transporte pronta para o aluno.
+    """
+
+    resultado: str
+    fontes: list[str]
+    args: dict
+    sucesso: bool
+    dados_publicos: dict[str, Any] | None = None
+
+    def __iter__(self):
+        yield self.resultado
+        yield self.fontes
+        yield self.args
 
 
 class Registro:
@@ -212,33 +255,77 @@ class Registro:
     # ─────────────────────────────────────────────
     # Execução
     # ─────────────────────────────────────────────
-    def rodar(self, chamada: dict, memo: dict) -> tuple[str, list[str], dict]:
+    def rodar(
+        self,
+        chamada: dict,
+        memo: dict,
+        extras_internos: dict | None = None,
+    ) -> ResultadoExecucao:
         """Executa uma tool call. Nunca levanta: falha vira texto para o modelo ler."""
         try:
             args = json.loads(chamada["args"] or "{}")
         except json.JSONDecodeError:
-            return "Os argumentos não são um JSON válido. Chame a ferramenta de novo.", [], {}
+            return ResultadoExecucao(
+                "Os argumentos não são um JSON válido. Chame a ferramenta de novo.",
+                [],
+                {},
+                False,
+            )
 
         if not isinstance(args, dict):
-            return "Os argumentos precisam ser um objeto JSON.", [], {}
+            return ResultadoExecucao(
+                "Os argumentos precisam ser um objeto JSON.", [], {}, False
+            )
+
+        # Argumentos iniciados por sublinhado pertencem ao backend e nunca ao
+        # modelo. Além disso, qualquer chave fornecida em ``extras_internos`` é
+        # autoritativa: removê-la dos argumentos públicos evita tanto colisão de
+        # kwargs quanto uma tentativa de sobrescrever contexto confiável.
+        extras_internos = extras_internos or {}
+        reservados = set(extras_internos)
+        args = {
+            chave: valor
+            for chave, valor in args.items()
+            if not str(chave).startswith("_") and chave not in reservados
+        }
 
         ferr = self._ferramentas.get(chamada["nome"])
         if ferr is None:
-            return f"Ferramenta desconhecida: {chamada['nome']}.", [], args
+            return ResultadoExecucao(
+                f"Ferramenta desconhecida: {chamada['nome']}.", [], args, False
+            )
 
         # O nome entra na chave do cache: sem ele, duas ferramentas que aceitem
         # um argumento de mesmo nome leriam o resultado cacheado uma da outra.
-        chave = (ferr.nome, json.dumps(args, sort_keys=True, ensure_ascii=False))
+        chave = (
+            ferr.nome,
+            json.dumps(args, sort_keys=True, ensure_ascii=False),
+            json.dumps(extras_internos, sort_keys=True, ensure_ascii=False),
+        )
 
         if chave not in memo:
             try:
-                memo[chave] = ferr.executar(**args)
+                memo[chave] = ferr.executar(**args, **extras_internos)
             except TypeError as erro:
                 # Argumento a mais ou faltando: devolve para o modelo se corrigir.
-                return f"Argumentos inválidos para '{ferr.nome}': {erro}", [], args
+                return ResultadoExecucao(
+                    f"Argumentos inválidos para '{ferr.nome}': {erro}",
+                    [],
+                    args,
+                    False,
+                )
             except Exception as erro:
                 print(f"[ferramenta] '{ferr.nome}' falhou: {type(erro).__name__}: {erro}")
-                return "A ferramenta falhou por um erro temporário. Avise o aluno.", [], args
+                return ResultadoExecucao(
+                    "A ferramenta falhou por um erro temporário. Avise o aluno.",
+                    [],
+                    args,
+                    False,
+                )
 
-        resultado, fontes = memo[chave]
-        return resultado, fontes, args
+        bruto = memo[chave]
+        resultado, fontes = bruto
+        dados_publicos = getattr(bruto, "dados_publicos", None)
+        return ResultadoExecucao(
+            resultado, fontes, args, True, dados_publicos=dados_publicos
+        )

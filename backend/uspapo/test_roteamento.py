@@ -2,9 +2,75 @@ import unittest
 from unittest.mock import Mock
 
 from uspapo import roteamento
+from uspapo.locais_usp import (
+    CATALOGO_LOCAIS,
+    coordenada_local,
+    mencoes_locais,
+    resolver_local,
+)
 
 
 class TestRoteamento(unittest.TestCase):
+    def test_catalogo_resolve_todos_os_nomes_e_aliases_explicitos(self):
+        for chave, local in CATALOGO_LOCAIS.items():
+            with self.subTest(chave=chave, nome=local["nome"]):
+                self.assertEqual(resolver_local(chave), chave)
+                self.assertEqual(resolver_local(local["nome"]), chave)
+                self.assertEqual(
+                    coordenada_local(chave),
+                    (local["latitude"], local["longitude"]),
+                )
+            for alias in local["aliases"]:
+                with self.subTest(chave=chave, alias=alias):
+                    self.assertEqual(resolver_local(alias), chave)
+
+    def test_coordenadas_ficam_na_regiao_da_cidade_universitaria(self):
+        for chave in CATALOGO_LOCAIS:
+            latitude, longitude = coordenada_local(chave)
+            with self.subTest(chave=chave):
+                self.assertGreater(latitude, -23.58)
+                self.assertLess(latitude, -23.54)
+                self.assertGreater(longitude, -46.75)
+                self.assertLess(longitude, -46.70)
+
+    def test_central_reitoria_e_administracao_sao_destinos_distintos(self):
+        self.assertEqual(resolver_local("Central"), "restaurante_central")
+        self.assertEqual(
+            resolver_local("Administração Central"), "administracao_central"
+        )
+        self.assertEqual(resolver_local("Reitoria"), "reitoria")
+        self.assertEqual(
+            mencoes_locais(
+                "Saio da Central, passo pela Administração Central e vou à Reitoria."
+            ),
+            ["restaurante_central", "administracao_central", "reitoria"],
+        )
+
+    def test_siglas_nao_casam_com_prefixos_de_palavras_diferentes(self):
+        for termo in (
+            "Academia de Polícia",
+            "Rua Faustolo",
+            "Avenida Ipiranga",
+            "Rua Hugo Carotini",
+        ):
+            with self.subTest(termo=termo):
+                self.assertIsNone(resolver_local(termo))
+
+        self.assertEqual(resolver_local("Poli"), "poli")
+        self.assertEqual(resolver_local("FAU"), "fau")
+        self.assertEqual(resolver_local("IP"), "psicologia")
+        self.assertEqual(resolver_local("HU"), "hu")
+
+    def test_metro_generico_nao_substitui_outra_estacao_por_butanta(self):
+        self.assertEqual(resolver_local("Metrô"), "metro_butanta")
+        self.assertEqual(resolver_local("Metrô Butantã"), "metro_butanta")
+        self.assertIsNone(resolver_local("Metrô Santana"))
+        self.assertIsNone(resolver_local("Metrô Vila Madalena"))
+        self.assertEqual(
+            mencoes_locais("Do Metrô Santana até a Poli"),
+            ["poli"],
+        )
+
     def test_extrai_origem_e_destino_de_perguntas_de_trajeto(self):
         casos = {
             (
@@ -21,11 +87,43 @@ class TestRoteamento(unittest.TestCase):
             "Qual o melhor ônibus da FEA até Letras?": {
                 "origem": "fea", "destino_ou_ponto": "letras"
             },
+            "Quanto tempo demora para ir da Central até o Biênio?": {
+                "origem": "restaurante_central", "destino_ou_ponto": "bienio"
+            },
+            "Quanto tempo demora pra chegar do metrô até a Poli?": {
+                "origem": "metro_butanta", "destino_ou_ponto": "poli"
+            },
+            "Qual é o trajeto do HU até a FAU?": {
+                "origem": "hu", "destino_ou_ponto": "fau"
+            },
+            "Quanto tempo leva do IP ao IME?": {
+                "origem": "psicologia", "destino_ou_ponto": "ime"
+            },
+            "Como vou da Administração Central para a Reitoria?": {
+                "origem": "administracao_central", "destino_ou_ponto": "reitoria"
+            },
+            "Central até o Biênio": {
+                "origem": "restaurante_central", "destino_ou_ponto": "bienio"
+            },
         }
 
         for pergunta, esperado in casos.items():
             with self.subTest(pergunta=pergunta):
                 self.assertEqual(roteamento.pedido_trajeto(pergunta), esperado)
+
+    def test_pedido_trajeto_usa_aliases_do_catalogo_inteiro(self):
+        itens = list(CATALOGO_LOCAIS.items())
+        for indice, (origem, info_origem) in enumerate(itens):
+            destino, info_destino = itens[(indice + 1) % len(itens)]
+            pergunta = (
+                f"Quanto tempo leva de {info_origem['aliases'][0]} "
+                f"até {info_destino['aliases'][0]}?"
+            )
+            with self.subTest(origem=origem, destino=destino):
+                self.assertEqual(
+                    roteamento.pedido_trajeto(pergunta),
+                    {"origem": origem, "destino_ou_ponto": destino},
+                )
 
     def test_nome_oficial_exato_encontra_imemorias(self):
         pagina = roteamento.pagina_por_titulo("O que é o imemórias?")
@@ -66,9 +164,16 @@ class TestRoteamento(unittest.TestCase):
         )
 
         registro.executar_direto.assert_called_once_with(
-            "consultar_circulares", linha="8084", destino_ou_ponto="biênio"
+            "consultar_circulares",
+            detalhes=False,
+            _pergunta="Quando chega o 8084 no ponto do biênio?",
+            linha="8084",
+            destino_ou_ponto="biênio",
         )
-        self.assertEqual(resultado, ("Chega às 21:04.", ["sptrans"], "consultar_circulares"))
+        self.assertEqual(
+            resultado,
+            ("Chega às 21:04.", ["sptrans"], "consultar_circulares", None),
+        )
 
 
 if __name__ == "__main__":
