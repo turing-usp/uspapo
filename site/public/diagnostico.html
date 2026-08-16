@@ -83,9 +83,13 @@
   /* O véu translúcido do perfil leve: deixa a cena passar crua e devolve na
      cor o ganho de saturação e brilho que a lente dava. */
   .leve { top: 112px; background-color: rgb(0 21 241 / 0.25); }
-  /* O opaco, que é o que o perfil leve fazia antes — e o que ele ainda faz nos
-     poucos vidros que têm conteúdo passando por trás. */
-  .opaco { top: 178px; background-color: #0a0d3c; }
+  /* O opaco: o que o perfil leve faz nos vidros que têm conteúdo passando por
+     trás (o menu do usuário, os tooltips do analytics, o painel lateral). É o
+     --glass-opaco do globals.css, calibrado contra a lente do pesado pela mesma
+     conta do véu translúcido. Era #0a0d3c, o var(--surface-raised), e errava a
+     cor da lente em 139 de distância RGB, era ele que fazia o vidro leve
+     parecer mais escuro que o pesado. */
+  .opaco { top: 178px; background-color: #0d1983; }
 </style>
 </head>
 <body>
@@ -116,9 +120,11 @@
 <p class="nota">
   As três lâminas, sobre a mesma cena. A 1ª é o vidro pesado, com
   backdrop-filter. A 2ª é o vidro leve: sem filtro nenhum, só um véu fino
-  deixando a cena passar. A 3ª é o opaco. As duas primeiras têm que ficar
-  parecidas; a terceira é a que destoa, e é por isso que ela ficou só onde
-  passa conteúdo por trás.
+  deixando a cena passar. A 3ª é o opaco, que é o que o leve usa onde passa
+  conteúdo por trás. <b>As três têm que ficar parecidas</b> — a 3ª não
+  acompanha o gradiente, então ela varia menos de ponta a ponta, mas não pode
+  ficar mais escura que as outras duas. Se ficar, é o bug de cor do vidro leve
+  de volta.
 </p>
 <div class="cena">
   <b>USPapo</b>

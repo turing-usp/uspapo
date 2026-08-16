@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef } from "react";
 /* Cresce até aqui e depois rola por dentro. */
 const ALTURA_MAXIMA = "40vh";
 
-export default function PromptInput({ value, onChange, onSubmit }: { value: string; onChange: (value: string) => void; onSubmit: (e: React.SyntheticEvent) => void; }) {
+export default function PromptInput({ value, onChange, onSubmit, disabled = false }: { value: string; onChange: (value: string) => void; onSubmit: (e: React.SyntheticEvent) => void; disabled?: boolean; }) {
   const campoRef = useRef<HTMLTextAreaElement>(null);
 
   /* Auto-resize: zera a altura para o scrollHeight refletir só o conteúdo. */
@@ -19,11 +19,15 @@ export default function PromptInput({ value, onChange, onSubmit }: { value: stri
     /* isComposing: não roubar o Enter de quem está montando um caractere no IME. */
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
+      if (disabled) return;
       onSubmit(e);
     }
   };
 
+  /* Enquanto trava, o botão continua sendo o de enviar: trocar para o microfone
+     no meio do envio pareceria que a pergunta se perdeu. */
   const temTexto = value.trim().length > 0;
+  const podeEnviar = temTexto && !disabled;
 
   return (
     <form onSubmit={onSubmit} className="w-full">
@@ -45,15 +49,17 @@ export default function PromptInput({ value, onChange, onSubmit }: { value: stri
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={aoTeclar}
+          disabled={disabled}
           /* text-[1rem] e não text-base: abaixo de 16px o iOS dá zoom ao focar. */
-          className="min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent py-2.5 text-[1rem] md:text-lg leading-6 text-foreground caret-brand placeholder:text-muted-foreground focus:outline-none"
+          className="min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent py-2.5 text-[1rem] md:text-lg leading-6 text-foreground caret-brand placeholder:text-muted-foreground focus:outline-none disabled:cursor-default"
           style={{ maxHeight: ALTURA_MAXIMA }}
           placeholder="Pesquise sobre a USP"
         />
 
         <button
-          type={temTexto ? "submit" : "button"}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand cursor-pointer"
+          type={podeEnviar ? "submit" : "button"}
+          disabled={disabled}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand cursor-pointer disabled:cursor-default disabled:opacity-60"
           aria-label={temTexto ? "Enviar pergunta" : "Falar"}
         >
           {/* As key são obrigatórias, e não decoração: sem elas os dois ramos

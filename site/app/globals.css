@@ -145,6 +145,28 @@
      painel separa por ser vidro fumê, não por ser mais claro. */
   --glass-tint-panel: rgb(255 255 255 / 0.10);
 
+  /* A lâmina resolvida como cor chapada: o que a lente entrega, virado num
+     valor só, para os lugares onde o véu TEM que ser opaco, navegador sem
+     backdrop-filter, quem pediu menos transparência, e os vidros do perfil
+     leve que têm conteúdo passando por trás (.glass-solid) ou que são o
+     próprio painel.
+
+     Aqui morava var(--surface-raised) e var(--surface), e era o erro: aquelas
+     duas cores existem para menu flutuante opaco e para barra lateral,
+     nasceram de outra necessidade e são bem mais escuras do que a lente
+     entrega. Medindo contra o pesado, o sólido errava 139 de distância RGB e o
+     painel 95, num site onde o .glass comum erra 48. Era isso que fazia o
+     vidro leve parecer mais escuro que o pesado.
+
+     Os números saíram do mesmo método do véu translúcido lá embaixo, o
+     scratchpad/calibrar-vidro.mjs: grade de 13x13 sobre o --page-backdrop,
+     resultado do pesado composto como o CSS compõe, e a cor que minimiza o
+     pior erro. Opaco não acompanha o gradiente, então o erro não zera — cai
+     para 26 no claro e 67 no escuro, que é a ordem do erro que o próprio
+     .glass já tem. */
+  --glass-opaco:       #e6e1ec;
+  --glass-opaco-panel: #e2dbeb;
+
   /* ------------------------------------------------------------------
      Séries dos gráficos (painel de analytics)
 
@@ -211,6 +233,8 @@
     --glass-edge-lo:      rgb(255 255 255 / 0.07);
     --glass-shadow-color: rgb(0 0 0 / 0.58);
     --glass-tint-panel:   rgb(6 9 42 / 0.18);
+    --glass-opaco:        #0d1983;
+    --glass-opaco-panel:  #081165;
 
     --chart-1: #d95926;
     --chart-2: #3987e5;
@@ -226,14 +250,19 @@
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"]  { color-scheme: dark; }
 
-/* Sem vidro possível, o véu vira as superfícies opacas do dicionário. Elas
-   já existem nos dois esquemas, então nada aqui precisa saber qual está no ar. */
+/* Sem vidro possível, o véu vira a lâmina chapada do dicionário. Ela já existe
+   nos dois esquemas, então nada aqui precisa saber qual está no ar. */
 
-/* Navegador sem backdrop-filter: sem isso o texto ficaria solto no fundo. */
+/* Navegador sem backdrop-filter: sem isso o texto ficaria solto no fundo.
+   Fica no :root, e não junto do perfil leve, porque o script do layout.tsx não
+   testa suporte a backdrop-filter, dá para cair aqui já promovido a pesado, e
+   é justamente esse caso que precisa do opaco. Sob o leve, que tem véu próprio
+   e calibrado, o [data-vidro="leve"] lá embaixo ganha por especificidade, e
+   ganha certo: ali translúcido é o resultado desejado. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   :root {
-    --glass-tint:       var(--surface-raised);
-    --glass-tint-panel: var(--surface);
+    --glass-tint:       var(--glass-opaco);
+    --glass-tint-panel: var(--glass-opaco-panel);
   }
 }
 
@@ -284,15 +313,6 @@
   }
 }
 
-/* Quem pediu menos transparência recebe a mesma superfície, sem blur. */
-@media (prefers-reduced-transparency: reduce) {
-  :root {
-    --glass-blur: 0px;
-    --glass-tint:       var(--surface-raised);
-    --glass-tint-panel: var(--surface);
-  }
-}
-
 /* Vidro leve: a mesma lâmina, sem a lente.
 
    É o perfil PADRÃO, e a direção importa: o <html> sai do servidor já com
@@ -306,12 +326,13 @@
    O valor "pesado" não casa com regra nenhuma daqui, e é assim de propósito: o
    pesado é o que o @utility glass já faz sozinho.
 
-   O `--glass-blur: 0px` do bloco acima não bastava, e é por isso que a regra
-   do ::before existe: blur(0px) continua sendo um backdrop-filter, e um
-   backdrop-filter continua criando superfície de composição e pagando a
-   leitura do framebuffer a cada quadro. O custo que se quer evitar é esse, não
-   o raio. Por isso o filtro tem que SAIR, e por isso o reduced-transparency
-   entra junto: quem pediu menos transparência estava pagando o preço cheio.
+   O `--glass-blur: 0px` do bloco de reduced-transparency, lá embaixo, não
+   bastava, e é por isso que a regra do ::before existe: blur(0px) continua
+   sendo um backdrop-filter, e um backdrop-filter continua criando superfície de
+   composição e pagando a leitura do framebuffer a cada quadro. O custo que se
+   quer evitar é esse, não o raio. Por isso o filtro tem que SAIR, e por isso o
+   reduced-transparency entra junto: quem pediu menos transparência estava
+   pagando o preço cheio.
 
    O véu NÃO vira superfície opaca, que é o caminho óbvio e o errado: quem faz
    o vidro parecer vidro é a cena atrás dele, e a cena atrás dele é um gradiente
@@ -332,12 +353,39 @@
    especificidade, sem !important. */
 :root[data-vidro="leve"] {
   --glass-tint: rgb(238 239 255 / 0.25);
-  @variant escuro { --glass-tint: rgb(0 21 241 / 0.25); }
 
   /* O painel de navegação é a exceção: atrás dele passa a conversa inteira, e
      sem o blur um véu de 0.25 deixaria o texto legível por baixo (contraste
-     ~11:1 na conta acima). Aqui o opaco não é preguiça, é a única saída. */
-  --glass-tint-panel: var(--surface);
+     ~11:1 na conta acima). Aqui o opaco não é preguiça, é a única saída, mas
+     opaco NA COR DA LENTE, que é o --glass-opaco-panel do dicionário, e não o
+     var(--surface) que estava aqui. */
+  --glass-tint-panel: var(--glass-opaco-panel);
+
+  /* O degrau 2 da escada, para vidro sobre vidro. Ver a regra logo abaixo.
+     Os valores moram AQUI, e não lá, e isso não é organização: o @variant
+     escuro cola o seletor do esquema no último compound do seletor em que está
+     aninhado. No :root ele vira `:root[data-vidro="leve"][data-theme="dark"]`,
+     que é o que se quer; dentro de `.glass .glass` viraria
+     `.glass:where([data-theme="dark"])`, exigindo o data-theme no próprio vidro
+     e ele mora no <html>. Os valores escuros simplesmente nunca apareceriam.
+
+     Escrever os dois esquemas à mão lá embaixo também não serve: o ramo da
+     media query nasce com um :not() a mais e sobe para (0,5,0), passando na
+     frente das regras do sólido e do painel que vêm depois, que são (0,4,0). O
+     sólido aninhado voltaria a ser translúcido só no escuro. Com os valores
+     aqui, a regra de lá é uma só, sem ramo de esquema, e a ordem de origem
+     resolve o resto. */
+  --glass-tint-empilhado:        rgb(255 225 240 / 0.21);
+  --glass-opaco-empilhado:       #e8e3eb;
+  --glass-opaco-panel-empilhado: #e7e0ea;
+
+  @variant escuro {
+    --glass-tint: rgb(0 21 241 / 0.25);
+
+    --glass-tint-empilhado:        rgb(0 30 255 / 0.54);
+    --glass-opaco-empilhado:       #031dbb;
+    --glass-opaco-panel-empilhado: #01119b;
+  }
 }
 
 :root[data-vidro="leve"] .glass::before {
@@ -345,17 +393,97 @@
   backdrop-filter: none;
 }
 
+/* Vidro sobre vidro.
+
+   A lente COMPÕE: o ::before do vidro de dentro amostra o resultado do de fora
+   e aplica saturate(1.7) brightness(1.14) de novo, então cada camada clareia
+   sobre a anterior. O véu do leve não faz isso — é uma cor fixa em cima de
+   outra cor fixa, e empilhar só escurece. Daí os 102 de distância RGB entre os
+   dois perfis nos vidros empilhados, o triplo do erro de uma lâmina só.
+
+   A escada tem dois degraus e para aí, de propósito. `.glass .glass` casa com
+   qualquer profundidade a partir de 2, e é o que se quer: no escuro o pesado em
+   profundidade 3 já satura o canal azul em 163 das 169 amostras da grade, virou
+   chapa, e o degrau 2 encosta nela. O único ponto de profundidade 3 do site é o
+   <p class="glass glass-panel"> do RevisaoFeedback, dentro do admin.
+
+   Os três precisam ser reapontados um a um, e não bastaria trocar um token de
+   trás: var() em custom property resolve na hora da substituição, então
+   --glass-tint-panel já nasceu no :root com o valor do degrau 1 dentro, e
+   redefinir o --glass-opaco-panel aqui não alcançaria ele.
+
+   Sem ramo de esquema aqui dentro, de propósito — o porquê está no comentário
+   dos tokens *-empilhado, lá em cima. */
+:root[data-vidro="leve"] .glass .glass {
+  --glass-tint:       var(--glass-tint-empilhado);
+  --glass-opaco:      var(--glass-opaco-empilhado);
+  --glass-tint-panel: var(--glass-opaco-panel-empilhado);
+}
+
 /* Marca "atrás de mim passa conteúdo, não o fundo da página".
 
    Sem efeito no vidro pesado, onde o blur já embaralha o que está atrás; no
-   leve, é o que impede o menu do usuário e os avisos do histórico virarem
-   janela para o texto que deveriam cobrir. Regra de CSS simples, e não
-   @utility: ela não gera variação nenhuma, só marca o elemento. */
-:root[data-vidro="leve"] .glass-solid {
-  --glass-tint: var(--surface-raised);
+   leve, é o que impede o menu do usuário, os tooltips do analytics e os avisos
+   do histórico virarem janela para o texto que deveriam cobrir. Regra de CSS
+   simples, e não @utility: ela não gera variação nenhuma, só marca o elemento.
+
+   Os dois seletores não são redundância. `.glass .glass-solid` empata em
+   especificidade com o `.glass .glass` de cima (0,4,0) e precisa vir DEPOIS
+   para ganhar na ordem de origem, sem ele, um sólido aninhado (que é
+   exatamente o tooltip do analytics flutuando sobre o CardGrafico) receberia o
+   véu translúcido do degrau 2 e deixaria o gráfico aparecer por baixo. */
+:root[data-vidro="leve"] .glass-solid,
+:root[data-vidro="leve"] .glass .glass-solid {
+  --glass-tint: var(--glass-opaco);
 }
 
+/* E o painel aninhado, pelo mesmo motivo, com um agravante: o degrau 2 escreve
+   --glass-tint no próprio elemento e é regra SEM camada, então ganha do
+   `--glass-tint: var(--glass-tint-panel)` que o @utility glass-panel escreve no
+   mesmo elemento, não por especificidade, por camada. Sem esta regra o painel
+   aninhado sairia com o véu translúcido do vidro comum. É o
+   <p class="glass glass-panel"> do RevisaoFeedback. */
+:root[data-vidro="leve"] .glass .glass-panel {
+  --glass-tint: var(--glass-tint-panel);
+}
+
+/* Quem pediu menos transparência recebe a mesma lâmina, chapada e sem blur.
+
+   Este bloco morava lá em cima, antes do vidro leve, e de lá não fazia efeito
+   nenhum: ele mira o :root (0,1,0) e o :root[data-vidro="leve"] (0,2,0) ganha
+   dele. Como o script do layout.tsx tem o prefers-reduced-transparency dentro
+   da conjunção que promove ao pesado, quem pede menos transparência está
+   SEMPRE no leve — ou seja, o bloco nunca alcançava ninguém, e essas pessoas
+   recebiam o véu translúcido de alfa 0.25 no lugar do opaco. Daí ele ter
+   descido para cá e ter ganhado o seletor do perfil leve na lista.
+
+   O degrau 2 também precisa ser desarmado à parte, pelo mesmo motivo: (0,4,0)
+   ganharia do (0,2,0) daqui. Só o --glass-tint, que é o único translúcido de
+   lá, e o var(--glass-opaco) resolve contra o valor que o próprio degrau 2
+   definiu, então cada nível vira o opaco do seu nível. O painel fica de fora
+   pelo :not(): ele já é chapado nos dois degraus, e sem a exceção esta regra
+   seria a última a falar e trocaria a cor dele pela do vidro comum. */
 @media (prefers-reduced-transparency: reduce) {
+  :root,
+  :root[data-vidro="leve"] {
+    --glass-blur: 0px;
+    --glass-tint:       var(--glass-opaco);
+    --glass-tint-panel: var(--glass-opaco-panel);
+
+    /* O véu é o único token do :root que tem ramo de esquema, e o ramo da media
+       query do @variant escuro nasce com um :not() a mais: (0,3,0) contra os
+       (0,2,0) da linha acima. Sem repetir a variante aqui, quem pede menos
+       transparência ficaria certo no claro e voltaria ao véu translúcido no
+       escuro — que é justo o esquema em que o problema aparece. O
+       --glass-tint-panel não precisa: ele é declarado uma vez só lá em cima,
+       fora da variante. */
+    @variant escuro { --glass-tint: var(--glass-opaco); }
+  }
+
+  :root[data-vidro="leve"] .glass .glass:not(.glass-panel) {
+    --glass-tint: var(--glass-opaco);
+  }
+
   .glass::before {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;

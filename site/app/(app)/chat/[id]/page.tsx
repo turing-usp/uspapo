@@ -5,6 +5,7 @@ import PromptInput from "@/components/propmptInput";
 import StatusBlock from "@/components/StatusBlock";
 import TypingIndicator from "@/components/TypingIndicator";
 import { obterConversa, salvarConversa, gerarTitulo, PENDENTE, type Mensagem } from "@/lib/conversas";
+import { lerPendente, descartarPendente } from "@/lib/pendente";
 import { obterFeedbacksDaConversa, type FeedbackItem } from "@/lib/feedback";
 import FeedbackBot from "@/components/FeedbackBot";
 import {
@@ -25,8 +26,19 @@ export default function ChatPage() {
 
     const { id } = useParams();
     const [pergunta, setPergunta] = useState("");
-    const [historico, setHistorico] = useState<Mensagem[]>([]);
-    const [respondendo, setRespondendo] = useState(false);
+    /* A pergunta que veio da home, lida uma única vez, no primeiro render.
+       Guardada em estado e não em ref porque três useState abaixo dependem
+       dela: é ela que faz a bolha, o "digitando" e o estado de "respondendo"
+       existirem no mesmo quadro da navegação, antes de qualquer ida ao banco.
+
+       Sem risco de divergência de hidratação, numa navegação de cliente não há
+       render no servidor, e num acesso direto à URL o Map do lib/pendente está
+       vazio dos dois lados. */
+    const [daHome] = useState(() => lerPendente(id as string));
+    const [historico, setHistorico] = useState<Mensagem[]>(() =>
+        daHome ? [{ user: daHome, bot: PENDENTE }] : []
+    );
+    const [respondendo, setRespondendo] = useState(!!daHome);
     const [streaming, setStreaming] = useState(false);
     /* O que o modelo está fazendo agora */
     const [status, setStatus] = useState<StatusStream>(STATUS_INICIAL);
@@ -40,11 +52,17 @@ export default function ChatPage() {
     /* O fade atrás do composer precisa saber onde ele começa. */
     useAlturaPublicada(composerRef, "--composer-h");
 
-    const completarResposta = async (texto: string, anteriores: Mensagem[]) => {
+    /* O prólogo mora fora do completarResposta porque o caminho da home não
+       precisa dele: quando a pergunta veio de lá, os três já nascem assim nos
+       useState acima. Chamá-los do efeito de montagem só cascatearia um render
+       para chegar num estado que já era o atual. */
+    const iniciarResposta = () => {
         setRespondendo(true);
         setStreaming(false);
         setStatus(STATUS_INICIAL);
+    };
 
+    const completarResposta = async (texto: string, anteriores: Mensagem[]) => {
         const acc = { corpo: "", fontes: [] as string[], erro: "" };
 
         /* Parser mais lento para não exigir muita performance do React */
@@ -110,6 +128,7 @@ export default function ChatPage() {
         const anteriores = historico;
         setHistorico((prev) => [...prev, { user: texto, bot: PENDENTE }]);
         setPergunta("");
+        iniciarResposta();
         await completarResposta(texto, anteriores);
     };
 
@@ -122,6 +141,24 @@ export default function ChatPage() {
     useEffect(() => {
         if (jaProcessouInicial.current) return;
         jaProcessouInicial.current = true;
+
+        /* Conversa recém-nascida na home: a pergunta veio em memória e já está
+           na tela, com o estado de resposta montado desde o primeiro render.
+           Não há o que buscar, nem conversa, nem feedback, e as três idas ao
+           banco abaixo só atrasariam o primeiro token. Quem grava é o efeito 2,
+           sozinho, com o stream já correndo. */
+        if (daHome) {
+            descartarPendente(id as string);
+            /* O set-state-in-effect segue para dentro do completarResposta e
+               acha os setState de lá, mas nenhum deles é síncrono: todos rodam
+               nos callbacks do stream, depois da rede. A regra aceita o mesmo
+               completarResposta duas telas abaixo só porque lá existe um await
+               antes dele, e pôr um await aqui, justamente no caminho que existe
+               para NÃO esperar nada, seria enganar a regra em vez de atender. */
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            completarResposta(daHome, []);
+            return;
+        }
 
         (async () => {
             const conversa = await obterConversa(id as string);
@@ -144,6 +181,7 @@ export default function ChatPage() {
             if (ultima && ultima.bot === PENDENTE) {
                 /* A última é justamente a que está sem resposta: ela é a pergunta
                 de agora, não um turno anterior. */
+                iniciarResposta();
                 completarResposta(ultima.user, conversa.mensagens.slice(0, -1));
             }
         })();
@@ -235,7 +273,10 @@ export default function ChatPage() {
                 className="relative z-30 flex-none pt-8 pb-4"
             >
                 <div className="app-container-chat">
-                    <PromptInput value={pergunta} onChange={setPergunta} onSubmit={lidarComEnvio} />
+                    {/* O guard do enviarPergunta já barrava a segunda pergunta,
+                    mas em silêncio: o campo aceitava o Enter e não acontecia
+                    nada. O disabled é o mesmo estado, visível. */}
+                    <PromptInput value={pergunta} onChange={setPergunta} onSubmit={lidarComEnvio} disabled={respondendo} />
                     <p className="mt-2 text-center text-sm text-muted-foreground text-balance">
                         O USPapo é uma IA e pode cometer erros. Sempre confirme as informações com fontes oficiais.
                     </p>

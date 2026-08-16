@@ -17,10 +17,17 @@ export type Conversa = {
 
 /* Tudo aqui pressupõe sessão: o proxy.ts não deixa chegar nesta parte do site
    sem login. Existia um caminho paralelo em localStorage, para quem usava sem
-   conta, e ele saiu junto com essa possibilidade. Uma chamada por operação é
-   barato: o cliente lê o cookie, não vai à rede. */
-async function uid(): Promise<string | null> {
-  const { data } = await criarCliente().auth.getUser();
+   conta, e ele saiu junto com essa possibilidade.
+
+   Dizia aqui que a chamada era barata porque "o cliente lê o cookie, não vai à
+   rede", e era o contrário: getUser() bate no /auth/v1/user para conferir o
+   token no servidor, quem lê o cookie e volta na hora é o getSession(). Era
+   uma ida à rede inteira, e ela abria a fila de seis que a home esperava antes
+   de trocar de tela. Continua sendo getUser() de propósito, porque gravar com
+   um id de token vencido só levaria erro do RLS; o que mudou é que ninguém mais
+   espera por ela olhando para a tela parada. */
+async function uid(supabase: ReturnType<typeof criarCliente>): Promise<string | null> {
+  const { data } = await supabase.auth.getUser();
   return data.user?.id ?? null;
 }
 
@@ -76,13 +83,43 @@ export async function obterConversa(id: string): Promise<Conversa | null> {
   };
 }
 
-export async function salvarConversa(conversa: Conversa): Promise<void> {
-  const usuario = await uid();
+/* Uma gravação por conversa de cada vez.
+ *
+ * As duas gravações de um turno, a pergunta entrando e a resposta fechando,
+ * saem do mesmo efeito do chat, e nada garantia que a primeira terminasse antes
+ * de a segunda começar. Antes isso não aparecia porque a home já tinha inserido
+ * o turno 0 e ido embora; agora quem insere é o próprio chat, com o stream
+ * correndo ao lado, e uma resposta rápida chega enquanto o insert da pergunta
+ * ainda está no ar. Os dois inserem (conversa_id, ordem) = (id, 0), o segundo
+ * bate na chave primária e a resposta se perde no console.
+ *
+ * A fila resolve sem transação nem upsert: quem chega espera quem está lá. Roda
+ * fora do caminho crítico de qualquer jeito, então esperar não custa tela. */
+const filaPorConversa = new Map<string, Promise<void>>();
+
+export function salvarConversa(conversa: Conversa): Promise<void> {
+  const anterior = filaPorConversa.get(conversa.id) ?? Promise.resolve();
+  /* O catch é da promessa ANTERIOR: uma gravação que falhou não pode travar a
+     fila da conversa para sempre. */
+  const atual = anterior.catch(() => {}).then(() => gravar(conversa));
+  filaPorConversa.set(conversa.id, atual);
+
+  /* Sem isto o Map cresce uma entrada por conversa e nunca solta. */
+  const limpar = () => {
+    if (filaPorConversa.get(conversa.id) === atual) filaPorConversa.delete(conversa.id);
+  };
+  void atual.then(limpar, limpar);
+
+  return atual;
+}
+
+async function gravar(conversa: Conversa): Promise<void> {
+  const supabase = criarCliente();
+  const usuario = await uid(supabase);
   /* Sessão vencida entre abrir a tela e mandar a pergunta: gravar sem user_id
      só levaria um erro do RLS. O proxy.ts manda para o login no próximo passo. */
   if (!usuario) return;
 
-  const supabase = criarCliente();
   const { error } = await supabase.from("conversas").upsert({
     id: conversa.id,
     user_id: usuario,
@@ -102,7 +139,7 @@ export async function salvarConversa(conversa: Conversa): Promise<void> {
   const salvos = new Map((existentes ?? []).map((l) => [l.ordem, l.resposta]));
 
   for (const [i, m] of conversa.mensagens.entries()) {
-    const resposta = m.bot === "..." ? null : m.bot;
+    const resposta = m.bot === PENDENTE ? null : m.bot;
 
     if (!salvos.has(i)) {
       const { error: erroInsercao } = await supabase.from("mensagens").insert({
@@ -118,7 +155,13 @@ export async function salvarConversa(conversa: Conversa): Promise<void> {
     }
   }
 
-  await podarConversas(supabase);
+  /* A poda só na gravação que FECHA o turno, e não em toda gravação.
+     São dois selects e uma volta ao banco por chamada, e a gravação da pergunta
+     acontece com o stream começando ao lado, disputar conexão ali atrasa o
+     primeiro token e não adianta nada, porque o que a poda conta (quantas
+     conversas existem) é o mesmo nas duas passadas do turno. */
+  const ultima = conversa.mensagens[conversa.mensagens.length - 1];
+  if (ultima && ultima.bot !== PENDENTE) await podarConversas(supabase);
 }
 
 /* As favoritas nunca entram na conta: é exatamente para isso que elas servem. */
