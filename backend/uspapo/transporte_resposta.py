@@ -301,17 +301,20 @@ def _frase_explicacao(resultado: ResultadoTrajeto) -> str:
     )
 
 
-def _frase_alternativas(resultado: ResultadoTrajeto) -> str:
+def _lista_alternativas(alternativas: tuple[AlternativaPublica, ...]) -> str:
     itens = [
         f"**{item.linha}** (cerca de {_minutos(item.total_s)} min)"
-        for item in resultado.alternativas
+        for item in alternativas
     ]
-    if not itens:
+    if len(itens) <= 1:
+        return itens[0] if itens else ""
+    return ", ".join(itens[:-1]) + " e " + itens[-1]
+
+
+def _frase_alternativas(resultado: ResultadoTrajeto) -> str:
+    lista = _lista_alternativas(resultado.alternativas)
+    if not lista:
         return "Não encontrei outra opção direta competitiva para esse trajeto."
-    if len(itens) == 1:
-        lista = itens[0]
-    else:
-        lista = ", ".join(itens[:-1]) + " e " + itens[-1]
     sufixo = (
         " pela programação"
         if resultado.espera.base == "eta_ao_vivo"
@@ -352,6 +355,106 @@ def renderizar_trajeto(
         partes.append(_frase_alternativas(resultado))
     if resultado.aviso:
         partes.append(resultado.aviso)
+    return "\n\n".join(partes)
+
+
+@dataclass(frozen=True)
+class ResultadoCaminhada:
+    """Contrato público do trajeto que se faz melhor a pé.
+
+    Ir a pé é uma resposta de primeira classe num campus onde quase tudo está a
+    quinze minutos de caminhada. Ela passa pelo mesmo contrato do trajeto de
+    ônibus para que a camada de linguagem receba os mesmos fatos obrigatórios —
+    antes esse ramo montava a prosa por fora e o naturalizador podia devolver
+    uma resposta simpática que não dizia quantos minutos eram.
+    """
+
+    origem: LocalPublico
+    destino: LocalPublico
+    distancia_m: float
+    duracao_s: float
+    alternativas: tuple[AlternativaPublica, ...] = ()
+    aviso: str = ""
+
+    def __post_init__(self) -> None:
+        if self.distancia_m < 0 or self.duracao_s < 0:
+            raise ValueError("caminhada com distância ou duração negativa")
+
+    @property
+    def duracao_min(self) -> int:
+        return max(1, _minutos(self.duracao_s))
+
+    def public_view(self, facetas: FacetasResposta) -> dict[str, object]:
+        """Fatos públicos já formatados para a verbalização final."""
+        vista: dict[str, object] = {
+            "tipo": "trajeto_a_pe",
+            "facetas": {
+                "localizacao": facetas.localizacao,
+                "duracao": facetas.duracao,
+                "tempo_real": facetas.tempo_real,
+                "alternativas": facetas.alternativas,
+                "explicacao": facetas.explicacao,
+            },
+            "origem": {
+                "nome": self.origem.nome_curto,
+                "localizacao": self.origem.localizacao,
+            },
+            "destino": {
+                "nome": self.destino.nome_curto,
+                "localizacao": self.destino.localizacao,
+            },
+            "melhor_opcao": {
+                "modo": "a_pe",
+                "distancia_m": round(self.distancia_m),
+                "tempo_total_min": self.duracao_min,
+            },
+            "fatos_obrigatorios": [self.destino.nome_curto],
+            # O tempo da caminhada é a resposta inteira aqui, não um detalhe
+            # que só aparece quando o aluno pergunta "quanto demora".
+            "numeros_obrigatorios": [self.duracao_min],
+        }
+        if facetas.alternativas and self.alternativas:
+            vista["alternativas"] = [
+                {
+                    "modo": "onibus",
+                    "linha": item.linha,
+                    "sentido": item.sentido,
+                    "tempo_total_min": _minutos(item.total_s),
+                    "base_tempo": "programacao",
+                }
+                for item in self.alternativas
+            ]
+        if self.aviso:
+            vista["aviso"] = self.aviso
+        return vista
+
+
+def renderizar_caminhada(
+    resultado: ResultadoCaminhada,
+    facetas: FacetasResposta,
+) -> str:
+    """Fallback determinístico do trajeto a pé."""
+    partes: list[str] = []
+    if facetas.localizacao:
+        partes.append(
+            f"A **{resultado.destino.nome_curto}** fica "
+            f"{resultado.destino.localizacao}."
+        )
+    partes.append(
+        f"De **{resultado.origem.nome_curto}** até "
+        f"**{resultado.destino.nome_curto}**, a melhor opção é ir a pé: são "
+        f"cerca de **{resultado.duracao_min} minutos** "
+        f"({round(resultado.distancia_m)} m)."
+    )
+    if resultado.aviso:
+        partes.append(resultado.aviso)
+    if facetas.alternativas:
+        lista = _lista_alternativas(resultado.alternativas)
+        partes.append(
+            f"Se preferir ônibus, as opções diretas são: {lista}."
+            if lista
+            else "Não há linha direta competitiva para esse trajeto agora."
+        )
     return "\n\n".join(partes)
 
 
@@ -832,9 +935,11 @@ __all__ = [
     "LocalPublico",
     "PassagensPorSentido",
     "PrevisaoChegada",
+    "ResultadoCaminhada",
     "ResultadoChegada",
     "ResultadoTrajeto",
     "facetas_da_pergunta",
+    "renderizar_caminhada",
     "renderizar_chegada",
     "renderizar_trajeto",
 ]

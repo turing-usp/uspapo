@@ -53,16 +53,45 @@ PARALELOS_PADRAO = 4
 
 # Teto de sites por ronda, com os mais atrasados primeiro.
 #
-# Existe por causa de um efeito de sincronização: quando muitos sites são
-# cadastrados ou recarregados no mesmo dia, eles passam a vencer todos no mesmo
-# dia também, para sempre. Depois do rebuild de 2026-08-06 são 43 sites ativos,
-# 22 deles com `frequency: 7d`. Sem teto, o sétimo dia traria 22 sites de uma
-# vez (~55 min) e estouraria o `timeout-minutes: 45` do workflow.
+# Existe como rede contra o `timeout-minutes` do workflow: um dia em que muitos
+# sites vencem juntos não pode matar a ronda no meio.
 #
-# Com o teto, o excedente simplesmente vence de novo amanhã e a fila drena
-# sozinha, desincronizando as datas de quebra. É preferível a um site ficar um
-# dia mais velho do que a ronda inteira ser morta no meio pelo runner.
-MAX_SITES_POR_RONDA = 12
+# O número acompanha a cadência. Enquanto a ronda era diária, 12 bastava e o
+# excedente vencia de novo no dia seguinte. Agora a ronda é semanal — porque
+# reindexar custa cota de embedding — e a próxima só vem em sete dias: um teto
+# baixo não adiaria o excedente, ele o deixaria envelhecer uma semana inteira.
+# A demanda de uma semana são ~31 sites (43 ativos: 22 a cada 7d, 9 a cada 14d,
+# 12 a cada 21d), e com `--paralelos 8` isso fecha dentro dos 90 minutos.
+MAX_SITES_POR_RONDA = 32
+
+# Piso de frequência, em dias.
+#
+# Raspar é barato; reindexar não é. Cada página promovida volta para o
+# `clean_data` e para o `build_vector`, e todo parágrafo cujo hash mudou vira um
+# embedding pago. Sites da USP têm carrossel de notícias e de eventos que muda
+# sozinho, então um site revisitado com frequência gera upsert mesmo sem nenhuma
+# mudança de conteúdo que interesse ao aluno.
+#
+# Nenhum site pode, portanto, ser revisitado em menos de uma semana. O piso mora
+# aqui, e não no `scrapers_config.json`, porque config é dado editável: um `1d`
+# digitado sem querer numa entrada nova não pode reabrir a torneira.
+MIN_FREQUENCIA_DIAS = 7
+
+
+def dias_de_frequencia(freq_str: str) -> int:
+    """Converte a frequência declarada, nunca abaixo do piso semanal."""
+    try:
+        dias = int(str(freq_str).replace("d", "").strip())
+    except (ValueError, TypeError):
+        print(f"[AVISO] Frequência inválida '{freq_str}'. Usando {MIN_FREQUENCIA_DIAS}d.")
+        return MIN_FREQUENCIA_DIAS
+    if dias < MIN_FREQUENCIA_DIAS:
+        print(
+            f"[AVISO] Frequência '{freq_str}' é menor que o piso de "
+            f"{MIN_FREQUENCIA_DIAS}d; tratando como {MIN_FREQUENCIA_DIAS}d."
+        )
+        return MIN_FREQUENCIA_DIAS
+    return dias
 
 
 def calcular_vencimento(data_str: str, freq_str: str) -> bool:
@@ -70,11 +99,10 @@ def calcular_vencimento(data_str: str, freq_str: str) -> bool:
         return True
     try:
         ultima = datetime.strptime(data_str, "%Y-%m-%d")
-        dias = int(str(freq_str).replace("d", ""))
-        return datetime.now() >= ultima + timedelta(days=dias)
     except (ValueError, TypeError) as erro:
         print(f"[AVISO] Data inválida '{data_str}': {erro}. Forçando atualização.")
         return True
+    return datetime.now() >= ultima + timedelta(days=dias_de_frequencia(freq_str))
 
 
 def _carregar(caminho: str) -> list:
@@ -254,12 +282,26 @@ def rodar_pipeline(
     _rodar(["-m", "embeddings.build_vector", "--somente", *limpos])
 
 
+# `build_vector` sai com 3 quando a cota mensal de embeddings acabou. Não é uma
+# falha do scraping: as páginas foram raspadas e promovidas, só a vetorização
+# não cabe mais neste mês. Confundir os dois faria alguém procurar um seletor
+# quebrado que não existe.
+SAIDA_COTA_MENSAL = 3
+
+
 def _rodar(argumentos: list[str]) -> bool:
     try:
         subprocess.run([sys.executable, *argumentos], check=True, cwd=RAIZ)
         return True
     except subprocess.CalledProcessError as erro:
-        print(f"[ERRO] {' '.join(argumentos)} falhou: {erro}")
+        if erro.returncode == SAIDA_COTA_MENSAL:
+            print(
+                "[COTA] A cota mensal de tokens de embedding acabou. O texto "
+                "raspado está salvo e será indexado na virada do mês; nada "
+                "aqui precisa ser reparado."
+            )
+        else:
+            print(f"[ERRO] {' '.join(argumentos)} falhou: {erro}")
         return False
 
 

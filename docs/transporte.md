@@ -25,6 +25,11 @@ instruções.
   USPapo mostra a faixa, o headway e uma janela para a próxima passagem. Também
   mostra o centro dessa janela como referência aproximada, sem apresentá-lo
   como partida exata ou previsão GPS.
+- A espera esperada numa faixa é **meio intervalo**, nunca zero. A SPTrans
+  publica as faixas como `[inicio, inicio+3540]`, deixando 60 segundos de lacuna
+  entre uma e a seguinte; tratar essa lacuna como "sem faixa" fazia o instante
+  que caísse nela valer uma espera de segundos, e essa linha vencia o ranking do
+  planejador. Fora da faixa, soma-se o tempo até ela abrir.
 - `calendar_dates.txt` tem precedência sobre o calendário semanal quando a
   SPTrans o publicar.
 - A resposta informa quando o recorte GTFS foi gerado e alerta após sete dias
@@ -35,6 +40,17 @@ calçadas. O planejador cobre caminhada e viagens diretas de ônibus; ele ainda
 não modela baldeações. A API do Google Maps não está integrada e não é tratada
 como fonte implícita.
 
+Duas regras de produto decidem o que é oferecido:
+
+- **A caminhada ganha o empate.** O ônibus só é recomendado quando chega antes
+  de quem foi a pé. O fator conservador de 15% sobre a distância em linha reta
+  já é a margem de erro do cálculo.
+- **Espera acima de hora e meia não é opção.** Sem esse teto, um domingo
+  devolvia "8084-10, cerca de 618 minutos" como alternativa, porque a próxima
+  partida programada era na segunda de manhã. Quando as linhas existem mas não
+  circulam agora, a resposta diz isso em vez de recomendar uma caminhada longa
+  sem explicação.
+
 ## Resposta para o aluno
 
 A resposta é montada em quatro camadas: o planejador preserva os componentes em
@@ -42,6 +58,14 @@ segundos, `transporte_resposta.py` cria uma visão pública tipada, uma chamada
 curta à LLM verbaliza somente esses fatos e um validador confere a resposta
 inteira antes de exibi-la. Assim, “onde fica e como chegar” responde às duas
 partes, enquanto uma pergunta simples não recebe uma explicação de engenharia.
+
+Os módulos seguem a mesma separação das outras ferramentas do projeto: o motor
+de horários é `backend/uspapo/gtfs_sptrans.py`, a API ao vivo é
+`backend/uspapo/olhovivo.py`, e `backend/uspapo/ferramentas/circulares.py` só
+faz o despacho entre os quatro modos de consulta, escreve a prosa de falha e
+declara o schema — ele não faz aritmética de horário nem de distância. O trajeto
+a pé passa pelo mesmo contrato tipado do trajeto de ônibus, com os mesmos fatos
+obrigatórios, para que a naturalização não possa omitir a duração.
 
 O modo normal mostra uma única duração: o total, já incluindo espera e
 caminhada. O tempo dentro do ônibus só aparece quando o aluno pede o cálculo;
@@ -67,6 +91,8 @@ $env:PYTHONPATH='backend'
 $env:SPTRANS_TOKEN=''
 .\venv\Scripts\python.exe -m unittest `
   backend.uspapo.test_roteamento `
+  backend.uspapo.test_gtfs_sptrans `
+  backend.uspapo.test_olhovivo `
   backend.uspapo.test_naturalizador_transporte `
   backend.uspapo.test_transporte_resposta `
   backend.uspapo.test_provedores `

@@ -2,13 +2,24 @@ name: USPapo Data Pipeline
 
 on:
   schedule:
+  # Diário, só transporte: o GTFS é um arquivo estático e não custa token
+  # nenhum, e a ferramenta de ônibus avisa o aluno quando o recorte passa de
+  # sete dias sem atualização.
   - cron: '0 5 * * *'
+  # Semanal, segunda-feira: scraping e reindexação. Cada parágrafo alterado
+  # vira um embedding pago, e a cota do plano é mensal — rodar isso todo dia
+  # gastava a cota inteira antes do fim do mês.
+  - cron: '30 5 * * 1'
   workflow_dispatch: # Cria um botão no GitHub para você rodar manualmente quando quiser
     inputs:
       forcar_migracao:
         description: 'Desliga o disjuntor de orçamento (use só para o rebuild completo)'
         type: boolean
         default: false
+      rodar_scrapers:
+        description: 'Raspar sites e reindexar (fora do dia semanal, gasta cota de embedding)'
+        type: boolean
+        default: true
 
 permissions:
   contents: write # Permite que o robô faça commit atualizando a data e o ledger no repositório
@@ -19,7 +30,9 @@ jobs:
     # Sem este teto, um 429 persistente do Pinecone deixava o job rodando até o
     # limite de 6 horas do GitHub. O `while not sucesso:` que causava isso já
     # virou backoff com número máximo de tentativas, mas o teto fica como rede.
-    timeout-minutes: 45
+    # 90 min porque a ronda semanal traz ~31 sites de uma vez (a semana inteira),
+    # e não a fatia diária de antes. O cron diário só faz o GTFS e sai em minutos.
+    timeout-minutes: 90
 
     steps:
       - name: 📥 Clonar o repositório
@@ -39,6 +52,11 @@ jobs:
       - name: 🚌 Atualizar itinerários oficiais da SPTrans
         run: python scripts/atualizar_gtfs_sptrans.py
 
+      - name: ✅ Validar cota de embeddings e piso de frequência
+        env:
+          DRY_RUN: '1'
+        run: python -m unittest embeddings.test_cota -v
+
       - name: ✅ Validar roteamento e semântica GTFS
         env:
           PYTHONPATH: backend
@@ -48,6 +66,9 @@ jobs:
         run: |
           python -m unittest \
             backend.uspapo.test_roteamento \
+            backend.uspapo.test_gtfs_sptrans \
+            backend.uspapo.test_olhovivo \
+            backend.uspapo.test_transporte_resposta \
             backend.uspapo.ferramentas.test_circulares \
             backend.uspapo.test_preconsulta_conversa \
             scripts.test_atualizar_gtfs_sptrans -v
@@ -63,6 +84,9 @@ jobs:
           git push
 
       - name: 🚀 Executar o Rodar Scrapers (Scraping + Clean + Pinecone)
+        # O cron diário para aqui: ele existe só para o GTFS. Scraping e
+        # reindexação são do cron semanal e do botão manual.
+        if: github.event.schedule == '30 5 * * 1' || (github.event_name == 'workflow_dispatch' && inputs.rodar_scrapers)
         env:
           PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
           PINECONE_INDEX: ${{ vars.PINECONE_INDEX || 'uspapo-rag' }}
@@ -74,15 +98,22 @@ jobs:
           # Mexer em >25% do banco de uma vez não é rotina, é migração — e
           # migração passa pelo botão manual, não pelo cron das 5h.
           # ─────────────────────────────────────────────
-          ORCAMENTO_UPSERTS: '2000'
+          # Teto por execução. Subiu de 2000 junto com a ronda semanal, mas o
+          # limite de cima é a cota mensal de embeddings: são ~4,3 rondas por
+          # mês, e 3000 chunks custam ~900 mil tokens cada, o que dá ~3,9 M
+          # contra um orçamento de 4,05 M. O teto acumulativo do mês está em
+          # `embeddings/cota.py` e vale mesmo na migração forçada.
+          ORCAMENTO_UPSERTS: '3000'
           ORCAMENTO_DELETES: '3000'
           LIMIAR_ABORTO_PCT: '0.25'
           PERMITIR_MIGRACAO_TOTAL: ${{ inputs.forcar_migracao && '1' || '0' }}
-        # 6 sites ao mesmo tempo. O trabalho é esperar `DOWNLOAD_DELAY`, não
-        # calcular, então isso cabe com folga nos 2 núcleos do runner — e sem
-        # ele um dia com muitos vencimentos coincidentes não fecha dentro do
-        # `timeout-minutes: 45` acima. Cada site continua vendo um crawler só.
-        run: python scrapers/spiders/rodar_scrapers.py --paralelos 6
+        # 8 sites ao mesmo tempo. O trabalho é esperar `DOWNLOAD_DELAY`, não
+        # calcular, e o teto útil é a memória do runner (~95 MB por processo do
+        # scrapy), não a paciência dos servidores da USP: cada site é um domínio
+        # e um processo separados, e continua vendo um crawler só. Subiu de 6
+        # para 8 porque a ronda agora é semanal e traz a semana inteira de uma
+        # vez, em vez de uma fatia por dia.
+        run: python scrapers/spiders/rodar_scrapers.py --paralelos 8
 
       - name: 📊 Resumo da execução
         if: always()
@@ -97,14 +128,28 @@ jobs:
           else
             echo 'Nenhum relatório gerado (nada foi sincronizado).' >> "$GITHUB_STEP_SUMMARY"
           fi
+          if [ -f data/index/cota_embeddings.json ]; then
+            {
+              echo '### Cota mensal de embeddings'
+              echo '```json'
+              cat data/index/cota_embeddings.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: 💾 Salvar nova data, ledger e dados processados
+        # Mesma condição do passo de scraping: sem ele não há nada novo para
+        # commitar, e o cron diário não deve produzir commit de dados.
+        if: github.event.schedule == '30 5 * * 1' || (github.event_name == 'workflow_dispatch' && inputs.rodar_scrapers)
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
           git add scrapers_config.json
           git add data/index/ledger_avancado.json
+          # O contador de cota é estado do mês: sem versioná-lo, cada runner
+          # começaria do zero e o teto mensal não seguraria nada.
+          git add data/index/cota_embeddings.json
           git add data/processed/
 
           git commit -m "chore(dados): atualiza pipeline, ledger e config [skip ci]" || echo "Nenhuma alteracao para commitar"

@@ -41,6 +41,7 @@ from datetime import datetime
 from tqdm import tqdm
 
 from embeddings import config_vetor as cfg
+from embeddings import cota as C
 from embeddings import ledger as L
 from embeddings.chunking import agrupar_paragrafos, gerar_hash, rechunking_ancorado, texto_para_embedding
 from embeddings.qualidade import filtrar_chunks
@@ -53,6 +54,10 @@ LIMIAR_SUMICO_ARQUIVO = 0.5
 
 class OrcamentoEstourado(RuntimeError):
     pass
+
+
+class CotaMensalEstourada(RuntimeError):
+    """A cota de tokens de embedding do mês acabou; backoff não resolve."""
 
 
 @dataclass
@@ -75,6 +80,24 @@ class Plano:
 # ─────────────────────────────────────────────
 # Disjuntor
 # ─────────────────────────────────────────────
+def custo_em_tokens(plano: Plano) -> int:
+    """Quanto esta remessa deve custar de tokens de embedding."""
+    return C.estimar_tokens(registro.get("text", "") for registro in plano.upserts)
+
+
+def verificar_cota_mensal(plano: Plano) -> None:
+    """Trava acumulativa: as outras são por execução, esta é do mês inteiro.
+
+    Vale inclusive na migração forçada. `--forcar-migracao` autoriza mexer em
+    muito vetor de uma vez; ele não cria tokens que o plano não tem, e um
+    rebuild completo do corpus (~25 mil chunks) custa mais que a cota mensal
+    sozinho — foi assim que o 429 apareceu.
+    """
+    cabe, motivo = C.cabe(custo_em_tokens(plano))
+    if not cabe:
+        raise CotaMensalEstourada(motivo)
+
+
 def verificar_orcamento(plano: Plano, permitir_migracao: bool) -> None:
     """Três travas independentes. Qualquer uma aborta antes de tocar na nuvem."""
     if permitir_migracao:
@@ -102,6 +125,17 @@ def verificar_orcamento(plano: Plano, permitir_migracao: bool) -> None:
         )
 
 
+# Um 429 de cota mensal não é o mesmo que um 429 de excesso de requisições. O
+# primeiro só passa na virada do mês; insistir seis vezes com backoff apenas
+# atrasa a falha em minutos e polui o log com "tentativa 5/6".
+MARCAS_DE_COTA = ("embedding token limit", "for the current month", "upgrade your plan")
+
+
+def _e_cota_mensal(texto: str) -> bool:
+    minusculo = texto.lower()
+    return any(marca in minusculo for marca in MARCAS_DE_COTA)
+
+
 def executar_com_backoff(operacao, descricao: str):
     """Repete com espera exponencial e desistência explícita."""
     for tentativa in range(1, cfg.MAX_TENTATIVAS + 1):
@@ -109,6 +143,12 @@ def executar_com_backoff(operacao, descricao: str):
             return operacao()
         except Exception as erro:
             texto = str(erro)
+            if _e_cota_mensal(texto):
+                raise CotaMensalEstourada(
+                    "a cota mensal de tokens de embedding do plano acabou. "
+                    "Ela só volta na virada do mês; nenhuma tentativa extra "
+                    f"adianta. {C.resumo()}"
+                ) from erro
             recuperavel = any(
                 marca in texto
                 for marca in ("429", "RESOURCE_EXHAUSTED", "503", "502", "504", "timeout", "Timeout")
@@ -319,7 +359,12 @@ def aplicar_plano(plano: Plano, ledger: dict, index) -> None:
                 lambda l=lote: index.upsert_records(namespace=cfg.PINECONE_NAMESPACE, records=l),
                 "upsert",
             )
+            # Contabiliza lote a lote, e não no fim: uma queda no meio da
+            # remessa já gastou os tokens dos lotes que passaram, e o mês
+            # precisa saber disso na próxima execução.
+            C.registrar(C.estimar_tokens(r.get("text", "") for r in lote))
             time.sleep(cfg.PAUSA_ENTRE_LOTES)
+        print(f"\n-> {C.resumo()}")
 
     # O ledger é salvo AQUI: tudo que ele afirma existir já foi confirmado.
     if deletes:
@@ -391,6 +436,8 @@ def construir_banco(
         print(f" Descartados na qualidade: {dict(plano.descartes)}")
     if plano.arquivos_pulados:
         print(f" Arquivos pulados       : {plano.arquivos_pulados}")
+    tokens_previstos = custo_em_tokens(plano)
+    print(f" Tokens de embedding    : ~{tokens_previstos} (restam ~{C.disponivel()} no mês)")
     print("=" * 56)
 
     relatorio = {
@@ -404,6 +451,8 @@ def construir_banco(
         "nascidos_por_arquivo": dict(plano.nascidos),
         "mortos_por_arquivo": dict(plano.mortos),
         "arquivos_pulados": plano.arquivos_pulados,
+        "tokens_embedding_previstos": tokens_previstos,
+        "cota_mensal": C.carregar(),
     }
     os.makedirs(cfg.PASTA_RELATORIOS, exist_ok=True)
     with open(os.path.join(cfg.PASTA_RELATORIOS, "ultima_execucao.json"), "w", encoding="utf-8") as f:
@@ -416,6 +465,10 @@ def construir_banco(
         return relatorio
 
     verificar_orcamento(plano, forcar_migracao or cfg.PERMITIR_MIGRACAO_TOTAL)
+    # A cota do mês vale mesmo na migração forçada: ela não é uma trava de
+    # segurança do banco, é o teto do plano contratado.
+    if not dry_run:
+        verificar_cota_mensal(plano)
 
     if dry_run:
         # O ledger simulado vai para OUTRO arquivo, de propósito. Se um ensaio
@@ -456,6 +509,11 @@ def main() -> None:
             dry_run=True if argumentos.dry_run else None,
             forcar_migracao=argumentos.forcar_migracao,
         )
+    except CotaMensalEstourada as erro:
+        # Código próprio: a ronda de scraping precisa distinguir "o banco não
+        # aceitou esta remessa" de "o mês acabou e nenhuma remessa vai passar".
+        print(f"\n[ABORTADO PELA COTA MENSAL] {erro}")
+        raise SystemExit(3)
     except OrcamentoEstourado as erro:
         print(f"\n[ABORTADO PELO ORÇAMENTO] {erro}")
         raise SystemExit(2)
