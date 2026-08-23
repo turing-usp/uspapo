@@ -30,7 +30,7 @@ import { credenciaisSupabase, dominioCookie } from './lib/supabase';
  * matcher abaixo exclui imagem mas não .html, então sem esta entrada a página
  * de diagnóstico caía no redirecionamento de login, justo ela, que não lê nada
  * da conta e cuja utilidade é funcionar quando o resto não está funcionando. */
-const PUBLICAS = ['/login', '/cadastro', '/esqueci-a-senha', '/auth', '/diagnostico.html'];
+const PUBLICAS = ['/login', '/cadastro', '/esqueci-a-senha', '/nova-senha', '/auth', '/diagnostico.html'];
 
 export async function proxy(request: NextRequest) {
   let resposta = NextResponse.next({ request });

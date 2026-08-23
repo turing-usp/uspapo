@@ -14,10 +14,6 @@ function EsqueciASenha() {
   const params = useSearchParams();
   const erroCallback = params.get('erro') === 'callback';
 
-  /* Para onde o aluno estava indo quando o proxy.ts o mandou para cá.
-     Só caminho interno: um "//site.com" ou "https://site.com" aqui viraria um
-     redirecionamento aberto, com o nosso domínio dando credibilidade ao destino. */
-     
   // Estado simplificado para credenciais de login
   const [formData, setFormData] = useState({
     email: '',

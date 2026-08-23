@@ -56,6 +56,6 @@ export async function entrarComGoogle() {
 export async function enviarLinkDeSenha(email: string) {
   const supabase = criarCliente();
   return supabase.auth.resetPasswordForEmail(email.trim(), {
-    redirectTo: `${window.location.origin}/auth/callback?next=/nova-senha`,
+    redirectTo: `${window.location.origin}/nova-senha`,
   });
 }
