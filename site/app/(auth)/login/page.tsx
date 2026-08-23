@@ -161,7 +161,7 @@ function LoginForm() {
 
         {/* LINK: Esqueceu a senha */}
         <a
-          href="/esqueci-senha"
+          href="/esqueci-a-senha"
           className="mt-4 text-sm text-brand font-medium hover:underline transition-colors cursor-pointer"
         >
           Esqueceu a senha?

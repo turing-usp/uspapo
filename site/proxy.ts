@@ -21,18 +21,16 @@ import { credenciaisSupabase, dominioCookie } from './lib/supabase';
 
 /* Rotas que existem justamente para quem não tem sessão.
  *
- * `/esqueci-senha` está aqui embora a página ainda não exista: a tela de login
- * já linka para ela, e é a única rota do site cuja ausência daqui vira armadilha
- * de verdade. Quem esqueceu a senha não consegue entrar, então exigir sessão
- * para chegar na recuperação de senha tranca a pessoa para fora de vez. É mais
- * barato deixar a porta destrancada agora do que descobrir isso depois.
+ * `/esqueci-a-senha` precisa ficar pública porque a tela de login já aponta
+ * para ela. Quem esqueceu a senha não consegue entrar, então exigir sessão
+ * nessa rota tranca a pessoa para fora de vez.
  *
  * `/diagnostico.html` é HTML estático de /public e existe para ser aberto no
  * aparelho de quem está com problema de renderização, para mandar o print. O
  * matcher abaixo exclui imagem mas não .html, então sem esta entrada a página
  * de diagnóstico caía no redirecionamento de login, justo ela, que não lê nada
  * da conta e cuja utilidade é funcionar quando o resto não está funcionando. */
-const PUBLICAS = ['/login', '/cadastro', '/esqueci-senha', '/auth', '/diagnostico.html'];
+const PUBLICAS = ['/login', '/cadastro', '/esqueci-a-senha', '/nova-senha', '/auth', '/diagnostico.html'];
 
 export async function proxy(request: NextRequest) {
   let resposta = NextResponse.next({ request });
