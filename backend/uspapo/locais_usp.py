@@ -579,7 +579,7 @@ def _mencoes_com_posicao(texto: str) -> list[tuple[int, int, str]]:
                     and fim < len(tokens)
                     and valores[fim] not in {
                         "a", "ao", "ate", "da", "de", "do", "e", "em",
-                        "na", "no", "ou", "para", "pra",
+                        "na", "no", "ou", "para", "pra", "pro",
                     }
                 ):
                     continue

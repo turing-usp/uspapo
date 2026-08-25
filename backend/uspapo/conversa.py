@@ -127,7 +127,7 @@ def conversar_com_provedor(
     # Intenções inequívocas chegam ao modelo já acompanhadas da fonte oficial.
     # Além de não depender da tool choice probabilística, isso elimina a rodada
     # de LLM que serviria apenas para pedir a ferramenta.
-    preconsulta = preconsultar(registro, pergunta)
+    preconsulta = preconsultar(registro, pergunta, historico)
     if preconsulta:
         resultado, urls, nome, dados_publicos = preconsulta
         urls_turno.update(urls)
@@ -252,11 +252,11 @@ def conversar_com_provedor(
 
         resultados_transporte: list[tuple[str, dict | None]] = []
         for chamada in chamadas:
-            extras_internos = (
-                {"_pergunta": pergunta}
-                if chamada["nome"] == "consultar_circulares"
-                else None
-            )
+            extras_internos = None
+            if chamada["nome"] == "consultar_circulares":
+                extras_internos = {"_pergunta": pergunta}
+                if historico:
+                    extras_internos["_historico"] = historico[-5:]
             execucao = registro.rodar(
                 chamada, memo, extras_internos
             )

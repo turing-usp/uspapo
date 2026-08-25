@@ -1,8 +1,11 @@
-"""Gera o recorte GTFS das linhas que atendem a USP usado pelo backend.
+"""Gera o catálogo consolidado das linhas SPTrans que atendem a USP.
 
-O arquivo completo da SPTrans tem cerca de 14 MB e muda com frequencia. Este
-script reduz o feed a rotas, calendarios, intervalos e paradas relevantes, para
-que o servidor nao precise baixar o GTFS a cada cold start.
+O GTFS fornece a estrutura padronizada da rede, paradas, calendários, shapes
+e perfis temporais. A PlanOper é usada como fonte complementar da programação
+operacional publicada pela própria SPTrans.
+
+O resultado é reduzido às linhas que atendem a região do campus para que o
+backend não precise consultar essas fontes a cada cold start.
 """
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ import json
 from pathlib import Path
 from urllib.request import Request, urlopen
 from zipfile import ZipFile
+import requests
 
 
 URL_GTFS = "https://www.sptrans.com.br/umbraco/Surface/PerfilDesenvolvedor/BaixarGTFS"
@@ -34,6 +38,29 @@ RAIZ = Path(__file__).resolve().parents[1]
 SAIDA_PADRAO = RAIZ / "backend" / "uspapo" / "dados_sptrans.json"
 MIN_ROTAS_RECORTE = 5
 MIN_PARADAS_AREA = 20
+URL_PLANOPER_CATALOGO = (
+    "https://itinerariosapi.sptrans.com.br/"
+    "RetornarLinhasTeste"
+)
+
+URL_PLANOPER_DETALHE = (
+    "https://itinerariosapi.sptrans.com.br/"
+    "BuscarDetalheLinhaTeste"
+)
+
+HEADERS_PLANOPER = {
+    "Accept": "application/json, text/javascript, */*; q=0.01",
+    "Content-Type": "application/json",
+    "Origin": "https://www.sptrans.com.br",
+    "Referer": "https://www.sptrans.com.br/",
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/151.0.0.0 Safari/537.36"
+    ),
+}
+
+TIMEOUT_PLANOPER_S = 30
 
 
 def _segundos(horario: str) -> int:
@@ -136,6 +163,7 @@ def gerar(arquivo_gtfs: Path | None, saida: Path) -> None:
         todas_viagens = _linhas(zip_gtfs, "trips.txt")
         todas_paradas = _linhas(zip_gtfs, "stops.txt")
         todos_tempos = _linhas(zip_gtfs, "stop_times.txt")
+        todos_shapes = _linhas_opcionais(zip_gtfs, "shapes.txt")
 
         ids_paradas_campus = {
             parada["stop_id"]
@@ -162,7 +190,51 @@ def gerar(arquivo_gtfs: Path | None, saida: Path) -> None:
             viagem for viagem in todas_viagens
             if viagem.get("route_id") in ids_rotas
         ]
+        codigos_planoper = {
+            str(rota.get("route_short_name") or "").strip().upper()
+            for rota in rotas
+            if str(rota.get("route_short_name") or "").strip()
+        }
+
+        dados_planoper, falhas_planoper = _carregar_planoper(
+            codigos_planoper
+        )
         ids_viagens = {viagem["trip_id"] for viagem in viagens}
+
+        ids_shapes = {
+            str(viagem.get("shape_id") or "").strip()
+            for viagem in viagens
+            if str(viagem.get("shape_id") or "").strip()
+        }
+
+        shapes: dict[str, list[dict[str, float | int]]] = {}
+
+        for ponto in todos_shapes:
+            shape_id = str(
+                ponto.get("shape_id") or ""
+            ).strip()
+
+            if not shape_id or shape_id not in ids_shapes:
+                continue
+
+            shapes.setdefault(shape_id, []).append({
+                "sequencia": int(
+                    ponto["shape_pt_sequence"]
+                ),
+                "latitude": float(
+                    ponto["shape_pt_lat"]
+                ),
+                "longitude": float(
+                    ponto["shape_pt_lon"]
+                ),
+            })
+
+        for pontos in shapes.values():
+            pontos.sort(
+                key=lambda item: int(
+                    item["sequencia"]
+                )
+            )
 
         frequencias_por_viagem = _indexar_frequencias(
             _linhas_opcionais(zip_gtfs, "frequencies.txt"), ids_viagens
@@ -243,6 +315,9 @@ def gerar(arquivo_gtfs: Path | None, saida: Path) -> None:
                 "servico": viagem["service_id"],
                 "sentido": viagem.get("direction_id", ""),
                 "destino": viagem.get("trip_headsign", ""),
+                "shape_id": str(
+                    viagem.get("shape_id") or ""
+                ).strip(),
                 "frequencias": frequencias_por_viagem.get(viagem["trip_id"], []),
                 "paradas": paradas_da_viagem,
             })
@@ -250,12 +325,30 @@ def gerar(arquivo_gtfs: Path | None, saida: Path) -> None:
         catalogo: dict[str, list[dict[str, object]]] = {}
         for rota in rotas:
             numero = rota["route_short_name"].split("-", 1)[0]
-            catalogo.setdefault(numero, []).append({
+            codigo_linha = str(
+                rota.get("route_short_name") or ""
+            ).strip()
+
+            registro_rota = {
                 "id": rota["route_id"],
-                "linha": rota["route_short_name"],
+                "linha": codigo_linha,
                 "nome": rota["route_long_name"],
-                "viagens": viagens_por_rota.get(rota["route_id"], []),
-            })
+                "viagens": viagens_por_rota.get(
+                    rota["route_id"],
+                    [],
+                ),
+            }
+
+            planoper = dados_planoper.get(
+                codigo_linha.upper()
+            )
+
+            if planoper is not None:
+                registro_rota["planoper"] = planoper
+
+            catalogo.setdefault(numero, []).append(
+                registro_rota
+            )
 
     quantidade_rotas = sum(len(rotas_numero) for rotas_numero in catalogo.values())
     if quantidade_rotas < MIN_ROTAS_RECORTE:
@@ -271,8 +364,14 @@ def gerar(arquivo_gtfs: Path | None, saida: Path) -> None:
         )
 
     documento = {
-        "versao_esquema": 2,
-        "fonte": URL_GTFS,
+        "versao_esquema": 4,
+        "fontes": {
+            "gtfs": URL_GTFS,
+            "planoper": {
+                "catalogo": URL_PLANOPER_CATALOGO,
+                "detalhe": URL_PLANOPER_DETALHE,
+            },
+        },
         "gerado_em": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "criterio": {"linhas_com_parada_na_area_do_campus": LIMITE_CAMPUS},
         "estatisticas": {
@@ -285,8 +384,20 @@ def gerar(arquivo_gtfs: Path | None, saida: Path) -> None:
             ),
             "paradas_unicas_itinerarios": len(paradas),
             "paradas_na_area_selecao": len(paradas_na_area),
+            "shapes": len(shapes),
+            "rotas_com_planoper": sum(
+                1
+                for rotas_numero in catalogo.values()
+                for rota in rotas_numero
+                if rota.get("planoper") is not None
+            ),
+
+            "linhas_planoper_falharam": len(
+                falhas_planoper
+            ),
         },
         "paradas_na_area_selecao": paradas_na_area,
+        "shapes": shapes,
         "calendarios": calendarios,
         "excecoes_calendario": excecoes_calendario,
         "linhas": catalogo,
@@ -301,6 +412,151 @@ def gerar(arquivo_gtfs: Path | None, saida: Path) -> None:
     )
     temporaria.replace(saida)
     print(f"Recorte GTFS gravado em {saida} ({saida.stat().st_size} bytes).")
+
+
+def _catalogo_planoper(
+    session: requests.Session,
+) -> dict[str, dict[str, object]]:
+    """Baixa uma vez o índice público de linhas usado pelo site da SPTrans."""
+    resposta = session.post(
+        URL_PLANOPER_CATALOGO,
+        timeout=TIMEOUT_PLANOPER_S,
+    )
+    resposta.raise_for_status()
+
+    dados = resposta.json()
+    if not isinstance(dados, list):
+        raise RuntimeError(
+            "RetornarLinhasTeste devolveu um formato inesperado."
+        )
+
+    indice: dict[str, dict[str, object]] = {}
+    duplicados: set[str] = set()
+
+    for item in dados:
+        if not isinstance(item, dict):
+            continue
+
+        codigo = str(item.get("codigo") or "").strip().upper()
+        if not codigo:
+            continue
+
+        if codigo in indice:
+            duplicados.add(codigo)
+            continue
+
+        indice[codigo] = item
+
+    # Melhor ficar sem enriquecimento do que escolher arbitrariamente
+    # entre dois registros com o mesmo código.
+    for codigo in duplicados:
+        indice.pop(codigo, None)
+
+    return indice
+
+
+def _detalhe_planoper(
+    session: requests.Session,
+    codigo_linha: str,
+    cadastro: dict[str, object],
+) -> dict[str, object] | None:
+    """Obtém e reduz os dados operacionais de uma linha da PlanOper."""
+    cod_planejamento = cadastro.get("CdPjOID")
+    if cod_planejamento is None:
+        return None
+
+    resposta = session.post(
+        URL_PLANOPER_DETALHE,
+        json={"codPlanejamento": cod_planejamento},
+        timeout=TIMEOUT_PLANOPER_S,
+    )
+    resposta.raise_for_status()
+
+    dados = resposta.json()
+    if not isinstance(dados, dict):
+        raise RuntimeError(
+            f"Detalhe PlanOper de {codigo_linha} tem formato inesperado."
+        )
+
+    codigo_recebido = str(
+        dados.get("codigoLinha") or dados.get("codigo") or ""
+    ).strip().upper()
+
+    if codigo_recebido != codigo_linha.upper():
+        raise RuntimeError(
+            "PlanOper devolveu linha diferente da solicitada: "
+            f"esperado={codigo_linha!r}, recebido={codigo_recebido!r}."
+        )
+
+    # Mantemos tipoDia/faixaHoraria exatamente como a SPTrans publica.
+    # Ainda não inferimos semanticamente o significado de tipoDia aqui.
+    return {
+        "codigo_planejamento": int(cod_planejamento),
+        "area": cadastro.get("AreCodVig"),
+        "letreiro_catalogo": cadastro.get("letreiro"),
+        "empresa": dados.get("empresa"),
+        "consorcio": dados.get("consorcio"),
+        "letreiro_ida": dados.get("letreiroIda"),
+        "letreiro_volta": dados.get("letreiroVolta"),
+        "horarios_operacao": dados.get("horarios", []),
+        "partidas_ida": dados.get("partidasIda", []),
+        "partidas_volta": dados.get("partidasVolta", []),
+        "tempos_estimados": dados.get("temposEstimados", []),
+        "itinerarios_id": dados.get("itiId", {}),
+    }
+
+
+def _carregar_planoper(
+    codigos_linhas: set[str],
+) -> tuple[dict[str, dict[str, object]], list[str]]:
+    """Enriquece apenas as linhas relevantes, sem tornar o GTFS dependente da API."""
+    detalhes: dict[str, dict[str, object]] = {}
+    falhas: list[str] = []
+
+    if not codigos_linhas:
+        return detalhes, falhas
+
+    session = requests.Session()
+    session.headers.update(HEADERS_PLANOPER)
+
+    try:
+        indice = _catalogo_planoper(session)
+    except Exception as err:
+        print(
+            "AVISO: não foi possível carregar o catálogo PlanOper; "
+            f"o GTFS será gerado sem esse enriquecimento: {err}"
+        )
+        return detalhes, sorted(codigos_linhas)
+
+    for codigo in sorted(codigos_linhas):
+        cadastro = indice.get(codigo.upper())
+
+        if cadastro is None:
+            falhas.append(codigo)
+            print(
+                f"AVISO: linha {codigo} não encontrada em "
+                "RetornarLinhasTeste."
+            )
+            continue
+
+        try:
+            detalhe = _detalhe_planoper(
+                session,
+                codigo,
+                cadastro,
+            )
+        except Exception as err:
+            falhas.append(codigo)
+            print(
+                f"AVISO: falha ao consultar PlanOper para "
+                f"{codigo}: {err}"
+            )
+            continue
+
+        if detalhe is not None:
+            detalhes[codigo.upper()] = detalhe
+
+    return detalhes, falhas
 
 
 def main() -> None:

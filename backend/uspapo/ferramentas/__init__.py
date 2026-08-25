@@ -148,6 +148,9 @@ class RespostaFerramenta:
     texto: str
     fontes: list[str]
     dados_publicos: dict[str, Any] | None = None
+    # Envelope factual tipado, consumido internamente. Mantém o payload público
+    # pequeno e não força ferramentas legadas a adotarem um único resultado.
+    resultado_transporte: Any | None = None
 
     def __iter__(self):
         yield self.texto

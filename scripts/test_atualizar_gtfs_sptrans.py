@@ -142,7 +142,7 @@ class TestParsingGTFS(unittest.TestCase):
         self.assertEqual(documento["excecoes_calendario"], {
             "servico": {"20260815": 1, "20260817": 2}
         })
-        self.assertEqual(documento["versao_esquema"], 2)
+        self.assertEqual(documento["versao_esquema"], 4)
         self.assertEqual(documento["estatisticas"]["rotas"], 1)
         self.assertEqual(documento["estatisticas"]["paradas_na_area_selecao"], 1)
         self.assertEqual(

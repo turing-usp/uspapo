@@ -268,6 +268,44 @@ class TestChegadaResposta(unittest.TestCase):
             vista["sentidos"][0]["base_previsao"], "eta_ao_vivo"
         )
 
+    def test_payload_misto_mantem_live_e_slots_estimados_com_origens_distintas(self):
+        resultado = ResultadoChegada(
+            linha="F-10",
+            parada="Ponto",
+            sentidos=(PassagensPorSentido(
+                linha="F-10",
+                parada="Ponto",
+                previsoes_ao_vivo=(PrevisaoChegada(
+                    "12:39", source="live", confidence="high",
+                    minutos_ate_chegada=7,
+                ),),
+                estimativas_programadas=(
+                    PrevisaoChegada(
+                        "12:45", source="scheduled_estimate",
+                        confidence="scheduled", intervalo_programado_min=15,
+                    ),
+                    PrevisaoChegada(
+                        "13:00", source="scheduled_estimate",
+                        confidence="scheduled", intervalo_programado_min=15,
+                    ),
+                ),
+            ),),
+            api_consultada=True,
+        )
+
+        chegadas = resultado.public_view()["sentidos"][0]["chegadas"]
+
+        self.assertEqual(
+            [(item["horario"], item["source"]) for item in chegadas],
+            [
+                ("12:39", "live"),
+                ("12:45", "scheduled_estimate"),
+                ("13:00", "scheduled_estimate"),
+            ],
+        )
+        self.assertEqual(chegadas[0]["confidence"], "high")
+        self.assertEqual(chegadas[1]["confidence"], "scheduled")
+
     def test_public_view_programada_e_publica_e_formatada(self):
         vista = chegada_8084().public_view(
             "Quando vai passar o 8084 no Biênio?"

@@ -53,6 +53,7 @@ Regras obrigatórias:
 - Responda diretamente ao que o aluno perguntou, em 2 a 4 frases curtas quando possível.
 - Use somente fatos presentes em FATOS_PÚBLICOS ou na RESPOSTA_FACTUAL_SEGURA.
 - Preserve números em algarismos e preserve exatamente linhas, horários, sentidos e nomes de locais.
+- Não atribua, aumente, diminua ou interprete níveis de confiança/origem das chegadas; eles são fatos calculados pelo backend.
 - Não acrescente números, linhas, horários, locais, pontos, sentidos ou estimativas.
 - Se citar o tempo total e o tempo dentro do ônibus, deixe claro que o total também inclui espera e caminhada.
 - Não mencione GTFS, stop_id, exact_times, payload, algoritmo, ranking ou recorte de dados.
@@ -248,6 +249,11 @@ def _validar_fatos_obrigatorios(
         esperado = str(horario)
         if esperado not in horarios:
             return f"horário obrigatório ausente: {horario}"
+
+    for frase in public_view.get("frases_obrigatorias", ()) or ():
+        esperado = _normalizar(frase)
+        if esperado and esperado not in normalizado:
+            return f"estado operacional ausente: {frase}"
     return None
 
 
@@ -268,9 +274,23 @@ def validar_resposta_transporte(
         return False, "link não permitido"
 
     normalizada = _normalizar(resposta)
+    horario_indisponivel = (
+        public_view.get("status_operacao") == "horario_indisponivel"
+        or public_view.get("status_programacao") == "horario_indisponivel"
+    )
+    if horario_indisponivel and (
+        _PADRAO_RELOGIO.search(resposta)
+        or re.search(r"\b(minuto|minutos|hora|horas)\b", normalizada)
+    ):
+        return False, "estimativa presente apesar de horário indisponível"
     for termo in _TERMOS_TECNICOS_PROIBIDOS:
         if _normalizar(termo) in normalizada:
             return False, f"termo técnico não permitido: {termo}"
+    if re.search(
+        r"\b(?:alta|media|baixa)\s+confianca\b|\b(?:high|medium|low|scheduled)\b",
+        normalizada,
+    ):
+        return False, "classificação de confiança não é escolhida pelo naturalizador"
 
     fonte = _fontes_allowlist(public_view, fallback)
     motivo = _validar_numeros(resposta, fonte)

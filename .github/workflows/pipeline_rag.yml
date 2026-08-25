@@ -66,10 +66,15 @@ jobs:
         run: |
           python -m unittest \
             backend.uspapo.test_roteamento \
+            backend.uspapo.test_intencao_transporte \
+            backend.uspapo.test_consulta_transporte \
+            backend.uspapo.test_fluxos_transporte_regressoes \
+            backend.uspapo.test_restricoes_temporais_transporte \
             backend.uspapo.test_gtfs_sptrans \
             backend.uspapo.test_olhovivo \
             backend.uspapo.test_transporte_resposta \
             backend.uspapo.ferramentas.test_circulares \
+            backend.uspapo.ferramentas.test_planejamento_regressoes \
             backend.uspapo.test_preconsulta_conversa \
             scripts.test_atualizar_gtfs_sptrans -v
 

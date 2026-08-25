@@ -14,7 +14,8 @@ import re
 from functools import lru_cache
 
 from uspapo.ferramentas import normalizar, palavras
-from uspapo.locais_usp import _mencoes_com_posicao
+from uspapo.consulta_transporte import interpretar_consulta_transporte
+from uspapo.locais_usp import _mencoes_com_posicao, mencoes_locais
 
 RAIZ = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 PASTA_PROCESSADOS = os.path.join(RAIZ, "data", "processed")
@@ -30,12 +31,31 @@ TERMOS_ONIBUS = frozenset(
     "chegada horario horarios previsao previsoes busp".split()
 )
 TERMOS_TRAJETO = frozenset(
-    "caminho chegar demora demorar distancia ir leva levar melhor onibus rota "
-    "trajeto tempo transporte vou circular circulares".split()
+    "caminho chegar demora demorar distancia ir leva levar melhor rota "
+    "trajeto tempo transporte vou".split()
 )
+TERMOS_CHEGADA = frozenset(
+    "agora chega chegada horario horarios hoje passando passa previsao previsoes "
+    "proximo proxima quando".split()
+)
+MAX_TURNOS_CONTEXTO_PONTO = 5
 PADROES_PONTO = (
-    re.compile(r"\b(?:no|na|ao|a)\s+(?:ponto\s+(?:do|da|de)\s+)?(.+?)(?:\?|$)", re.I),
     re.compile(r"\b(?:ponto|parada)\s+(?:do|da|de)?\s*(.+?)(?:\?|$)", re.I),
+    re.compile(
+        r"\b(?:no|na|ao|pelo|pela)\s+"
+        r"(?:ponto\s+(?:do|da|de)\s+)?(.+?)(?:\?|$)",
+        re.I,
+    ),
+    re.compile(
+        r"\b(?:chega|passa|passando)\s+(?:ao|a|no|na)\s+(.+?)(?:\?|$)",
+        re.I,
+    ),
+)
+SUFIXO_PONTO = re.compile(
+    r"\s*(?:,|;)?\s+"
+    r"(?:saindo|partindo|vindo|a\s+partir|hoje|amanh[ãa]|"
+    r"neste|nesse|este|esse|pr[oó]ximo|passado|aos?\s+finais?)\b.*$",
+    re.I,
 )
 
 
@@ -123,7 +143,7 @@ def pedido_trajeto(pergunta: str) -> dict[str, str] | None:
     tem_intencao = bool(set(palavras(texto)) & TERMOS_TRAJETO)
     if len(mencoes) >= 2 and not tem_intencao:
         entre_locais = texto[mencoes[0][1]:mencoes[1][0]]
-        tem_intencao = bool(re.search(r"\b(?:ate|para|pra)\b", entre_locais))
+        tem_intencao = bool(re.search(r"\b(?:ate|ao|para|pra)\b", entre_locais))
     if not tem_intencao:
         return None
     unicas: list[tuple[int, int, str]] = []
@@ -146,11 +166,11 @@ def pedido_trajeto(pergunta: str) -> dict[str, str] | None:
 
     destino = None
     marcador_destino = re.compile(
-        r"(?:\bate(?:\s+[ao])?|\b(?:para|pra)(?:\s+[ao])?|"
+        r"(?:\b(?:ao|aos)|\bate(?:\s+[ao])?|\b(?:para|pra)(?:\s+[ao])?|"
         r"\b(?:chegar|chego|ir|vou)\s+(?:ate\s+|para\s+|pra\s+)?"
         r"(?:ao|a|no|na))\s*$"
     )
-    for mencao in unicas:
+    for mencao in mencoes:
         antes = texto[max(0, mencao[0] - 45):mencao[0]]
         if marcador_destino.search(antes):
             destino = mencao
@@ -166,12 +186,23 @@ def pedido_circular(pergunta: str) -> dict[str, str] | None:
     termos = set(palavras(pergunta))
     if not (termos & TERMOS_ONIBUS or "chega" in termos):
         return None
+    # Primeiro recortamos o trecho sintaticamente ligado a ponto/parada. Só
+    # então aplicamos aliases conhecidos; um local mencionado como origem não
+    # pode sobrescrever uma parada explícita fora do catálogo.
     ponto = ""
     for padrao in PADROES_PONTO:
         achado = padrao.search(pergunta)
-        if achado:
-            ponto = achado.group(1).strip(" .?!")
-            break
+        if not achado:
+            continue
+        trecho = SUFIXO_PONTO.sub("", achado.group(1)).strip(" .?!")
+        locais_trecho = list(dict.fromkeys(mencoes_locais(trecho)))
+        if len(locais_trecho) > 1:
+            return None
+        ponto = locais_trecho[0] if len(locais_trecho) == 1 else trecho
+        break
+    if not ponto:
+        locais = list(dict.fromkeys(mencoes_locais(pergunta)))
+        ponto = locais[0] if len(locais) == 1 else ""
     if not match and not ponto:
         return None
     return {
@@ -180,17 +211,142 @@ def pedido_circular(pergunta: str) -> dict[str, str] | None:
     }
 
 
+def _pediu_chegada(pergunta: str) -> bool:
+    """Se a linha precisa de uma parada, e não apenas de seu itinerário."""
+    return bool(set(palavras(pergunta)) & TERMOS_CHEGADA)
+
+
+def _linhas_mencionadas(texto: str) -> set[str]:
+    return {
+        normalizar(match.group(1)).upper()
+        for match in PADRAO_LINHA.finditer(texto or "")
+    }
+
+
+def _ponto_recente_associado(
+    linha: str, historico: list[dict] | None
+) -> str | None:
+    """Recupera um ponto anterior somente quando o vínculo é inequívoco.
+
+    A pergunta do turno é a única fonte do local. A resposta anterior serve só
+    para confirmar que aquele turno tratou da linha atual — nunca extraímos um
+    ponto dela, pois um itinerário pode mencionar dezenas de paradas. Se o turno
+    associado mais recente contém dois locais, a referência é ambígua e paramos
+    em vez de ressuscitar um ponto mais antigo.
+    """
+    alvo = normalizar(linha).split("-", 1)[0].upper()
+    if not alvo or not isinstance(historico, list):
+        return None
+
+    ponto_de_contexto: str | None = None
+    destino_de_rota_fallback: str | None = None
+    for turno in reversed(historico[-MAX_TURNOS_CONTEXTO_PONTO:]):
+        if not isinstance(turno, dict):
+            continue
+        pergunta_anterior = str(turno.get("pergunta") or "").strip()
+        resposta_anterior = str(turno.get("resposta") or "").strip()
+        if not pergunta_anterior:
+            continue
+
+        rota_anterior = pedido_trajeto(pergunta_anterior)
+        termos = set(palavras(pergunta_anterior))
+        if not (
+            termos & TERMOS_ONIBUS
+            or _linhas_mencionadas(pergunta_anterior)
+            or rota_anterior
+        ):
+            continue
+
+        locais = list(dict.fromkeys(mencoes_locais(pergunta_anterior)))
+        # Em um turno de rota com dois locais, a pergunta do usuário pode
+        # identificar inequivocamente origem e destino. Nesse caso "lá" no
+        # turno seguinte significa o destino; ainda não lemos locais da
+        # resposta do assistente, que poderia listar muitas paradas.
+        ponto_da_rota = (
+            rota_anterior.get("destino_ou_ponto")
+            if rota_anterior and rota_anterior.get("destino_ou_ponto")
+            else None
+        )
+        linhas = _linhas_mencionadas(
+            pergunta_anterior + "\n" + resposta_anterior
+        )
+        if alvo in linhas:
+            if len(locais) == 1:
+                return locais[0]
+            # Um turno que associa explicitamente a linha a dois locais não
+            # determina em qual parada o aluno espera o ônibus.
+            return None
+        if ponto_de_contexto is None and len(locais) == 1:
+            # Uma consulta recente de "quais linhas passam no Biênio" mantém o
+            # Biênio como assunto mesmo quando a resposta correta exclui a linha
+            # perguntada agora. Turnos origem→destino (dois locais) são ignorados.
+            ponto_de_contexto = locais[0]
+        # Uma rota anterior menciona origem e destino, mas não associa a linha
+        # atual a nenhum deles. Não deixe, por exemplo, o destino de uma rota
+        # recente substituir uma parada explicitamente discutida antes.
+        if destino_de_rota_fallback is None and ponto_da_rota:
+            destino_de_rota_fallback = ponto_da_rota
+    return ponto_de_contexto or destino_de_rota_fallback
+
+
+def _continuacao_de_esclarecimento(
+    pergunta: str,
+    historico: list[dict] | None,
+) -> tuple[dict[str, str], str] | None:
+    """Liga uma resposta curta de local ao pedido de parada do turno anterior."""
+    locais = list(dict.fromkeys(mencoes_locais(pergunta)))
+    if len(locais) != 1 or not historico:
+        return None
+    ultimo = historico[-1] if isinstance(historico[-1], dict) else {}
+    pergunta_anterior = str(ultimo.get("pergunta") or "")
+    resposta_anterior = normalizar(ultimo.get("resposta") or "")
+    linhas = _linhas_mencionadas(pergunta_anterior)
+    if (
+        len(linhas) != 1
+        or not _pediu_chegada(pergunta_anterior)
+        or "qual parada" not in resposta_anterior
+    ):
+        return None
+    linha = next(iter(linhas))
+    pergunta_operacional = (
+        pergunta_anterior + "\nParada informada na continuação: " + pergunta
+    )
+    return (
+        {"linha": linha, "destino_ou_ponto": locais[0]},
+        pergunta_operacional,
+    )
+
+
 def preconsultar(
-    registro, pergunta: str
+    registro, pergunta: str, historico: list[dict] | None = None
 ) -> tuple[str, list[str], str, dict | None] | None:
+    historico = list((historico or [])[-MAX_TURNOS_CONTEXTO_PONTO:])
+    internos = {"_pergunta": pergunta}
+    if historico:
+        internos["_historico"] = historico
+
     trajeto = pedido_trajeto(pergunta)
-    if trajeto and "consultar_circulares" in registro.nomes:
+    consulta_trajeto = (
+        interpretar_consulta_transporte(
+            pergunta,
+            origin=trajeto["origem"],
+            destination=trajeto["destino_ou_ponto"],
+            interpretation="preconsulta",
+        )
+        if trajeto else None
+    )
+    if (
+        trajeto
+        and consulta_trajeto
+        and consulta_trajeto.task == "route"
+        and "consultar_circulares" in registro.nomes
+    ):
         try:
             resposta = registro.executar_direto(
                 "consultar_circulares",
                 linha="",
                 detalhes=_pediu_detalhes_transporte(pergunta),
-                _pergunta=pergunta,
+                **internos,
                 **trajeto,
             )
             texto, fontes = resposta
@@ -209,12 +365,48 @@ def preconsultar(
         )
 
     circular = pedido_circular(pergunta)
-    if circular and "consultar_circulares" in registro.nomes:
+    pergunta_operacional = pergunta
+    if not circular:
+        continuacao = _continuacao_de_esclarecimento(pergunta, historico)
+        if continuacao:
+            circular, pergunta_operacional = continuacao
+    consulta_circular = (
+        interpretar_consulta_transporte(
+            pergunta_operacional,
+            line=circular["linha"],
+            stop=circular["destino_ou_ponto"],
+            interpretation="preconsulta",
+        )
+        if circular else None
+    )
+    if (
+        circular
+        and consulta_circular
+        and consulta_circular.task != "general"
+        and "consultar_circulares" in registro.nomes
+    ):
+        if (
+            circular["linha"]
+            and not circular["destino_ou_ponto"]
+            and _pediu_chegada(pergunta)
+        ):
+            ponto_contextual = _ponto_recente_associado(
+                circular["linha"], historico
+            )
+            if ponto_contextual:
+                circular = {
+                    **circular,
+                    "destino_ou_ponto": ponto_contextual,
+                }
         try:
+            internos_circular = {
+                **internos,
+                "_pergunta": pergunta_operacional,
+            }
             resposta = registro.executar_direto(
                 "consultar_circulares",
                 detalhes=_pediu_detalhes_transporte(pergunta),
-                _pergunta=pergunta,
+                **internos_circular,
                 **circular,
             )
             texto, fontes = resposta

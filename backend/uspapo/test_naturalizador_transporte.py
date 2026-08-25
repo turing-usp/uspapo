@@ -1,3 +1,4 @@
+import copy
 import json
 import unittest
 from types import SimpleNamespace
@@ -74,6 +75,98 @@ def _provedor(modelo, respostas, nome="groq-teste"):
 
 
 class TestNaturalizadorTransporte(unittest.TestCase):
+    def test_naturalizador_nao_altera_confianca_calculada_pelo_backend(self):
+        vista = {
+            "tipo": "chegada_onibus",
+            "linha": "8084-10",
+            "parada": "Biênio",
+            "sentidos": [{
+                "chegadas": [{
+                    "horario": "10:05",
+                    "minutos_ate_chegada": 5,
+                    "source": "live",
+                    "confidence": "high",
+                }],
+            }],
+            "fatos_obrigatorios": ["8084-10", "Biênio"],
+            "horarios_obrigatorios": ["10:05"],
+        }
+        original = copy.deepcopy(vista)
+        fallback = "O 8084-10 chega no Biênio às 10:05."
+        provedor, _ = _provedor(
+            "openai/gpt-oss-120b", [_completion(fallback)]
+        )
+
+        naturalizar_resposta_transporte(
+            [provedor], "Quando passa?", vista, fallback
+        )
+
+        self.assertEqual(vista, original)
+
+    def test_naturalizador_nao_pode_declarar_outro_nivel_de_confianca(self):
+        vista = {
+            "tipo": "chegada_onibus",
+            "fatos_obrigatorios": ["8084-10", "Biênio"],
+            "sentidos": [{"chegadas": [{
+                "horario": "10:05", "source": "live", "confidence": "high",
+            }]}],
+        }
+        valida, motivo = validar_resposta_transporte(
+            "O 8084-10 chega no Biênio às 10:05 com baixa confiança.",
+            vista,
+            "O 8084-10 chega no Biênio às 10:05.",
+        )
+
+        self.assertFalse(valida)
+        self.assertIn("confiança", motivo)
+
+    def test_nao_permite_inverter_estado_sem_servico(self):
+        vista = {
+            "tipo": "chegada_onibus",
+            "linha": "8084-10",
+            "parada": "Biênio",
+            "status_operacao": "sem_servico",
+            "fatos_obrigatorios": ["8084-10", "Biênio"],
+            "frases_obrigatorias": ["não tem serviço programado"],
+        }
+        fallback = (
+            "A linha 8084-10 não tem serviço programado na parada Biênio hoje."
+        )
+
+        valida, motivo = validar_resposta_transporte(
+            "A linha 8084-10 tem serviço programado na parada Biênio hoje.",
+            vista,
+            fallback,
+        )
+
+        self.assertFalse(valida)
+        self.assertIn("estado operacional ausente", motivo)
+
+    def test_horario_indisponivel_nao_reaproveita_distancia_como_tempo(self):
+        vista = {
+            "tipo": "trajeto_onibus_sem_horario",
+            "linha": "8012-10",
+            "caminhada_m": 114,
+            "status_programacao": "horario_indisponivel",
+            "fatos_obrigatorios": ["8012-10"],
+            "frases_obrigatorias": [
+                "não é seguro informar a espera nem o tempo total"
+            ],
+        }
+        fallback = (
+            "Use a 8012-10; não é seguro informar a espera nem o tempo total."
+        )
+
+        valida, motivo = validar_resposta_transporte(
+            "Use a 8012-10. Não é seguro informar a espera nem o tempo total, "
+            "mas a viagem leva 114 minutos.",
+            vista,
+            fallback,
+        )
+
+        self.assertFalse(valida)
+        self.assertIn("horário indisponível", motivo)
+
     def test_aceita_parafrase_natural_sem_mudar_fatos(self):
         texto = (
             "O prédio fica na Escola Politécnica. Saindo do Terminal Metrô "
