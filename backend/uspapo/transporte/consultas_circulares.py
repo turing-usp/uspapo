@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import requests
 
+from uspapo import gtfs_sptrans, olhovivo
 from uspapo.ferramentas import RespostaFerramenta, Registro, cache, casa, normalizar
 from uspapo.locais_usp import (
     CATALOGO_LOCAIS,
@@ -3233,6 +3234,24 @@ def _obter_previsao_sptrans(
             programacao["aviso_api"] = "A API Olho Vivo não respondeu agora."
             programacao["api_consultada"] = True
         return programacao
+
+
+# A modularização que já existia na main continua sendo a autoridade para as
+# responsabilidades compartilhadas e estáveis: leitura do recorte, calendário,
+# geometria básica e acesso bruto ao Olho Vivo. As regras mais conservadoras de
+# identidade GTFS↔Olho Vivo, sentido, confiança, ETA por GPS e ranking ficam
+# neste motor, pois são justamente as garantias acrescentadas depois.
+_catalogo_gtfs = gtfs_sptrans.catalogo
+_mesmo_nome = gtfs_sptrans.mesmo_nome
+_servico_ativo = gtfs_sptrans.servico_ativo
+_distancia_parada_gtfs = gtfs_sptrans.distancia_m
+
+_autenticar_sptrans = olhovivo._autenticar
+_get_json = olhovivo._get_json
+_linhas_sptrans = olhovivo._linhas
+_previsoes_linha = olhovivo._previsoes_linha
+_posicoes_linha = olhovivo._posicoes_linha
+_destino_linha_sptrans = olhovivo.destino_da_linha
 
 
 def _consultar_circulares_calcular(
