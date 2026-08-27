@@ -149,6 +149,11 @@ Next.js 16 (App Router) + React 19 + Tailwind 4 + Supabase para login.
 | `npm run dev` | servidor de desenvolvimento |
 | `npm run build` | build de produção |
 | `npm run lint` | ESLint |
+| `npm run app:sync:dev` | sincroniza o app Android apontando para o `next dev` (`10.0.2.2:3000`) |
+| `npm run app:sync:prod` | sincroniza o app Android apontando para o domínio de produção |
+
+O wrapper do app Android (Capacitor) vive em `site/android/`; desenvolvimento,
+domínio e release estão em `docs/app-android.md`.
 
 | Pasta | Do que cuida |
 | --- | --- |
