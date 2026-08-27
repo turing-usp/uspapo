@@ -23,7 +23,7 @@ class SessaoSPTransFalsa:
         if caminho == "Buscar":
             resposta.json.return_value = [
                 {"cl": 35812, "lt": "8084", "tl": 10, "sl": 1,
-                 "tp": "METRO BUTANTA", "ts": "CIDADE UNIVERSITARIA"}
+                 "tp": "CIDADE UNIVERSITARIA", "ts": "METRO BUTANTA"}
             ]
         elif caminho == "Linha":
             resposta.json.return_value = {
@@ -59,7 +59,7 @@ class SessaoSemPrevisaoFalsa:
         if "/Linha/Buscar" in url:
             resposta.json.return_value = [
                 {"cl": 2607, "lt": "8084", "tl": 10, "sl": 1,
-                 "tp": "CIDADE UNIVERSITARIA", "ts": "METRO BUTANTA"}
+                 "tp": "METRO BUTANTA", "ts": "CIDADE UNIVERSITARIA"}
             ]
         elif "/Previsao/Linha" in url:
             resposta.json.return_value = {"hr": "11:30", "ps": []}
@@ -804,7 +804,16 @@ class TestCirculares(unittest.TestCase):
         sessao = SessaoSPTransFalsa()
         criar_sessao.return_value = sessao
 
-        resultado = circulares._obter_previsao_sptrans("8084", "Biênio", "token-teste")
+        instante_api = datetime(
+            2026, 8, 20, 21, 0, tzinfo=circulares.FUSO_SP
+        )
+        with patch(
+            "uspapo.ferramentas.circulares._agora_sptrans",
+            return_value=instante_api,
+        ):
+            resultado = circulares._obter_previsao_sptrans(
+                "8084", "Biênio", "token-teste"
+            )
 
         self.assertEqual(resultado["linha"], "8084-10")
         self.assertEqual(resultado["destino"], "Cid. Universitária")
@@ -841,11 +850,11 @@ class TestCirculares(unittest.TestCase):
         linha = {"tp": "TERMINAL PRINCIPAL", "ts": "TERMINAL SECUNDARIO"}
         self.assertEqual(
             circulares._destino_linha_sptrans({**linha, "sl": 1}),
-            "TERMINAL SECUNDARIO",
+            "TERMINAL PRINCIPAL",
         )
         self.assertEqual(
             circulares._destino_linha_sptrans({**linha, "sl": 2}),
-            "TERMINAL PRINCIPAL",
+            "TERMINAL SECUNDARIO",
         )
 
     def test_stop_id_do_plano_tem_prioridade_na_previsao_ao_vivo(self):
@@ -909,14 +918,23 @@ class TestCirculares(unittest.TestCase):
             "horarios": ["11:42", "11:54", "12:06"],
         }
 
-        resultado = circulares._obter_previsao_sptrans(
-            "8084", "Biênio", "token-teste"
+        instante_api = datetime(
+            2026, 8, 20, 11, 30, tzinfo=circulares.FUSO_SP
         )
+        with patch(
+            "uspapo.ferramentas.circulares._agora_sptrans",
+            return_value=instante_api,
+        ):
+            resultado = circulares._obter_previsao_sptrans(
+                "8084", "Biênio", "token-teste"
+            )
 
         self.assertEqual(resultado["tipo"], "programacao")
         self.assertEqual(resultado["veiculos_ativos"], 2)
         self.assertEqual(resultado["hr"], "11:30")
         self.assertTrue(any("/Posicao/Linha" in url for url in sessao.consultas))
+        self.assertIn("posição GPS", resultado["aviso_api"])
+        self.assertNotIn("associação GTFS", resultado["aviso_api"])
 
     @staticmethod
     def _programacao_ao_vivo(stop_id="gtfs-bienio", destino="TERMINAL A"):
@@ -937,6 +955,7 @@ class TestCirculares(unittest.TestCase):
             patch("uspapo.ferramentas.circulares.requests.Session", return_value=sessao),
             patch("uspapo.ferramentas.circulares._programacao_gtfs", return_value=programacao),
             patch("uspapo.ferramentas.circulares._instante_referencia_sptrans", return_value=referencia),
+            patch("uspapo.ferramentas.circulares._agora_sptrans", return_value=referencia),
             patch(
                 "uspapo.ferramentas.circulares.cache",
                 side_effect=lambda _c, _t, produzir: produzir(),
@@ -1027,7 +1046,7 @@ class TestCirculares(unittest.TestCase):
     def test_eta_ao_vivo_ordena_deduplica_e_preserva_evidencia_operacional(self):
         linha = {
             "cl": 1, "lt": "8084", "tl": 10, "sl": 1,
-            "tp": "TERMINAL B", "ts": "TERMINAL A",
+            "tp": "TERMINAL A", "ts": "TERMINAL B",
         }
         resultado, _ = self._consultar_chegadas_controladas(
             self._programacao_ao_vivo(), [linha], {
@@ -1066,10 +1085,105 @@ class TestCirculares(unittest.TestCase):
         self.assertEqual(vista["chegadas"][0]["source"], "live")
         self.assertEqual(vista["chegadas"][0]["confidence"], "high")
 
+    def test_8084_sem_eta_direto_usa_gps_do_sentido_oficial(self):
+        linhas = [
+            {
+                "cl": 2607, "lt": "8084", "tl": 10, "sl": 1,
+                "tp": "CID. UNIVERSITÁRIA", "ts": "METRÔ BUTANTÃ",
+            },
+            {
+                "cl": 35375, "lt": "8084", "tl": 10, "sl": 2,
+                "tp": "CID. UNIVERSITÁRIA", "ts": "METRÔ BUTANTÃ",
+            },
+        ]
+        posicoes = {
+            2607: {
+                "hr": "13:28",
+                "vs": [
+                    {
+                        "p": "82494", "a": True,
+                        "ta": "2026-08-26T16:28:29Z",
+                        "py": -23.5711535, "px": -46.709219,
+                    },
+                    {
+                        "p": "82638", "a": True,
+                        "ta": "2026-08-26T16:28:12Z",
+                        "py": -23.564584, "px": -46.7133085,
+                    },
+                ],
+            },
+            35375: {
+                "hr": "13:28",
+                "vs": [{
+                    "p": "sentido-oposto", "a": True,
+                    "ta": "2026-08-26T16:28:30Z",
+                    "py": -23.559268, "px": -46.72992025,
+                }],
+            },
+        }
+        sessao = SessaoChegadasControlada(
+            linhas,
+            {
+                2607: {"hr": "13:28", "ps": []},
+                35375: {"hr": "13:28", "ps": []},
+            },
+            posicoes,
+        )
+        referencia = datetime(
+            2026, 8, 26, 13, 28, tzinfo=circulares.FUSO_SP
+        )
+        with (
+            patch(
+                "uspapo.ferramentas.circulares.requests.Session",
+                return_value=sessao,
+            ),
+            patch(
+                "uspapo.ferramentas.circulares._programacao_gtfs",
+                return_value=self._programacao_ao_vivo(
+                    "120010357", "Cid. Universitária"
+                ),
+            ),
+            patch(
+                "uspapo.ferramentas.circulares._instante_referencia_sptrans",
+                return_value=referencia,
+            ),
+            patch(
+                "uspapo.ferramentas.circulares._agora_sptrans",
+                return_value=referencia,
+            ),
+            patch(
+                "uspapo.ferramentas.circulares.cache",
+                side_effect=lambda _c, _t, produzir: produzir(),
+            ),
+        ):
+            resultado = circulares._obter_previsao_sptrans(
+                "8084", "Biênio", "token-teste",
+                sentido_esperado="Cid. Universitária",
+            )
+
+        self.assertEqual(resultado["tipo"], "previsao")
+        self.assertEqual(resultado["destino"], "Cid. Universitária")
+        self.assertEqual(
+            [item["p"] for item in resultado["veiculos"]],
+            ["82638"],
+        )
+        self.assertNotIn(
+            "82494",
+            {item["p"] for item in resultado["veiculos"]},
+        )
+        self.assertTrue(all(
+            item["source"] == "live_gps_estimate"
+            for item in resultado["veiculos"]
+        ))
+        self.assertNotIn(
+            "sentido-oposto",
+            {item["p"] for item in resultado["veiculos"]},
+        )
+
     def test_plataforma_proxima_ou_cp_sem_mapeamento_nunca_viram_eta(self):
         linha = {
             "cl": 1, "lt": "8084", "tl": 10, "sl": 1,
-            "tp": "TERMINAL B", "ts": "TERMINAL A",
+            "tp": "TERMINAL A", "ts": "TERMINAL B",
         }
         programacao = self._programacao_ao_vivo()
         resultado, _ = self._consultar_chegadas_controladas(programacao, [linha], {
@@ -1102,8 +1216,8 @@ class TestCirculares(unittest.TestCase):
 
     def test_dois_sentidos_na_mesma_parada_ficam_separados(self):
         linhas = [
-            {"cl": 1, "lt": "8084", "tl": 10, "sl": 1, "tp": "TERMINAL B", "ts": "TERMINAL A"},
-            {"cl": 2, "lt": "8084", "tl": 10, "sl": 2, "tp": "TERMINAL B", "ts": "TERMINAL A"},
+            {"cl": 1, "lt": "8084", "tl": 10, "sl": 1, "tp": "TERMINAL A", "ts": "TERMINAL B"},
+            {"cl": 2, "lt": "8084", "tl": 10, "sl": 2, "tp": "TERMINAL A", "ts": "TERMINAL B"},
         ]
         programacao = {
             "tipo": "programacao", "linha": "8084-10", "parada": "Biênio",
@@ -1127,10 +1241,53 @@ class TestCirculares(unittest.TestCase):
         )
         self.assertEqual(len(contrato.sentidos), 2)
 
+    def test_sentido_sem_eta_nao_some_quando_o_oposto_tem_live(self):
+        linhas = [
+            {"cl": 1, "lt": "8084", "tl": 10, "sl": 1,
+             "tp": "TERMINAL A", "ts": "TERMINAL B"},
+            {"cl": 2, "lt": "8084", "tl": 10, "sl": 2,
+             "tp": "TERMINAL A", "ts": "TERMINAL B"},
+        ]
+        programacao = {
+            "tipo": "programacao", "linha": "8084-10", "parada": "Biênio",
+            "sentidos": [
+                self._programacao_ao_vivo("gtfs-a", "TERMINAL A"),
+                self._programacao_ao_vivo("gtfs-b", "TERMINAL B"),
+            ],
+        }
+        resultado, _ = self._consultar_chegadas_controladas(
+            programacao,
+            linhas,
+            {
+                1: {"hr": "10:00", "ps": [{
+                    "cp": "gtfs-a",
+                    "vs": [{"p": "a", "t": "10:05"}],
+                }]},
+                2: {"hr": "10:00", "ps": []},
+            },
+        )
+
+        contrato = circulares._resultado_chegada_publico(
+            resultado, api_consultada=True, ponto_pedido="Biênio"
+        )
+
+        self.assertEqual(
+            [item.sentido for item in contrato.sentidos],
+            ["TERMINAL A", "TERMINAL B"],
+        )
+        self.assertTrue(contrato.sentidos[0].previsoes_ao_vivo)
+        self.assertEqual(
+            contrato.sentidos[1].horarios_programados,
+            ("10:20",),
+        )
+        texto = circulares.renderizar_chegada(contrato)
+        self.assertIn("TERMINAL B", texto)
+        self.assertIn("10:20", texto)
+
     def test_sentido_explicito_exclui_eta_do_oposto(self):
         linhas = [
-            {"cl": 1, "lt": "8084", "tl": 10, "sl": 1, "tp": "TERMINAL B", "ts": "TERMINAL A"},
-            {"cl": 2, "lt": "8084", "tl": 10, "sl": 2, "tp": "TERMINAL B", "ts": "TERMINAL A"},
+            {"cl": 1, "lt": "8084", "tl": 10, "sl": 1, "tp": "TERMINAL A", "ts": "TERMINAL B"},
+            {"cl": 2, "lt": "8084", "tl": 10, "sl": 2, "tp": "TERMINAL A", "ts": "TERMINAL B"},
         ]
         resultado, _ = self._consultar_chegadas_controladas(
             self._programacao_ao_vivo("gtfs-b", "TERMINAL B"), linhas, {
@@ -1145,7 +1302,7 @@ class TestCirculares(unittest.TestCase):
     def test_eta_stale_faz_fallback_programado(self):
         linha = {
             "cl": 1, "lt": "8084", "tl": 10, "sl": 1,
-            "tp": "TERMINAL B", "ts": "TERMINAL A",
+            "tp": "TERMINAL A", "ts": "TERMINAL B",
         }
         resultado, _ = self._consultar_chegadas_controladas(
             self._programacao_ao_vivo(), [linha], {

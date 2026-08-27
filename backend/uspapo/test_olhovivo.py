@@ -44,7 +44,7 @@ class SessaoComPrevisao(SessaoFalsa):
         if caminho == "Buscar":
             resposta.json.return_value = [
                 {"cl": 35812, "lt": "8084", "tl": 10, "sl": 1,
-                 "tp": "METRO BUTANTA", "ts": "CIDADE UNIVERSITARIA"}
+                 "tp": "CIDADE UNIVERSITARIA", "ts": "METRO BUTANTA"}
             ]
         elif caminho == "Linha":
             resposta.json.return_value = {
@@ -96,7 +96,7 @@ class SessaoDe8082(SessaoFalsa):
         if caminho == "Buscar":
             resposta.json.return_value = [
                 {"cl": 1234, "lt": "8082", "tl": 10, "sl": 1,
-                 "tp": "METRO BUTANTA", "ts": "CID. UNIVERSITARIA"}
+                 "tp": "CID. UNIVERSITARIA", "ts": "METRO BUTANTA"}
             ]
         else:
             raise AssertionError(f"Endpoint inesperado: {url}")
@@ -250,10 +250,10 @@ class TestParadas(unittest.TestCase):
     def test_destino_respeita_o_sentido_da_api(self):
         linha = {"tp": "TERMINAL PRINCIPAL", "ts": "TERMINAL SECUNDARIO"}
         self.assertEqual(
-            olhovivo.destino_da_linha({**linha, "sl": 1}), "TERMINAL SECUNDARIO"
+            olhovivo.destino_da_linha({**linha, "sl": 1}), "TERMINAL PRINCIPAL"
         )
         self.assertEqual(
-            olhovivo.destino_da_linha({**linha, "sl": 2}), "TERMINAL PRINCIPAL"
+            olhovivo.destino_da_linha({**linha, "sl": 2}), "TERMINAL SECUNDARIO"
         )
 
     def test_stop_id_do_plano_tem_prioridade(self):

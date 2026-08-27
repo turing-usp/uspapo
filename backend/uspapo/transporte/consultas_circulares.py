@@ -545,36 +545,11 @@ def _programacao_gtfs(
             )
         }
 
-    # A busca geográfica pode encontrar vários pontos próximos. Misturar as
-    # faixas de todos eles e rotular o resultado com apenas o primeiro nome
-    # produzia uma tabela impossível de auditar. A programação abaixo pertence
-    # sempre a um único stop_id (a plataforma mais próxima); repetições desse
-    # mesmo ID em viagens/serviços continuam sendo combinadas.
-    if coordenada:
-        candidatos.sort(
-            key=lambda item: (
-                _distancia_parada_gtfs(item[2], coordenada),
-                str(item[2].get("id", "")),
-            )
-        )
-    else:
-        candidatos.sort(
-            key=lambda item: (
-                normalizar(str(item[2].get("nome", ""))),
-                str(item[2].get("id", "")),
-            )
-        )
-    parada_escolhida_id = str(candidatos[0][2].get("id", ""))
-    candidatos = [
-        item
-        for item in candidatos
-        if str(item[2].get("id", "")) == parada_escolhida_id
-    ]
-
-    # Um mesmo stop_id pode aparecer nos dois sentidos da linha (especialmente
-    # em terminais). Somar as faixas e imprimir apenas o headsign do primeiro
-    # candidato atribui horários do sentido oposto ao rótulo errado. Sem um
-    # sentido pedido, devolvemos blocos independentes e auditáveis.
+    # Sem sentido explícito, preserve todos os headsigns plausíveis antes de
+    # escolher um stop_id. Plataformas opostas costumam ter IDs diferentes;
+    # selecionar primeiro a mais próxima publicava silenciosamente a grade de
+    # apenas um lado da via. Cada recursão abaixo fixa o sentido e, só então,
+    # escolhe sua plataforma canônica.
     destinos = sorted({
         str(item[1].get("destino", "")).strip()
         for item in candidatos
@@ -624,6 +599,32 @@ def _programacao_gtfs(
                 "aviso": " ".join(avisos),
             }
 
+    # A busca geográfica pode encontrar vários pontos próximos. Misturar as
+    # faixas de todos eles e rotular o resultado com apenas o primeiro nome
+    # produzia uma tabela impossível de auditar. A programação abaixo pertence
+    # sempre a um único stop_id (a plataforma mais próxima); repetições desse
+    # mesmo ID em viagens/serviços continuam sendo combinadas.
+    if coordenada:
+        candidatos.sort(
+            key=lambda item: (
+                _distancia_parada_gtfs(item[2], coordenada),
+                str(item[2].get("id", "")),
+            )
+        )
+    else:
+        candidatos.sort(
+            key=lambda item: (
+                normalizar(str(item[2].get("nome", ""))),
+                str(item[2].get("id", "")),
+            )
+        )
+    parada_escolhida_id = str(candidatos[0][2].get("id", ""))
+    candidatos = [
+        item
+        for item in candidatos
+        if str(item[2].get("id", "")) == parada_escolhida_id
+    ]
+
     instante = agora or datetime.now(FUSO_SP)
     if instante.tzinfo is None:
         instante = instante.replace(tzinfo=FUSO_SP)
@@ -640,6 +641,20 @@ def _programacao_gtfs(
         if datas_ordenadas
         else None
     )
+    # Uma consulta de próxima chegada feita no fim do dia não termina
+    # artificialmente à meia-noite civil. Mantemos um horizonte curto de três
+    # horas (o mesmo máximo aceito para ETA Olho Vivo), sem abrir datas futuras
+    # em consultas explícitas para outro dia.
+    estendeu_horizonte_atual = False
+    if (
+        datas_ordenadas
+        and restricao_temporal is None
+        and datas_ordenadas[-1] == instante.date()
+        and limite_fim is not None
+        and instante + timedelta(hours=3) > limite_fim
+    ):
+        limite_fim = instante + timedelta(hours=3)
+        estendeu_horizonte_atual = True
     if restricao_temporal is not None:
         # A consulta e calculada a partir do limite pedido, mesmo quando a
         # janela esta no passado/futuro em relacao ao relogio da requisicao.
@@ -651,6 +666,11 @@ def _programacao_gtfs(
         sorted({
             *(dia - timedelta(days=1) for dia in datas_ordenadas),
             *datas_ordenadas,
+            *(
+                (datas_ordenadas[-1] + timedelta(days=1),)
+                if estendeu_horizonte_atual
+                else ()
+            ),
         })
         if datas_ordenadas
         else [instante.date() + timedelta(days=dias) for dias in range(-1, 8)]
@@ -799,14 +819,50 @@ def _programacao_gtfs(
                             faixas_frequencia.add(
                                 (inicio_util, fim_util, intervalo)
                             )
-                            for slot in _slots_estimados_frequencia(
-                                inicio_ponto,
-                                fim_ponto,
-                                intervalo,
-                                inicio_util,
+                            # Uma faixa/janela ainda futura deve incluir seu
+                            # primeiro slot. Já em uma faixa ativa, a consulta
+                            # continua pedindo o slot estritamente posterior ao
+                            # instante atual. Aproximar o corte futuro em um
+                            # microssegundo também evita que o limite de três do
+                            # helper seja consumido por slots anteriores à
+                            # janela civil solicitada.
+                            corte_slots = (
+                                inicio_util - timedelta(microseconds=1)
+                                if inicio_util > instante
+                                else instante
+                            )
+                            slots_validos = [
+                                slot
+                                for slot in _slots_estimados_frequencia(
+                                    inicio_ponto,
+                                    fim_ponto,
+                                    intervalo,
+                                    corte_slots,
+                                )
+                                if inicio_util <= slot < fim_util
+                            ]
+                            for slot in slots_validos:
+                                estimativas_frequencia.add((slot, intervalo))
+
+                            # No fim de uma faixa ativa pode já não restar um
+                            # múltiplo ancorado, embora a própria faixa ainda
+                            # indique serviço esperado. Preserve a referência
+                            # central da janela restante como estimativa, em
+                            # vez de escondê-la atrás da faixa seguinte.
+                            if (
+                                not slots_validos
+                                and inicio_ponto <= instante < fim_util
                             ):
-                                if limite_fim is None or slot < limite_fim:
-                                    estimativas_frequencia.add((slot, intervalo))
+                                janela_fim = min(
+                                    instante + timedelta(seconds=intervalo),
+                                    fim_util,
+                                )
+                                referencia = instante + (
+                                    janela_fim - instante
+                                ) / 2
+                                estimativas_frequencia.add(
+                                    (referencia, intervalo)
+                                )
             else:
                 chegada = meia_noite + timedelta(seconds=int(parada["horario"]))
                 if (
@@ -1657,8 +1713,13 @@ def _local_publico(chave: str, dados: dict[str, Any] | None) -> LocalPublico:
     )
 
 
+def _agora_sptrans() -> datetime:
+    """Relógio isolado para validar a atualidade dos payloads da API."""
+    return datetime.now(FUSO_SP)
+
+
 def _instante_referencia_sptrans(horario: str | None) -> datetime:
-    agora = datetime.now(FUSO_SP)
+    agora = _agora_sptrans()
     try:
         hora, minuto = (int(parte) for parte in str(horario).split(":")[:2])
         referencia = datetime.combine(
@@ -1671,6 +1732,22 @@ def _instante_referencia_sptrans(horario: str | None) -> datetime:
         return referencia
     except (TypeError, ValueError):
         return agora
+
+
+def _referencia_api_recente(horario: str | None) -> bool:
+    """Valida o relógio ``hr`` no limite de ingestão do Olho Vivo."""
+    try:
+        partes = str(horario or "").split(":")
+        time(int(partes[0]), int(partes[1]))
+    except (IndexError, TypeError, ValueError):
+        return False
+    referencia = _instante_referencia_sptrans(horario)
+    idade_hr_s = (_agora_sptrans() - referencia).total_seconds()
+    return (
+        -ADIANTAMENTO_TA_MAXIMO_S
+        <= idade_hr_s
+        <= IDADE_TA_MAXIMA_S
+    )
 
 
 def _melhor_eta_ao_vivo(
@@ -2028,7 +2105,7 @@ def _resultado_chegada_publico(
                 instantes_programados=tuple(
                     str(item) for item in programacao.get("instantes", [])
                 ),
-                estimativas_programadas = tuple(
+                estimativas_programadas=tuple(
                     PrevisaoChegada(
                         horario=str(item["horario"]),
                         acessivel=(
@@ -2049,6 +2126,7 @@ def _resultado_chegada_publico(
                             if item.get("intervalo_min") is not None
                             else None
                         ),
+                        instante=str(item.get("instante") or "") or None,
                     )
                     for item in programacao.get("estimativas", [])
                     if isinstance(item, dict)
@@ -2072,6 +2150,7 @@ def _resultado_chegada_publico(
             parada=str(previsao.get("parada") or sentidos[0].parada),
             sentidos=tuple(sentidos),
             api_consultada=api_consultada,
+            api_falhou=bool(previsao.get("falha_api")),
             observado_em=str(previsao.get("hr") or "") or None,
             veiculos_ativos=(
                 int(previsao["veiculos_ativos"])
@@ -2107,12 +2186,39 @@ def _resultado_chegada_publico(
                     _segundos_ate_eta_sptrans(str(item["t"]), referencia_api)
                     / 60
                 ),
+                instante=(
+                    referencia_api + timedelta(seconds=float(
+                        _segundos_ate_eta_sptrans(
+                            str(item["t"]), referencia_api,
+                        )
+                    ))
+                ).isoformat(),
             )
             for item in _veiculos_ao_vivo_ordenados(
                 list(bloco.get("veiculos", [])), bloco.get("hr"),
             )
         )
         if not veiculos:
+            fallback_programado = {
+                "tipo": "programacao",
+                "linha": bloco.get("linha") or previsao.get("linha", ""),
+                "parada": bloco.get("parada") or ponto_pedido,
+                "destino": bloco.get("destino", ""),
+                "horarios": list(bloco.get("horarios_programados", [])),
+                "instantes": list(bloco.get("instantes_programados", [])),
+                "estimativas": list(bloco.get("estimativas_programadas", [])),
+                "faixas": list(bloco.get("faixas_programadas", [])),
+                "programacao_incompleta": bool(
+                    bloco.get("programacao_incompleta")
+                ),
+            }
+            sentidos_ao_vivo.extend(
+                _resultado_chegada_publico(
+                    fallback_programado,
+                    api_consultada=api_consultada,
+                    ponto_pedido=ponto_pedido,
+                ).sentidos
+            )
             continue
         estimativas_programadas = tuple(
             PrevisaoChegada(
@@ -2135,6 +2241,7 @@ def _resultado_chegada_publico(
                     if item.get("intervalo_min") is not None
                     else None
                 ),
+                instante=str(item.get("instante") or "") or None,
             )
             for item in bloco.get(
                 "estimativas_programadas",
@@ -2186,6 +2293,7 @@ def _resultado_chegada_publico(
         parada=parada,
         sentidos=tuple(sentidos_ao_vivo),
         api_consultada=api_consultada,
+        api_falhou=bool(previsao.get("falha_api")),
         observado_em=str(
             previsao.get("hr")
             or blocos_ao_vivo[0].get("hr", "")
@@ -2214,10 +2322,10 @@ def _posicoes_linha(session: requests.Session, codigo_linha: int) -> dict[str, A
 
 def _destino_linha_sptrans(linha: dict[str, Any]) -> str:
     """Destino operacional conforme o sentido documentado pela SPTrans."""
-    # ``sl=1`` segue em direção a ``ts``; no sentido oposto, a referência é
-    # ``tp``. Inverter esses campos faz o filtro abaixo associar um veículo ao
-    # headsign GTFS oposto e elimina previsões válidas antes do contrato.
-    destino = linha.get("ts") if linha.get("sl") == 1 else linha.get("tp")
+    # ``sl=1`` segue em direção a ``tp``; ``sl=2`` usa ``ts``. Esses nomes
+    # parecem terminais de origem, mas a documentação da Linha/Buscar os
+    # define como os letreiros descritivos dos respectivos sentidos.
+    destino = linha.get("tp") if linha.get("sl") == 1 else linha.get("ts")
     return str(destino or "")
 
 def _shape_da_viagem(
@@ -2309,12 +2417,31 @@ def _eta_derivado_de_gps(
     if len(paradas) < 2:
         return None
 
-    # Se alguma parada da viagem estiver muito distante do shape,
-    # a geometria dessa trip não é confiável o bastante para ETA.
+    indices_alvo = [
+        indice
+        for indice, parada in enumerate(paradas)
+        if parada["id"] == stop_id_alvo
+    ]
+
+    # Um mesmo stop_id repetido na viagem (por exemplo, o terminal inicial e
+    # final de uma circular) não identifica sozinho qual ocorrência receberá
+    # o veículo. Nesse caso continuamos recusando a inferência.
+    if len(indices_alvo) != 1:
+        return None
+
+    indice_alvo = indices_alvo[0]
+    paradas_ate_alvo = paradas[:indice_alvo + 1]
+
+    if len(paradas_ate_alvo) < 2:
+        return None
+
+    # Para chegar ao alvo só precisamos validar o prefixo da viagem. Linhas
+    # circulares podem repetir o terminal depois dele; projetar essa repetição
+    # no primeiro ramo do shape não torna o trecho anterior ambíguo.
     if any(
         float(parada["erro_shape_m"])
         > MAX_ERRO_PARADA_SHAPE_M
-        for parada in paradas
+        for parada in paradas_ate_alvo
     ):
         return None
 
@@ -2325,23 +2452,13 @@ def _eta_derivado_de_gps(
         + TOLERANCIA_ORDEM_SHAPE_M
         < float(anterior["shape_m"])
         for anterior, atual in zip(
-            paradas,
-            paradas[1:],
+            paradas_ate_alvo,
+            paradas_ate_alvo[1:],
         )
     ):
         return None
 
-    alvo = next(
-        (
-            parada
-            for parada in paradas
-            if parada["id"] == stop_id_alvo
-        ),
-        None,
-    )
-
-    if alvo is None:
-        return None
+    alvo = paradas_ate_alvo[-1]
 
     try:
         latitude = float(veiculo["py"])
@@ -2378,13 +2495,49 @@ def _eta_derivado_de_gps(
     if posicao_veiculo_m >= posicao_alvo_m:
         return None
 
+    # Em circulares, um ramo posterior ao alvo pode voltar muito perto do
+    # trecho de ida. A projeção global sozinha escolheria um deles por poucos
+    # metros e poderia anunciar como futuro um veículo que já passou. Reuse a
+    # tolerância geométrica existente e recuse quando o GPS também encaixa no
+    # sufixo da viagem sem margem espacial clara.
+    acumulado_shape_m = 0.0
+    indice_segmento_alvo: int | None = None
+    for indice, (ponto_a, ponto_b) in enumerate(zip(shape, shape[1:])):
+        try:
+            tamanho_segmento_m = _distancia_local_coordenadas_m(
+                float(ponto_a["latitude"]),
+                float(ponto_a["longitude"]),
+                float(ponto_b["latitude"]),
+                float(ponto_b["longitude"]),
+            )
+        except (KeyError, TypeError, ValueError):
+            return None
+        if acumulado_shape_m + tamanho_segmento_m >= posicao_alvo_m:
+            indice_segmento_alvo = indice
+            break
+        acumulado_shape_m += tamanho_segmento_m
+
+    if indice_segmento_alvo is None:
+        return None
+    projecao_pos_alvo = _projetar_ponto_no_shape(
+        latitude,
+        longitude,
+        shape[indice_segmento_alvo:],
+    )
+    if (
+        projecao_pos_alvo is not None
+        and float(projecao_pos_alvo["distancia_m"])
+        <= distancia_shape_m + TOLERANCIA_ORDEM_SHAPE_M
+    ):
+        return None
+
     # Descobre entre quais duas paradas GTFS o ônibus está.
     anterior: dict[str, Any] | None = None
     posterior: dict[str, Any] | None = None
 
     for parada_a, parada_b in zip(
-        paradas,
-        paradas[1:],
+        paradas_ate_alvo,
+        paradas_ate_alvo[1:],
     ):
         posicao_a = float(
             parada_a["shape_m"]
@@ -2700,8 +2853,10 @@ def _veiculos_ao_vivo_ordenados(
 ) -> list[dict[str, Any]]:
     """Valida, ordena e deduplica ETAs antes de limitar os próximos três."""
     referencia = _instante_referencia_sptrans(horario_referencia)
-    ordenados: list[tuple[float, tuple[str, ...], dict[str, Any]]] = []
-    vistos: set[tuple[str, ...]] = set()
+    melhores_por_veiculo: dict[
+        tuple[str, ...],
+        tuple[tuple[float, float, float], float, dict[str, Any]],
+    ] = {}
     for veiculo in veiculos:
         if not isinstance(veiculo, dict):
             continue
@@ -2726,9 +2881,6 @@ def _veiculos_ao_vivo_ordenados(
                 str(veiculo.get("py") or ""), str(veiculo.get("px") or ""),
             )
         )
-        if chave in vistos:
-            continue
-        vistos.add(chave)
         # Mantém a evidência operacional disponível no resultado interno sem
         # despejar campos técnicos no renderer/naturalizador.
         preservado = {
@@ -2754,9 +2906,31 @@ def _veiculos_ao_vivo_ordenados(
             "confidence": confianca["level"],
             "confidence_reasons": list(confianca["reasons"]),
         })
-        ordenados.append((segundos, chave, preservado))
-    ordenados.sort(key=lambda item: (item[0], item[1]))
-    return [item[2] for item in ordenados[:3]]
+
+        atualizado_em = _instante_atualizacao_sptrans(
+            veiculo.get("ta"), referencia,
+        )
+        qualidade = {
+            "high": 3.0,
+            "medium": 2.0,
+            "low": 1.0,
+        }.get(str(confianca["level"]), 0.0)
+        preferencia = (
+            qualidade,
+            atualizado_em.timestamp() if atualizado_em else -math.inf,
+            -segundos,
+        )
+        anterior = melhores_por_veiculo.get(chave)
+        if anterior is None or preferencia > anterior[0]:
+            melhores_por_veiculo[chave] = (
+                preferencia, segundos, preservado,
+            )
+
+    ordenados = sorted(
+        melhores_por_veiculo.items(),
+        key=lambda item: (item[1][1], item[0]),
+    )
+    return [item[1][2] for item in ordenados[:3]]
 
 
 def _obter_previsao_sptrans(
@@ -2796,6 +2970,110 @@ def _obter_previsao_sptrans(
             ):
                 return bloco
         return programacao if isinstance(programacao, dict) else {}
+
+    def programacao_apos_ultimo_eta(
+        contexto: dict[str, str],
+        veiculos: list[dict[str, Any]],
+        horario_referencia: str,
+    ) -> dict[str, Any]:
+        """Obtém referências GTFS posteriores ao último ETA já conhecido.
+
+        A programação inicial contém apenas as três próximas passagens. Se um
+        ETA ao vivo vier depois delas, reaproveitá-la não permite completar a
+        resposta mista. Reconsultar o motor local a partir do último ETA evita
+        aumentar indefinidamente o payload interno e mantém o limite público.
+        """
+        fallback = programacao_do_contexto(contexto)
+        referencia = _instante_referencia_sptrans(horario_referencia)
+        segundos_validos = [
+            segundos
+            for segundos in (
+                _segundos_ate_eta_sptrans(
+                    str(veiculo.get("t") or ""), referencia
+                )
+                for veiculo in veiculos
+            )
+            if segundos is not None
+        ]
+        if not segundos_validos:
+            return fallback
+        ultimo_eta = referencia + timedelta(seconds=max(segundos_validos))
+
+        restricao_restante = restricao_temporal
+        if restricao_restante is not None:
+            inicio_restante = max(restricao_restante.inicio, ultimo_eta)
+            if (
+                restricao_restante.fim is not None
+                and inicio_restante >= restricao_restante.fim
+            ):
+                return fallback
+            restricao_restante = replace(
+                restricao_restante,
+                inicio=inicio_restante,
+            )
+
+        posterior = _programacao_gtfs(
+            numero,
+            ponto,
+            agora=ultimo_eta,
+            sentido_esperado=contexto["destino"],
+            datas_permitidas=(
+                datas_permitidas
+                if restricao_restante is not None
+                else (ultimo_eta.date(),)
+            ),
+            restricao_temporal=restricao_restante,
+        )
+        if posterior.get("erro"):
+            return fallback
+        if str(posterior.get("parada_id") or "") != contexto["stop_id"]:
+            # O complemento não pode trocar de plataforma só porque outra do
+            # mesmo sentido ficou geograficamente mais próxima na nova busca.
+            return fallback
+        if not any(
+            posterior.get(campo)
+            for campo in ("horarios", "estimativas", "faixas")
+        ):
+            return fallback
+        return posterior
+
+    def completar_contextos_sem_eta(
+        blocos: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Mantém programação dos sentidos que não receberam ETA ao vivo."""
+        presentes = {
+            (
+                str(bloco.get("parada_id_gtfs") or ""),
+                _normalizar_sentido_operacional(bloco.get("destino")),
+            )
+            for bloco in blocos
+        }
+        completos = list(blocos)
+        for contexto in contextos_gtfs:
+            chave = (
+                contexto["stop_id"],
+                _normalizar_sentido_operacional(contexto["destino"]),
+            )
+            if chave in presentes:
+                continue
+            fallback = programacao_do_contexto(contexto)
+            completos.append({
+                "linha": str(fallback.get("linha") or numero),
+                "destino": contexto["destino"],
+                "parada": str(
+                    fallback.get("parada") or contexto["parada"] or ponto
+                ),
+                "parada_id_gtfs": contexto["stop_id"],
+                "veiculos": [],
+                "horarios_programados": list(fallback.get("horarios", [])),
+                "instantes_programados": list(fallback.get("instantes", [])),
+                "estimativas_programadas": list(fallback.get("estimativas", [])),
+                "faixas_programadas": list(fallback.get("faixas", [])),
+                "programacao_incompleta": bool(
+                    fallback.get("programacao_incompleta")
+                ),
+            })
+        return completos
     if sentido_esperado and not any(
         _normalizar_sentido_operacional(contexto["destino"])
         == _normalizar_sentido_operacional(sentido_esperado)
@@ -2840,7 +3118,8 @@ def _obter_previsao_sptrans(
     if not _autenticar_sptrans(session, token):
         if not programacao.get("erro"):
             programacao["aviso_api"] = "A autenticação da API Olho Vivo falhou."
-            programacao["api_consultada"] = False
+            programacao["api_consultada"] = True
+            programacao["falha_api"] = True
         return programacao
 
     try:
@@ -2853,8 +3132,12 @@ def _obter_previsao_sptrans(
             programacao["api_consultada"] = True
             return programacao
 
-        tentativas: list[tuple[dict[str, Any], dict[str, str], dict[str, Any], str]] = []
+        tentativas: list[
+            tuple[dict[str, Any], dict[str, str], dict[str, Any], str]
+        ] = []
         ha_linha_no_sentido = False
+        publicou_paradas_no_sentido = False
+        payload_ao_vivo_desatualizado = False
         for linha_api in linhas:
             codigo_linha = int(linha_api["cl"])
             previsoes = cache(
@@ -2869,6 +3152,9 @@ def _obter_previsao_sptrans(
                 ):
                     continue
                 ha_linha_no_sentido = True
+                publicou_paradas_no_sentido = (
+                    publicou_paradas_no_sentido or bool(paradas)
+                )
                 for parada in _paradas_olho_vivo_do_stop_gtfs(
                     paradas, contexto["stop_id"],
                 ):
@@ -2878,24 +3164,36 @@ def _obter_previsao_sptrans(
 
         previsoes_por_sentido: list[dict[str, Any]] = []
         for linha_api, contexto, parada, horario_referencia in tentativas:
+            if not _referencia_api_recente(horario_referencia):
+                # Um payload antigo pode ter ``ta`` e ``t`` coerentes entre si
+                # e ainda assim descrever o passado. O TTL local não garante
+                # frescor upstream.
+                payload_ao_vivo_desatualizado = True
+                continue
             veiculos = _veiculos_ao_vivo_ordenados(
                 list(parada.get("vs", [])), horario_referencia,
                 restricao_temporal,
             )
             if not veiculos:
                 continue
-            fallback_programado = programacao_do_contexto(contexto)
+            fallback_programado = programacao_apos_ultimo_eta(
+                contexto, veiculos, horario_referencia
+            )
             previsoes_por_sentido.append({
                 "hr": horario_referencia,
                 "linha": f"{linha_api.get('lt', numero)}-{linha_api.get('tl', 10)}",
                 "sentido": linha_api.get("sl"),
                 "destino": contexto["destino"],
+                "parada_id_gtfs": contexto["stop_id"],
                 "parada": contexto["parada"] or parada.get("np") or ponto,
                 "endereco": parada.get("ed", ""),
                 "veiculos": veiculos,
                 "horarios_programados": list(fallback_programado.get("horarios", [])),
                 "instantes_programados": list(fallback_programado.get("instantes", [])),
-                "estimativas_programadas": list(fallback_programado.get("estimativas", [])),
+                "estimativas_programadas": list(
+                    fallback_programado.get("estimativas", [])
+                ),
+                "faixas_programadas": list(fallback_programado.get("faixas", [])),
                 "programacao_incompleta": bool(
                     fallback_programado.get("programacao_incompleta")
                 ),
@@ -2919,6 +3217,9 @@ def _obter_previsao_sptrans(
                 },
             })
         if previsoes_por_sentido:
+            previsoes_por_sentido = completar_contextos_sem_eta(
+                previsoes_por_sentido
+            )
             resultado: dict[str, Any] = {
                 "tipo": "previsao",
                 "previsoes_por_sentido": previsoes_por_sentido,
@@ -3004,6 +3305,10 @@ def _obter_previsao_sptrans(
                 horario_referencia = str(
                     posicoes.get("hr") or ""
                 )
+
+                if not _referencia_api_recente(horario_referencia):
+                    payload_ao_vivo_desatualizado = True
+                    continue
 
                 if horario_referencia:
                     horarios_contexto.append(
@@ -3098,10 +3403,10 @@ def _obter_previsao_sptrans(
             if not veiculos_estimados:
                 continue
 
-            fallback_programado = (
-                programacao_do_contexto(
-                    contexto
-                )
+            fallback_programado = programacao_apos_ultimo_eta(
+                contexto,
+                veiculos_estimados,
+                horario_contexto,
             )
 
             previsoes_gps_por_sentido.append({
@@ -3114,6 +3419,7 @@ def _obter_previsao_sptrans(
                     "sl"
                 ),
                 "destino": contexto["destino"],
+                "parada_id_gtfs": contexto["stop_id"],
                 "parada": (
                     contexto["parada"]
                     or ponto
@@ -3138,6 +3444,9 @@ def _obter_previsao_sptrans(
                         "estimativas",
                         [],
                     )
+                ),
+                "faixas_programadas": list(
+                    fallback_programado.get("faixas", [])
                 ),
 
                 "programacao_incompleta": bool(
@@ -3179,6 +3488,9 @@ def _obter_previsao_sptrans(
 
 
         if previsoes_gps_por_sentido:
+            previsoes_gps_por_sentido = completar_contextos_sem_eta(
+                previsoes_gps_por_sentido
+            )
             resultado_gps: dict[
                 str,
                 Any,
@@ -3218,9 +3530,12 @@ def _obter_previsao_sptrans(
             ),
             "api_consultada": True,
             "aviso_api": (
+                "A API Olho Vivo respondeu com uma referência temporal antiga; "
+                "nenhum ETA desse payload foi usado."
+                if payload_ao_vivo_desatualizado else
                 "A API Olho Vivo não publicou uma parada com associação "
                 "GTFS inequívoca para esse ponto e sentido; nenhum ETA foi usado."
-                if not tentativas else
+                if publicou_paradas_no_sentido and not tentativas else
                 "A API Olho Vivo não publicou um ETA e nenhuma posição GPS "
                 "disponível permitiu calcular uma chegada com segurança para "
                 "essa parada e esse sentido."
@@ -3233,6 +3548,7 @@ def _obter_previsao_sptrans(
         if not programacao.get("erro"):
             programacao["aviso_api"] = "A API Olho Vivo não respondeu agora."
             programacao["api_consultada"] = True
+            programacao["falha_api"] = True
         return programacao
 
 
