@@ -260,3 +260,15 @@ tests/
 # que o backend precisa saber do Supabase vem do .env, e o esquema vem do
 # projeto de produção por `supabase db pull`. Ver o .env.example para montar.
 supabase/
+
+# Turing (planos do orquestrador)
+.turing/plans/
+
+# Capacitor / Android
+# (build/ já é ignorado globalmente na seção Distribution/packaging)
+.gradle/
+*.iml
+local.properties
+site/android/.idea/
+*.keystore
+*.jks
