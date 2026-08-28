@@ -40,3 +40,13 @@ export function criarCliente() {
     cookieOptions: { domain: dominioCookie },
   });
 }
+
+/* Token da sessão no navegador, para mandar como `Authorization: Bearer <token>`
+   nos fetches same-origin que batem nas rotas de API que pararam de ler cookies
+   (export estático: a cookie store as forçava dinâmicas).
+   Sem sessão devolve null — o consumidor manda o pedido como antes e o 401
+   mantém o comportamento de "sessão expirada". */
+export async function tokenDaSessao(): Promise<string | null> {
+  const { data: { session } } = await criarCliente().auth.getSession();
+  return session?.access_token ?? null;
+}
