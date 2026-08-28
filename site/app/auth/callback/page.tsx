@@ -37,8 +37,10 @@ function Callback() {
         return;
       }
 
-      /* Sessão já gravada em cookie do navegador; o refresh faz o proxy
-         revalidar contra o cookie novo — mesmo padrão da página de login. */
+      /* Sessão já gravada em cookie do navegador: o refresh abaixo faz a árvore
+         cliente re-hidratar e o guard do AppShell enxergar o cookie novo e
+         liberar as rotas protegidas (o proxy.ts, que fazia essa revalidação,
+         foi removido) — mesmo padrão da página de login. */
       router.replace('/');
       router.refresh();
     })();
