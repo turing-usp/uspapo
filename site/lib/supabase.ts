@@ -1,10 +1,25 @@
 import { createBrowserClient } from '@supabase/ssr';
 
-export const dominioCookie =
-  process.env.NODE_ENV === 'production' ? '.turingusp.com' : undefined;
+/* Domínio do cookie de sessão.
+   NEXT_PUBLIC_COOKIE_DOMAIN, quando DEFINIDA — inclusive string vazia — manda
+   na frente; o check é `!== undefined` de propósito, nunca `||`, porque o
+   vazio é valor legítimo e significa "sem domínio". O vazio é mapeado para
+   `undefined` no cookieOptions, que é como o @supabase/ssr representa cookie
+   host-only (sem domínio): o app embutido roda na origem local
+   (`localhost`) e nenhum domínio de subdomínio se aplica.
+   INDEFINIDA → o comportamento de sempre: produção no domínio raiz
+   `.turingusp.com` (o cookie vale em qualquer subdomínio), dev sem domínio. */
+export const dominioCookie = (() => {
+  const variavel = process.env.NEXT_PUBLIC_COOKIE_DOMAIN;
+  if (variavel !== undefined) {
+    return variavel === '' ? undefined : variavel;
+  }
+  return process.env.NODE_ENV === 'production' ? '.turingusp.com' : undefined;
+})();
 
 /* URL e anon key do projeto, o único lugar do site que nomeia essas duas
-   variáveis: o cliente de navegador, o de servidor e o proxy todos vêm aqui.
+   variáveis: o cliente de navegador vem aqui (a portaria de sessão é o guard
+   do AppShell e o callback de login — ambos no client).
 
    A chave é pública mesmo: vai embutida no bundle e qualquer um lê. Quem
    protege as tabelas é o RLS.

@@ -5,10 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:app": "NEXT_EXPORT=1 NEXT_PUBLIC_COOKIE_DOMAIN= next build",
     "start": "next start",
     "lint": "eslint",
     "app:sync:dev": "CAPACITOR_URL=http://10.0.2.2:3000 npx cap sync android",
-    "app:sync:prod": "CAPACITOR_URL=https://uspapo.turingusp.com npx cap sync android"
+    "app:sync:prod": "npm run build:app && npx cap sync android"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",

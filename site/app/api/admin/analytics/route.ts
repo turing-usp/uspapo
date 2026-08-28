@@ -2,6 +2,15 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { credenciaisSupabase } from '@/lib/supabase';
 
+/* `revalidate = false` é o valor DEFAULT documentado (sem efeito no modo SSR:
+   a rota segue dinâmica por causa do request.headers e do fetch no-store),
+   mas no modo export (NEXT_EXPORT=1) o Next 16 exige que uma rota com handler
+   GET declare explicitamente como se renderiza — e esse literal satisfaz a
+   checagem. Aí o handler devolve o 404 fixo acima sem tocar no request
+   (totalmente estático), então o prerender vira um arquivo fixo sem surpresa.
+   `dynamic = 'force-static'` não pode: congela a rota também no SSR. */
+export const revalidate = false;
+
 function administradorPermitido(email: string | undefined) {
   const permitidos = (process.env.ADMIN_EMAILS || '')
     .split(',')
@@ -11,6 +20,18 @@ function administradorPermitido(email: string | undefined) {
 }
 
 export async function GET(request: Request) {
+  // Export estático do app (Capacitor): NEXT_EXPORT=1 é lida no build e esta
+  // rota vira arquivo estático — qualquer leitura do `request` a tornaria
+  // dinâmica e derrubaria o export. No app o analytics admin nem existe
+  // (sem backend por perto), então 404 direto, ANTES de tocar no request;
+  // as telas admin já tratam a resposta com erro como indisponível.
+  // No modo SSR (Vercel) a flag é indefinida e o handler segue intacto.
+  if (process.env.NEXT_EXPORT === '1') {
+    return NextResponse.json(
+      { ok: false, erro: 'Analytics indisponivel no app.' },
+      { status: 404 },
+    );
+  }
   try {
     // A autenticação parou de ler cookies: era o que impedia esta rota de
     // entrar no export estático do app (a cookie store a forçava dinâmica).
