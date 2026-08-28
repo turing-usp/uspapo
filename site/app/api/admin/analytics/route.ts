@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { criarClienteServidor } from '@/lib/supabase-servidor';
+import { createClient } from '@supabase/supabase-js';
+import { credenciaisSupabase } from '@/lib/supabase';
 
 function administradorPermitido(email: string | undefined) {
   const permitidos = (process.env.ADMIN_EMAILS || '')
@@ -9,10 +10,27 @@ function administradorPermitido(email: string | undefined) {
   return permitidos.length === 0 || permitidos.includes((email || '').toLowerCase());
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const supabase = await criarClienteServidor();
-    const { data: { user }, error } = await supabase.auth.getUser();
+    // A autenticação parou de ler cookies: era o que impedia esta rota de
+    // entrar no export estático do app (a cookie store a forçava dinâmica).
+    // O navegador já tem a sessão, então as páginas admin enviam o token no
+    // header `Authorization: Bearer <token>`.
+    const autenticacao = request.headers.get('authorization') || '';
+    const [esquema, token] = autenticacao.split(' ');
+
+    if (esquema?.toLowerCase() !== 'bearer' || !token) {
+      return NextResponse.json(
+        { ok: false, erro: 'Acesso negado. Login de administrador necessario.' },
+        { status: 401 },
+      );
+    }
+
+    // `persistSession: false` porque isto roda no servidor: o cliente é só a
+    // via de validação do JWT contra o Supabase, não há sessão a persistir.
+    const [url, chave] = credenciaisSupabase();
+    const supabase = createClient(url, chave, { auth: { persistSession: false } });
+    const { data: { user }, error } = await supabase.auth.getUser(token);
 
     if (error || !user) {
       return NextResponse.json(
