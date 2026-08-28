@@ -108,12 +108,19 @@ CHARS_POR_TOKEN = 3.5
 # ─────────────────────────────────────────────
 # Liberamos o acesso tanto para o domínio oficial do Turing quanto para os
 # testes locais!
+#
+# A origem da WebView embutida (Estratégia A: o app embutido chama a API de
+# dentro da própria WebView do app) entra aqui também: o Capacitor 8 aponta o
+# androidScheme para "https", então a WebView nasce em https://localhost — e em
+# modo debug/cleartext ela aparece em http://localhost.
 ORIGENS_CORS = [
     "https://turingusp.com",       # Para o site público
     "https://www.turingusp.com",   # Garantia caso alguém digite www
     "http://localhost:3000",       # Para continuar testando na sua máquina
     "https://uspapo.turingusp.com",
     "https://www.uspapo.turingusp.com",
+    "https://localhost",           # Origem da WebView embutida (padrão do Capacitor 8)
+    "http://localhost",            # Mesma WebView, modo debug/cleartext
 ]
 
 # Authorization e X-Admin-Key são headers customizados: sem eles liberados aqui,
