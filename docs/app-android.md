@@ -11,15 +11,51 @@ revisão da Play Store para mudar a interface.
 ### Por que a Estratégia A foi rejeitada (`output: 'export'`)
 
 A alternativa era exportar o site para estáticos e empacotá-los na WebView
-(Estratégia A). Este fork do Next **falha o build com export**:
+(Estratégia A). O build com `output: 'export'` falhava com dois erros; os
+dois estão **RESOLVIDOS** no site:
 
-- **E87** em `/chat/[id]`: rota dinâmica sem `generateStaticParams`;
-- **E558** nos route handlers `/auth/callback` e `/api/admin/analytics`: usam
-  `cookies()`, que não existe num export estático.
+- **E87 em `/chat/[id]` — RESOLVIDO:** a conversa agora mora na query
+  string (`/chat?id=<uuid>`). A rota é **estática** (`/chat`, não
+  parametrizada) e o `id` é lido no client com `useSearchParams` dentro de
+  uma fronteira de `<Suspense>` — exigência do build para `useSearchParams`
+  numa página estática.
+- **E558 nos route handlers — RESOLVIDO:** `cookies()` não existe num
+  export estático, e nenhum dos dois a usa mais:
+  - **`/auth/callback` é página client:** o `exchangeCodeForSession` roda
+    no browser client (o route handler server e o client de servidor foram
+    removidos). A sessão é gravada em cookie do próprio browser no origin
+    do site (domínio `.turingusp.com` via `dominioCookie`, ver seção
+    "Domínio").
+  - **`/api/admin/analytics` autentica por header**
+    `Authorization: Bearer <token>` validado server-side com
+    `supabase.auth.getUser(token)`; as duas páginas admin mandam o token
+    via `tokenDaSessao()`; a `ADMIN_API_KEY` segue restrita ao server-side.
 
-Refatorar isso (parametrizar a rota de chat e tirar o callback de auth dos
-route handlers) é refatorar o **site**, não o app — fora do escopo do
-wrapper, e por isso a Estratégia A segue rejeitada.
+O site não tem mais nenhum uso de `cookies()`/`next/headers` (o
+`proxy.ts` lê os cookies do `Request` da requisição).
+
+**`generateStaticParams` é inviável para a rota de chat:** o uuid é
+cunhado no client (`novoId()`, `crypto.randomUUID()`), os dados são por
+usuário (atrás de RLS do Supabase) e não há fonte enumerável em build para
+listar os caminhos. No Next 16, um `generateStaticParams` retornando `[]` é
+erro de build (`empty-generate-static-params`), e a doc oficial de static
+exports orienta remover `output: 'export'` quando os caminhos não são
+conhecíveis em build — por isso o padrão adotado é rota estática + query
+string.
+
+A Estratégia A **segue rejeitada**: restam estes bloqueios para habilitar
+`output: 'export'`:
+
+- **`proxy.ts`:** Proxy é feature **não suportada** em export (lista
+  oficial de unsupported features do Next); a proteção de rotas migraria
+  para o client.
+- **`/api/admin/analytics`:** ainda é dinâmico — route handler que depende
+  do `Request`; em export, só GET sem acesso ao request é prerenderável.
+- **`next/image` com loader padrão:** o avatar remoto do Supabase
+  (`remotePatterns` em `next.config.ts`) exigirá loader custom.
+
+Resolver esses bloqueios é refatorar o **site**, não o app — fora do escopo
+do wrapper.
 
 ## Domínio
 
@@ -123,10 +159,15 @@ Antes de cada release:
   para produção** — o padrão recomendado é conteúdo local + refresh
   versionado. Trade-off aceito para o scaffold: com conteúdo remoto, a
   atualização deixa de ser um release de app e vira um redeploy do site.
-- Migrar para export estático no futuro (Estratégia A) exige primeiro
-  refatorar `/chat/[id]` (`generateStaticParams`) e os route handlers
-  `/auth/callback` e `/api/admin/analytics` (sem `cookies()`); até lá o app
-  segue na Estratégia B.
+- Migrar para export estático no futuro (Estratégia A): os dois erros
+  originais de build estão **RESOLVIDOS** no site — **E87** com a rota
+  estática `/chat?id=<uuid>` (lida no client com `useSearchParams` em
+  fronteira de Suspense) e **E558** com `/auth/callback` como página client
+  (`exchangeCodeForSession` do browser client, sessão em cookie do browser)
+  e `/api/admin/analytics` sem `cookies()` (Bearer validado server-side).
+  Restam `proxy.ts`, o handler dinâmico de analytics e `next/image` (loader
+  padrão) — detalhes na seção "Por que a Estratégia A foi rejeitada". Até a
+  resolução deles, o app segue na Estratégia B.
 - **A sessão Supabase do app é isolada da do browser:** a WebView tem
   storage próprio, então o login feito no app não propaga para o browser
   (nem o contrário), mesmo no mesmo aparelho.
