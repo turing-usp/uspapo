@@ -66,8 +66,11 @@ export async function proxy(request: NextRequest) {
   if (!data.user && !publica) {
     const login = request.nextUrl.clone();
     login.pathname = '/login';
-    /* Para onde ele queria ir, para o login devolver depois de entrar. */
-    login.searchParams.set('destino', caminho);
+    /* Para onde ele queria ir, para o login devolver depois de entrar.
+       Caminho + query string: com o id da conversa na query (?id=<uuid>,
+       Estratégia A), só o pathname faria o deep-link /chat?id=... morrer no
+       round-trip do login. */
+    login.searchParams.set('destino', request.nextUrl.pathname + request.nextUrl.search);
     return NextResponse.redirect(login);
   }
 

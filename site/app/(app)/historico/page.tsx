@@ -235,7 +235,7 @@ export default function Historico() {
                     ) : (
                       <>
                         <Link
-                            href={`/chat/${conversa.id}`}
+                            href={'/chat?id=' + conversa.id}
                             className="group flex items-start gap-4 p-4 pl-5 pr-14 rounded-2xl overflow-hidden glass hover:bg-scrim/20 transition-colors"
                         >
                             <span
