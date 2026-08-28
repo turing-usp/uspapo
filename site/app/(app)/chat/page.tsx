@@ -17,24 +17,28 @@ import {
 } from "@/lib/stream";
 import { UserBubble } from "@/components/UserBubble";
 import { useAlturaPublicada } from "@/lib/janela";
-import { useState } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 
+function Chat() {
 
-export default function ChatPage() {
-
-    const { id } = useParams();
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    /* O id migrou do segmento de rota (/chat/[id]) para a query string
+       (?id=<uuid>) por causa do export estático da Estratégia A: uma rota
+       dinâmica não sai no export, e a estática lê o id só no cliente. */
+    const id = searchParams.get("id");
     const [pergunta, setPergunta] = useState("");
     /* A pergunta que veio da home, lida uma única vez, no primeiro render.
        Guardada em estado e não em ref porque três useState abaixo dependem
        dela: é ela que faz a bolha, o "digitando" e o estado de "respondendo"
        existirem no mesmo quadro da navegação, antes de qualquer ida ao banco.
 
-       Sem risco de divergência de hidratação, numa navegação de cliente não há
-       render no servidor, e num acesso direto à URL o Map do lib/pendente está
-       vazio dos dois lados. */
-    const [daHome] = useState(() => lerPendente(id as string));
+       Sem risco de divergência de hidratação: a fronteira de Suspense abaixo
+       só renderiza este componente no cliente, e num acesso direto à URL o
+       Map do lib/pendente está vazio. */
+    const [daHome] = useState(() => (id ? lerPendente(id) : null));
     const [historico, setHistorico] = useState<Mensagem[]>(() =>
         daHome ? [{ user: daHome, bot: PENDENTE }] : []
     );
@@ -85,6 +89,9 @@ export default function ChatPage() {
         };
 
         try {
+            /* id só é null num /chat sem ?id=, e o efeito de montagem já
+               mandou o aluno para a home: nenhum caminho aqui chega a
+               perguntar sem conversa. */
             await perguntar(texto, anteriores, (evento) => {
                 setStatus((atual) => reduzirStatus(atual, evento));
 
@@ -103,7 +110,7 @@ export default function ChatPage() {
                         acc.erro = evento.mensagem;
                         break;
                 }
-            }, id as string);
+            }, id ?? undefined);
         } catch (erro) {
             console.error(erro);
             /* O back-end explica o 429 do rate limit na própria mensagem. */
@@ -137,10 +144,21 @@ export default function ChatPage() {
         enviarPergunta(pergunta);
     };
 
+    // 0. /chat sem ?id=: não existe conversa para abrir. O redirecionamento é
+    //    no cliente porque o HTML da rota estática não conhece a query — só o
+    //    navegador sabe que ?id= está ausente.
+    useEffect(() => {
+        if (!id) router.replace("/");
+    }, [id, router]);
+
     // 1. carrega a conversa salva e, se houver resposta pendente, completa
     useEffect(() => {
         if (jaProcessouInicial.current) return;
         jaProcessouInicial.current = true;
+
+        /* /chat sem ?id=: nem conversa há que buscar nem pendência; o efeito
+           acima já devolveu o aluno para a home. */
+        if (!id) return;
 
         /* Conversa recém-nascida na home: a pergunta veio em memória e já está
            na tela, com o estado de resposta montado desde o primeiro render.
@@ -148,7 +166,7 @@ export default function ChatPage() {
            banco abaixo só atrasariam o primeiro token. Quem grava é o efeito 2,
            sozinho, com o stream já correndo. */
         if (daHome) {
-            descartarPendente(id as string);
+            descartarPendente(id);
             /* O set-state-in-effect segue para dentro do completarResposta e
                acha os setState de lá, mas nenhum deles é síncrono: todos rodam
                nos callbacks do stream, depois da rede. A regra aceita o mesmo
@@ -161,7 +179,7 @@ export default function ChatPage() {
         }
 
         (async () => {
-            const conversa = await obterConversa(id as string);
+            const conversa = await obterConversa(id);
             /* Sair calado aqui deixava a tela em branco: nem mensagem, nem erro,
                nem pista. Acontece quando a gravação falhou logo antes (banco sem
                o esquema, RLS barrando) e também quando a URL é de uma conversa
@@ -174,7 +192,7 @@ export default function ChatPage() {
             }
 
             setHistorico(conversa.mensagens);
-            const mapaFeedbacks = await obterFeedbacksDaConversa(id as string);
+            const mapaFeedbacks = await obterFeedbacksDaConversa(id);
             setFeedbacks(mapaFeedbacks);
 
             const ultima = conversa.mensagens[conversa.mensagens.length - 1];
@@ -190,12 +208,14 @@ export default function ChatPage() {
     // 2. salva a pergunta assim que entra e a resposta quando o stream acaba.
     //    Depender do array inteiro dispararia uma escrita a cada 50ms do stream.
     useEffect(() => {
-        if (turnos === 0) return;
+        /* Sem ?id= não há conversa que salvar: o efeito de montagem devolveu
+           o aluno para a home. Com id, sem conversa carrega turnos é 0. */
+        if (!id || turnos === 0) return;
 
         (async () => {
-            const existente = await obterConversa(id as string);
+            const existente = await obterConversa(id);
             await salvarConversa({
-                id: id as string,
+                id,
                 titulo: existente?.titulo ?? gerarTitulo(historico[0].user),
                 criadoEm: existente?.criadoEm ?? Date.now(),
                 favorita: existente?.favorita,
@@ -239,9 +259,10 @@ export default function ChatPage() {
                                 {!semTexto && <ChatResponse text={item.bot} streaming={streamando} />}
                                 {item.fontes && <Fontes urls={item.fontes} />}
                                 {mostrarStatus && <StatusBlock ferramentas={ferramentasAtivas} />}
-                                {!semTexto && !streamando && (
+                                {/* Sem ?id= não há conversa: nem bolha, nem botão de feedback. */}
+                                {!semTexto && !streamando && id && (
                                     <FeedbackBot
-                                        conversaId={id as string}
+                                        conversaId={id}
                                         mensagemOrdem={index}
                                         feedbackInicial={feedbacks[index]}
                                         disabled={respondendo}
@@ -283,5 +304,18 @@ export default function ChatPage() {
                 </div>
             </div>
         </>
+    );
+}
+
+export default function ChatPage() {
+    /* A página /chat é estática (export da Estratégia A) e lê ?id= com
+       useSearchParams no cliente: sem esta fronteira de Suspense o build de
+       produção falha ("Missing Suspense boundary with useSearchParams") — o
+       mesmo padrão que /login usa. No HTML inicial o fallback é só a casca da
+       tela; a hidratação o troca por <Chat /> quando a query é lida. */
+    return (
+        <Suspense fallback={<div className="app-scroll" />}>
+            <Chat />
+        </Suspense>
     );
 }

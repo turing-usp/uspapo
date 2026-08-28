@@ -46,6 +46,7 @@ import {
   rotuloDia,
 } from '@/components/analytics/primitivos';
 import RevisaoFeedback, { type FeedbackAnalytics } from '@/components/analytics/RevisaoFeedback';
+import { tokenDaSessao } from '@/lib/supabase';
 
 interface BaldeTokens {
   prompt_tokens: number;
@@ -111,7 +112,13 @@ export default function AdminAnalyticsPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('/api/admin/analytics');
+      // A rota parou de ler cookies (export estático): autentica por Bearer.
+      // Sem sessão o pedido vai como antes e o 401 mantém o fluxo de
+      // "sessão expirada" de hoje.
+      const token = await tokenDaSessao();
+      const res = await fetch('/api/admin/analytics', {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       const json = await res.json();
 
       if (json.ok === false) {

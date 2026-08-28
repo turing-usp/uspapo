@@ -1,16 +1,33 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import TuringLogo from '../../turing-logo.svg'
 import { validarCadastro, cadastrar, entrarComGoogle } from '@/lib/auth';
 import { checarSenha } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
+import { useSessao } from '@/lib/useSessao';
 
 export default function RegisterPage() {
   // Estados para visibilidade das senhas
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const router = useRouter();
+  const { usuario } = useSessao();
+
+  /* Já logado não tem o que fazer na tela de cadastro: segunda regra do antigo
+     proxy.ts (que mandava /login e /cadastro de volta para /), agora no client —
+     mesmo padrão da página de login. Aqui, diferente do login, o ref
+     `acabouDeEntrar` não se aplica: o cadastro nunca gera um "logado" na própria
+     página (sucesso do form não cria sessão — a conta só vale depois do link do
+     email — e o fluxo do Google redireciona a página inteira para
+     /auth/callback), então não há push do cadastro que o replace('/') poderia
+     rebater. */
+  useEffect(() => {
+    if (usuario) router.replace('/');
+  }, [usuario, router]);
 
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);

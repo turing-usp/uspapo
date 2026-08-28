@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import TuringLogo from '../../turing-logo.svg';
 import { entrar, entrarComGoogle } from '@/lib/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {Suspense} from "react";
+import { useSessao } from '@/lib/useSessao';
 
 function LoginForm() {
   // Estado para visibilidade da senha
@@ -17,11 +18,24 @@ function LoginForm() {
   const params = useSearchParams();
   const erroCallback = params.get('erro') === 'callback';
 
-  /* Para onde o aluno estava indo quando o proxy.ts o mandou para cá.
+  /* Para onde o aluno estava indo quando a portaria do AppShell o mandou para
+     cá (o antigo proxy.ts, removido p/ viabilizar o export estático).
      Só caminho interno: um "//site.com" ou "https://site.com" aqui viraria um
      redirecionamento aberto, com o nosso domínio dando credibilidade ao destino. */
   const pedido = params.get('destino') ?? '';
   const destino = pedido.startsWith('/') && !pedido.startsWith('//') ? pedido : '/';
+
+  /* Já logado não tem o que fazer na tela de login: a segunda regra do antigo
+     proxy.ts (que mandava /login e /cadastro de volta para /), agora no client.
+     O ref existe para o login do próprio formulário: o onAuthStateChange
+     devolve o usuário assim que ele entra, e sem a marca o replace('/')
+     disputaria com o push para o ?destino= e o deep-link /chat?id=... morria. */
+  const acabouDeEntrar = useRef(false);
+  const { usuario } = useSessao();
+
+  useEffect(() => {
+    if (usuario && !acabouDeEntrar.current) router.replace('/');
+  }, [usuario, router]);
 
   // Estado simplificado para credenciais de login
   const [formData, setFormData] = useState({
@@ -54,6 +68,9 @@ function LoginForm() {
       return;
     }
 
+    /* Marca antes do push: o usuário já chegou via onAuthStateChange e o
+       efeito de "já logado" não pode rebater para cima do destino pedido. */
+    acabouDeEntrar.current = true;
     router.push(destino);
     router.refresh();
   };

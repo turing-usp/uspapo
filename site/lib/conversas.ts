@@ -15,8 +15,10 @@ export type Conversa = {
   total?: number;
 };
 
-/* Tudo aqui pressupõe sessão: o proxy.ts não deixa chegar nesta parte do site
-   sem login. Existia um caminho paralelo em localStorage, para quem usava sem
+/* Tudo aqui pressupõe sessão: o guard de sessão do AppShell (client) não
+   deixa chegar nesta parte do site sem login — o proxy.ts saiu porque o
+   export estático não tem Proxy. Existia um caminho paralelo em localStorage,
+   para quem usava sem
    conta, e ele saiu junto com essa possibilidade.
 
    Dizia aqui que a chamada era barata porque "o cliente lê o cookie, não vai à
@@ -117,7 +119,8 @@ async function gravar(conversa: Conversa): Promise<void> {
   const supabase = criarCliente();
   const usuario = await uid(supabase);
   /* Sessão vencida entre abrir a tela e mandar a pergunta: gravar sem user_id
-     só levaria um erro do RLS. O proxy.ts manda para o login no próximo passo. */
+     só levaria um erro do RLS. O guard do AppShell manda para o login no
+     próximo passo. */
   if (!usuario) return;
 
   const { error } = await supabase.from("conversas").upsert({

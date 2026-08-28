@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import RevisaoFeedback, { type FeedbackAnalytics } from '@/components/analytics/RevisaoFeedback';
 import { CardGrafico } from '@/components/analytics/primitivos';
+import { tokenDaSessao } from '@/lib/supabase';
 
 const PERCENTUAL = new Intl.NumberFormat('pt-BR', {
   style: 'percent',
@@ -29,7 +30,13 @@ export default function AdminFeedbackPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/analytics');
+      // A rota parou de ler cookies (export estático): autentica por Bearer.
+      // Sem sessão o pedido vai como antes e o 401 mantém o fluxo de
+      // "sessão expirada" de hoje.
+      const token = await tokenDaSessao();
+      const res = await fetch('/api/admin/analytics', {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       if (!res.ok) {
         if (res.status === 403) {
           throw new Error('Acesso negado: apenas administradores podem visualizar os feedbacks.');

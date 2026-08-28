@@ -27,19 +27,19 @@ export default function BuscaInicial({ perguntasFrequentes }: { perguntasFrequen
   }, [perguntasFrequentes]);
 
   /* O id da conversa é cunhado aqui, no primeiro render, e não no envio.
-     /chat/[id] é rota dinâmica: com um uuid novo a cada Enter, nada podia ser
-     prefetchado e a navegação pagava a ida ao servidor inteira na hora do
-     clique. Sabendo o id de antemão dá para aquecer a rota enquanto a pessoa
-     digita, e aí o push acontece no mesmo quadro. */
+     Desde o export estático da Estratégia A a rota /chat é estática e o id
+     mora na query string (?id=<uuid>): o export não conhece o id, mas a
+     página dá para aquecer (prefetch) enquanto a pessoa digita, e aí o push
+     acontece no mesmo quadro. */
   const idRef = useRef<string | null>(null);
   if (idRef.current === null) idRef.current = novoId();
 
   useEffect(() => {
-    router.prefetch(`/chat/${idRef.current}`);
+    router.prefetch(`/chat?id=${idRef.current}`);
   }, [router]);
 
   /* Sem await, sem banco: guarda a pergunta na memória e navega. Quem grava é
-     o próprio /chat/[id], no efeito que ele já tinha, em segundo plano. */
+     o próprio /chat, no efeito que ele já tinha, em segundo plano. */
   const enviarPergunta = (texto: string) => {
     /* O ref, e não o estado: dois Enter no mesmo tick leem o mesmo `enviando`
        antigo, porque setState não é síncrono. Antes não havia trava nenhuma e o
@@ -50,7 +50,7 @@ export default function BuscaInicial({ perguntasFrequentes }: { perguntasFrequen
     setEnviando(true);
 
     guardarPendente(idRef.current!, texto);
-    router.push(`/chat/${idRef.current}`);
+    router.push(`/chat?id=${idRef.current}`);
   };
 
   const lidarComEnvio = (e: React.SyntheticEvent) => {
