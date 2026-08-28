@@ -30,11 +30,11 @@ export default function MenuUsuario() {
   }, [aberto]);
 
   /* Um espaço vazio, nunca "Entrar"/"Cadastrar".
-     Esta navbar só existe dentro de app/(app), e o proxy.ts não deixa chegar
-     lá sem sessão: oferecer login aqui seria oferecer o que quem está vendo a
-     tela já tem. Sobra a janela em que o cookie vale (o servidor deixou passar)
-     mas o cliente ainda não leu a sessão, ou falhou ao ler, e aí um instante
-     vazio é melhor do que piscar um botão de entrar para quem já entrou. */
+     Esta navbar só existe dentro de app/(app), e o guard de sessão do AppShell
+     não deixa chegar lá sem sessão: oferecer login aqui seria oferecer o que
+     quem está vendo a tela já tem. Sobra a janela em que o cookie vale mas o
+     cliente ainda não leu a sessão, ou falhou ao ler, e aí um instante vazio
+     é melhor do que piscar um botão de entrar para quem já entrou. */
   if (carregando || !usuario) return <div className="h-9 w-9" />;
 
   const nome = perfil?.nome ?? (usuario.user_metadata?.nome as string) ?? usuario.email ?? '';
@@ -79,9 +79,9 @@ export default function MenuUsuario() {
             onClick={async () => {
               await sair();
               setAberto(false);
-              /* Direto para o login: mandar para "/" faria o proxy.ts rebater
-                 para cá de qualquer jeito, e o aluno acabaria numa URL com um
-                 ?destino=%2F pendurado sem motivo. */
+              /* Direto para o login: mandar para "/" faria o guard do AppShell
+                 rebater para cá de qualquer jeito, e o aluno acabaria numa URL
+                 com um ?destino=%2F pendurado sem motivo. */
               router.push('/login');
               router.refresh();
             }}

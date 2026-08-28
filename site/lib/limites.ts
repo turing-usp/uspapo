@@ -1,7 +1,9 @@
 /* Os tetos do lado do cliente, num lugar só.
  *
- * Um perfil só: o login é obrigatório (a portaria está em proxy.ts, e o backend
- * confere de novo no /chat), então toda conversa mora no banco. Existiam dois
+ * Um perfil só: o login é obrigatório (a portaria é o guard de sessão do
+ * AppShell no client, o proxy.ts saiu porque o export estático não tem Proxy,
+ * e o backend confere de novo no /chat), então toda conversa mora no banco.
+ * Existiam dois
  * perfis enquanto dava para perguntar sem conta, aí tudo vivia no localStorage
  * deste navegador, que é pequeno, é compartilhado com o resto do site e some
  * quando o aluno limpa o histórico, e prometer 20 conversas ali seria mentira.
