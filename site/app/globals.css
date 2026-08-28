@@ -679,7 +679,7 @@
    guarda a altura real de cada turno e passa a usar a dele.
 
    Não vai no turno que está respondendo: ali o scrollIntoView corre a cada
-   quadro do stream e brigaria com a altura estimada. Ver o chat/[id]/page.tsx. */
+   quadro do stream e brigaria com a altura estimada. Ver o chat/page.tsx. */
 @utility turno-assentado {
   content-visibility: auto;
   contain-intrinsic-size: auto 24rem;
