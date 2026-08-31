@@ -11,10 +11,32 @@ export function useSessao() {
   useEffect(() => {
     const supabase = criarCliente();
 
-    supabase.auth.getUser().then(({ data }) => {
-      setUsuario(data.user);
-      setCarregando(false);
-    });
+    // `ativo` impede setState após o unmount e faz o timeout ceder para o
+    // resultado real da chamada, se ele ainda chegar.
+    let ativo = true;
+
+    // O fetch do getUser() não tem timeout próprio: rede que conecta mas não
+    // responde deixaria a promessa pendurada e o esqueleto do AppShell eterno.
+    const timer = window.setTimeout(() => {
+      if (ativo) {
+        setUsuario(null);
+        setCarregando(false);
+      }
+    }, 15000);
+
+    // Sem .catch, uma rejeição de rede (AuthRetryableFetchError, lançado pelo
+    // supabase-js) mantinha `carregando` true para sempre (esqueleto eterno).
+    supabase.auth.getUser()
+      .then(({ data }) => {
+        if (ativo) setUsuario(data.user);
+      })
+      .catch(() => {
+        if (ativo) setUsuario(null);
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        if (ativo) setCarregando(false);
+      });
 
     // Mantém a UI em sincronia com login, logout e refresh de token,
     // inclusive quando acontecem em outra aba.
@@ -22,7 +44,11 @@ export function useSessao() {
       setUsuario(sessao?.user ?? null);
     });
 
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      ativo = false;
+      clearTimeout(timer);
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   return { usuario, carregando };
