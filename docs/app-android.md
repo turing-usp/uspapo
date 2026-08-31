@@ -234,11 +234,11 @@ mv app/build/outputs/bundle/release/app-release.aab app/build/outputs/bundle/rel
   não é usado: o APK dele espera a saída `-unsigned` do Gradle, que não
   existe com o `signingConfig` configurado, e o AAB dele falha porque o
   `apksigner` não assina bundle.)
-- **Bumpar `versionCode` a cada release** (em `site/android/app/build.gradle`):
-  a **1.0.0 (versionCode 1)** saiu com env de dev — ver seção "Limitações";
-  a **1.0.1 (versionCode 2)** sai com env de produção (o guard acima não
-  deixa o build passar sem as vars). A Play Store exige um `versionCode`
-  maior que o da versão anterior em cada release seguinte.
+- Versão: o versionName é 0.0.1 (placeholder) e o versionCode fica em 2 —
+  o projeto não faz bump a cada release; o APK novo instala por cima do
+  1.0.0/1.0.1 já no aparelho sem desinstalar. Se a 1.0.0 (versionCode 1,
+  env de dev) for publicada na Play Store, o primeiro upload exigirá um
+  versionCode maior que o dela.
 
 ## Limitações
 
@@ -248,8 +248,8 @@ mv app/build/outputs/bundle/release/app-release.aab app/build/outputs/bundle/rel
   distribuir:** o build da 1.0.0 rodou sem as vars de produção, então o
   bundle embutido aponta para `127.0.0.1:54321` (Supabase dev) e
   `localhost:5000` (API dev) — inalcançáveis no aparelho: o app não
-  carrega e não funciona. A **1.0.1 (versionCode 2)** sai com env de
-  produção embutida (seção "Release"); a distribuição é dela. A 1.0.0
+  carrega e não funciona. O build **0.0.1 (versionCode 2)** sai com env
+  de produção embutida (seção "Release"); a distribuição é dele. A 1.0.0
   instalada em aparelho só é corrigida por esse novo build — redeploy web
   não atualiza o app.
 - **Analytics admin indisponível no app:** no export a rota
