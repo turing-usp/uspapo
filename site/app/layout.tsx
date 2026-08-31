@@ -136,6 +136,95 @@ try {
 })();
 `;
 
+/* Diagnóstico temporário da WebView — remover depois da triagem.
+
+   O app instalado nunca mostra a tela de erro de timeout: sintoma coerente
+   com o JavaScript dos chunks nunca executar na WebView (o HTML estático e o
+   CSS funcionam sem JS). Este script roda MESMO se o bundle falhar, porque
+   é inline e não depende dele. Só atua em hostname === "localhost" (o
+   deploy web é no-op); após 8 s, se detectar qualquer problema — flight
+   data ausente, fetch de um chunk de controle com falha, erro de
+   load/promise capturado, ou recurso _next sem bytes — injeta na base da
+   tela uma faixa fixa com o veredito: versão do Chrome, flight, chunk,
+   erros e contagem de recursos. Tudo ok: não injeta nada.
+
+   O código de dentro é var/clássico e SEM template strings (nenhum ${),
+   por ser texto crú dentro deste template literal — os backslashes da
+   regex e do \n estão duplicados justamente por isso. */
+const DIAGNOSTICO_WEBVIEW = `
+(function () {
+  if (location.hostname !== "localhost") return;
+  try {
+    var erros = [];
+    function h(e) {
+      erros.push((e && e.target && e.target.src ? "script " + e.target.src.split("/").pop() : "js") + ": " + (e.message || "falha de load"));
+      if (erros.length > 10) window.removeEventListener("error", h, true);
+    }
+    window.addEventListener("error", h, true);
+    function hRej(e) {
+      var motivo = e.reason;
+      erros.push("promise: " + ((motivo && motivo.message) || (motivo ? String(motivo) : "rejeição sem motivo")));
+      if (erros.length > 10) window.removeEventListener("unhandledrejection", hRej);
+    }
+    window.addEventListener("unhandledrejection", hRej);
+    setTimeout(function () {
+      try {
+        var flight = !!window.__next_f;
+        var recs = performance.getEntriesByType("resource").filter(function (r) {
+          return r.name.indexOf("_next/") !== -1;
+        });
+        var comBytes = recs.filter(function (r) {
+          return (r.transferSize || 0) > 0;
+        }).length;
+        var el = document.querySelector("script[src*='_next/static/chunks']");
+        var chunkInfo = "chunk: elemento não encontrado";
+        var chunkFalhou = true;
+        function concluir() {
+          if (flight && !chunkFalhou && comBytes >= recs.length && erros.length === 0) return;
+          var corpo = document.body;
+          if (!corpo) {
+            corpo = document.createElement("body");
+            document.documentElement.appendChild(corpo);
+          }
+          var faixa = document.createElement("div");
+          faixa.style.cssText = "position:fixed;left:8px;right:8px;bottom:8px;z-index:2147483647;background:#111;color:#fff;font:11px/1.5 monospace;padding:8px;border-radius:8px;white-space:pre-wrap";
+          var m = navigator.userAgent.match(/Chrome\\/(\\d+)/);
+          var linhas = ["USPapo diag: chrome " + (m ? m[1] : navigator.userAgent.slice(0, 60))];
+          linhas.push("USPapo diag: flight: " + (flight ? "ok" : "faltando"));
+          linhas.push("USPapo diag: " + chunkInfo);
+          if (erros.length > 0) {
+            var n = Math.min(2, erros.length);
+            for (var i = 0; i < n; i++) linhas.push("USPapo diag: " + erros[i].slice(0, 80));
+          } else {
+            linhas.push("USPapo diag: erros: nenhum");
+          }
+          linhas.push("USPapo diag: recursos _next com bytes: " + comBytes + "/" + recs.length);
+          faixa.textContent = linhas.join("\\n");
+          corpo.appendChild(faixa);
+        }
+        if (el) {
+          fetch(el.src)
+            .then(function (resp) {
+              if (!resp.ok) { chunkInfo = "chunk: " + resp.status; return; }
+              return resp.text().then(function (texto) {
+                var bytes = parseInt(resp.headers.get("content-length"), 10) || texto.length;
+                chunkInfo = "chunk: " + resp.status + " (" + Math.round(bytes / 1024) + " kB)";
+                chunkFalhou = false;
+              });
+            })
+            .catch(function (e) {
+              chunkInfo = "chunk: erro " + (e && e.message ? e.message : String(e));
+            })
+            .then(concluir);
+        } else {
+          concluir();
+        }
+      } catch (e) {}
+    }, 8000);
+  } catch (e) {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -156,6 +245,10 @@ export default function RootLayout({
       {/* O data-vidro acima é reescrito aqui, antes do React montar. O <html>
           já tem suppressHydrationWarning, então o valor trocado não diverge. */}
       <script dangerouslySetInnerHTML={{ __html: ESCOLHER_VIDRO }} />
+      {/* Diagnóstico temporário da WebView — remover depois da triagem.
+          Inerte no site web (gated por hostname === "localhost"); no app,
+          só aparece se o JS do bundle não rodar como esperado. */}
+      <script dangerouslySetInnerHTML={{ __html: DIAGNOSTICO_WEBVIEW }} />
     </head>
     <body className="h-full">
       {children}
