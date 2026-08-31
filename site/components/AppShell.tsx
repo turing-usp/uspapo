@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
 import { useJanelaVisual } from "@/lib/janela";
@@ -75,10 +75,21 @@ function PortariaSessao({ children }: { children: React.ReactNode }) {
    getUser() era invisível e a bola pulsava para sempre no app. O fallback do
    Suspense usa o componente sem props (roda fora do hook): skeleton simples. */
 function EsqueletoSessao({ falha, aoTentarNovamente }: { falha?: string | null; aoTentarNovamente?: () => void }) {
+  /* Marca temporária de triagem da WebView — remover depois: o efeito só
+     roda se o JavaScript do bundle executou, então o texto abaixo da bola
+     é a prova direta de que o JS está vivo no app. */
+  const [jsAtivo, setJsAtivo] = useState(false);
+  useEffect(() => {
+    setJsAtivo(true);
+  }, []);
+
   return (
     <div aria-hidden={!falha} className="flex h-full w-full items-center justify-center">
       <div className="flex flex-col items-center gap-3">
         <div className="h-9 w-9 animate-pulse rounded-full bg-line/30" />
+        {jsAtivo && (
+          <p aria-hidden className="text-[10px] uppercase tracking-wide text-muted-foreground/60">js ativo</p>
+        )}
         {falha && (
           <>
             <p role="alert" className="max-w-xs text-center text-xs text-muted-foreground">

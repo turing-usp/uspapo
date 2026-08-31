@@ -142,11 +142,11 @@ try {
    com o JavaScript dos chunks nunca executar na WebView (o HTML estático e o
    CSS funcionam sem JS). Este script roda MESMO se o bundle falhar, porque
    é inline e não depende dele. Só atua em hostname === "localhost" (o
-   deploy web é no-op); após 8 s, se detectar qualquer problema — flight
-   data ausente, fetch de um chunk de controle com falha, erro de
-   load/promise capturado, ou recurso _next sem bytes — injeta na base da
-   tela uma faixa fixa com o veredito: versão do Chrome, flight, chunk,
-   erros e contagem de recursos. Tudo ok: não injeta nada.
+   deploy web é no-op); após 8 s injeta SEMPRE na base da tela uma faixa
+   fixa com o veredito — versão do Chrome, Turbo, flight, chunk, erros e a
+   contagem de recursos — mesmo quando está tudo ok: a ausência da faixa no
+   app já acusa o problema. A linha dos recursos carrega o prefixo "info",
+   porque é só informação (transferSize 0 sem Content-Length não é falha).
 
    O código de dentro é var/clássico e SEM template strings (nenhum ${),
    por ser texto crú dentro deste template literal — os backslashes da
@@ -180,7 +180,6 @@ const DIAGNOSTICO_WEBVIEW = `
         var chunkInfo = "chunk: elemento não encontrado";
         var chunkFalhou = true;
         function concluir() {
-          if (flight && !chunkFalhou && comBytes >= recs.length && erros.length === 0) return;
           var corpo = document.body;
           if (!corpo) {
             corpo = document.createElement("body");
@@ -190,6 +189,7 @@ const DIAGNOSTICO_WEBVIEW = `
           faixa.style.cssText = "position:fixed;left:8px;right:8px;bottom:8px;z-index:2147483647;background:#111;color:#fff;font:11px/1.5 monospace;padding:8px;border-radius:8px;white-space:pre-wrap";
           var m = navigator.userAgent.match(/Chrome\\/(\\d+)/);
           var linhas = ["USPapo diag: chrome " + (m ? m[1] : navigator.userAgent.slice(0, 60))];
+          linhas.push("USPapo diag: turbo: " + ((window.TURBOPACK && window.TURBOPACK.length) || 0));
           linhas.push("USPapo diag: flight: " + (flight ? "ok" : "faltando"));
           linhas.push("USPapo diag: " + chunkInfo);
           if (erros.length > 0) {
@@ -198,7 +198,7 @@ const DIAGNOSTICO_WEBVIEW = `
           } else {
             linhas.push("USPapo diag: erros: nenhum");
           }
-          linhas.push("USPapo diag: recursos _next com bytes: " + comBytes + "/" + recs.length);
+          linhas.push("USPapo diag: info recursos _next com bytes: " + comBytes + "/" + recs.length);
           faixa.textContent = linhas.join("\\n");
           corpo.appendChild(faixa);
         }
@@ -247,7 +247,7 @@ export default function RootLayout({
       <script dangerouslySetInnerHTML={{ __html: ESCOLHER_VIDRO }} />
       {/* Diagnóstico temporário da WebView — remover depois da triagem.
           Inerte no site web (gated por hostname === "localhost"); no app,
-          só aparece se o JS do bundle não rodar como esperado. */}
+          a faixa é injetada sempre, após 8 s. */}
       <script dangerouslySetInnerHTML={{ __html: DIAGNOSTICO_WEBVIEW }} />
     </head>
     <body className="h-full">
