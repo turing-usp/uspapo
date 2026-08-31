@@ -41,13 +41,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
    useEffect deixaria o aluno deslogado ver a interface do chat montar
    inteira. O deep-link ?id=... segue vivo no ?destino= para o login devolver. */
 function PortariaSessao({ children }: { children: React.ReactNode }) {
-  const { usuario, carregando } = useSessao();
+  const { usuario, carregando, falha, tentarNovamente } = useSessao();
   const router = useRouter();
   const caminho = usePathname();
   const busca = useSearchParams().toString();
 
   useEffect(() => {
-    if (carregando || usuario) return;
+    /* Com `falha` o esqueleto vira diagnóstico (mensagem + retry): o
+       redirect para /login apagaria a tela de erro antes de ela ser lida,
+       e o retry nunca seria alcançável. Sem falha, o deslogado segue para
+       o login como antes. */
+    if (carregando || usuario || falha) return;
 
     /* destino = caminho + query, codificado: com o id da conversa na query
        (?id=<uuid>, Estratégia A), colar a string crua faria o ? virar o
@@ -55,19 +59,43 @@ function PortariaSessao({ children }: { children: React.ReactNode }) {
        round-trip — o proxy antigo usava searchParams.set, que codifica. */
     const destino = busca ? `${caminho}?${busca}` : caminho;
     router.replace(`/login?destino=${encodeURIComponent(destino)}`);
-  }, [carregando, usuario, caminho, busca, router]);
+  }, [carregando, usuario, falha, caminho, busca, router]);
 
-  if (carregando || !usuario) return <EsqueletoSessao />;
+  if (carregando || !usuario)
+    return <EsqueletoSessao falha={falha} aoTentarNovamente={tentarNovamente} />;
 
   return <>{children}</>;
 }
 
 /* O que a casca entrega até a sessão decidir: um pulso neutro no centro, no
-   lugar de montar a página de verdade. */
-function EsqueletoSessao() {
+   lugar de montar a página de verdade.
+
+   Com `falha`, o pulso vira diagnóstico: a mensagem curta do erro (ex.:
+   "Failed to fetch" ou o timeout de 15s) e um retry — antes a falha do
+   getUser() era invisível e a bola pulsava para sempre no app. O fallback do
+   Suspense usa o componente sem props (roda fora do hook): skeleton simples. */
+function EsqueletoSessao({ falha, aoTentarNovamente }: { falha?: string | null; aoTentarNovamente?: () => void }) {
   return (
-    <div aria-hidden className="flex h-full w-full items-center justify-center">
-      <div className="h-9 w-9 animate-pulse rounded-full bg-line/30" />
+    <div aria-hidden={!falha} className="flex h-full w-full items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-9 w-9 animate-pulse rounded-full bg-line/30" />
+        {falha && (
+          <>
+            <p role="alert" className="max-w-xs text-center text-xs text-muted-foreground">
+              {falha}
+            </p>
+            {/* Mesma gramática do botão secundário do login (surface-raised +
+                borda line/15), em tamanho small. */}
+            <button
+              type="button"
+              onClick={aoTentarNovamente}
+              className="cursor-pointer rounded-full border border-line/15 bg-surface-raised px-4 py-1.5 text-xs font-medium text-foreground transition-colors duration-200 hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            >
+              Tentar novamente
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
