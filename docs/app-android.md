@@ -268,3 +268,15 @@ mv app/build/outputs/bundle/release/app-release.aab app/build/outputs/bundle/rel
 - **A sessão Supabase do app é isolada da do browser:** a WebView tem
   storage próprio, então o login feito no app não propaga para o browser
   (nem o contrário), mesmo no mesmo aparelho.
+- **Gerenciadores de senha tratam o app como outro domínio:** o app roda
+  na origem `https://localhost` (host fixo do servidor de assets do
+  Capacitor), então o Bitwarden e afins não casam a senha salva de
+  `uspapo.turingusp.com` com o formulário do login do app e oferecem
+  criar uma entrada nova "localhost". A correção é no gerenciador, sem
+  código: na entrada de login existente, adicionar `localhost` como URI
+  adicional (Bitwarden: editar item → URIs → adicionar `localhost`) — o
+  autofill no app passa a oferecer a senha real; descartar a entrada
+  "localhost" nova, se criada. A alternativa de rodar o app na origem do
+  domínio real foi descartada: a allowlist de redirects do Supabase
+  registra `https://localhost/auth/callback`, os cookies de sessão são
+  por origem e o host é fixo no Capacitor.
