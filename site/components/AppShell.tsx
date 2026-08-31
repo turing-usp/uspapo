@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
 import { useJanelaVisual } from "@/lib/janela";
@@ -46,12 +46,23 @@ function PortariaSessao({ children }: { children: React.ReactNode }) {
   const caminho = usePathname();
   const busca = useSearchParams().toString();
 
+  /* Rotas públicas: a portaria não pode cobrir a própria tela de login.
+     Sem isto, o deslogado em /login ia para /login?destino=<a própria URL> —
+     e como a URL atual JÁ é o /login, cada redirect re-codificava o
+     ?destino= com uma URL que já continha o destino anterior: a query
+     crescia ~30 chars por volta, os headers estouravam (431) e a navegação
+     client-side nunca concluía (a tela ficava presa na bola do esqueleto).
+     /auth/callback é o mesmo caso: o token chega na query, então a tela
+     precisa renderizar mesmo sem sessão. */
+  const rotaPublica = caminho === '/login' || caminho === '/auth/callback';
+
   useEffect(() => {
     /* Com `falha` o esqueleto vira diagnóstico (mensagem + retry): o
        redirect para /login apagaria a tela de erro antes de ela ser lida,
        e o retry nunca seria alcançável. Sem falha, o deslogado segue para
-       o login como antes. */
-    if (carregando || usuario || falha) return;
+       o login como antes. Rota pública nunca redireciona: a portaria não
+       atua sobre si mesma. */
+    if (carregando || usuario || falha || rotaPublica) return;
 
     /* destino = caminho + query, codificado: com o id da conversa na query
        (?id=<uuid>, Estratégia A), colar a string crua faria o ? virar o
@@ -59,9 +70,12 @@ function PortariaSessao({ children }: { children: React.ReactNode }) {
        round-trip — o proxy antigo usava searchParams.set, que codifica. */
     const destino = busca ? `${caminho}?${busca}` : caminho;
     router.replace(`/login?destino=${encodeURIComponent(destino)}`);
-  }, [carregando, usuario, falha, caminho, busca, router]);
+  }, [carregando, usuario, falha, rotaPublica, caminho, busca, router]);
 
-  if (carregando || !usuario)
+  /* Em rota pública o children (tela de login/callback) SEMPRE renderiza,
+     mesmo sem usuário ou com falha de rede: o login exibe a própria
+     mensagem de rede. */
+  if (carregando || (!usuario && !rotaPublica))
     return <EsqueletoSessao falha={falha} aoTentarNovamente={tentarNovamente} />;
 
   return <>{children}</>;
@@ -75,21 +89,10 @@ function PortariaSessao({ children }: { children: React.ReactNode }) {
    getUser() era invisível e a bola pulsava para sempre no app. O fallback do
    Suspense usa o componente sem props (roda fora do hook): skeleton simples. */
 function EsqueletoSessao({ falha, aoTentarNovamente }: { falha?: string | null; aoTentarNovamente?: () => void }) {
-  /* Marca temporária de triagem da WebView — remover depois: o efeito só
-     roda se o JavaScript do bundle executou, então o texto abaixo da bola
-     é a prova direta de que o JS está vivo no app. */
-  const [jsAtivo, setJsAtivo] = useState(false);
-  useEffect(() => {
-    setJsAtivo(true);
-  }, []);
-
   return (
     <div aria-hidden={!falha} className="flex h-full w-full items-center justify-center">
       <div className="flex flex-col items-center gap-3">
         <div className="h-9 w-9 animate-pulse rounded-full bg-line/30" />
-        {jsAtivo && (
-          <p aria-hidden className="text-[10px] uppercase tracking-wide text-muted-foreground/60">js ativo</p>
-        )}
         {falha && (
           <>
             <p role="alert" className="max-w-xs text-center text-xs text-muted-foreground">
