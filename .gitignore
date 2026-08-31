@@ -181,6 +181,8 @@ venv.bak/
 # /site
 /site/node_modules/
 /site/.next/
+# Next.js export do build do app (Capacitor): bundle estático derivado, nunca versionado.
+/site/out/
 .next/
 
 
