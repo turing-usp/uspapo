@@ -8,7 +8,7 @@ ranking e texto nunca tenham verdades diferentes.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, time, timedelta
 import math
 import re
 import unicodedata
@@ -491,6 +491,9 @@ class PrevisaoChegada:
     confidence: str = "low"
     minutos_ate_chegada: int | None = None
     intervalo_programado_min: int | None = None
+    # Instante técnico usado apenas para ordenar fontes diferentes (inclusive
+    # em 24:xx/meia-noite). Não é exposto ao naturalizador.
+    instante: str | None = None
 
     def __post_init__(self) -> None:
         if not self.horario.strip():
@@ -633,6 +636,7 @@ class ResultadoChegada:
     parada: str
     sentidos: tuple[PassagensPorSentido, ...]
     api_consultada: bool
+    api_falhou: bool = False
     observado_em: str | None = None
     veiculos_ativos: int | None = None
     aviso_api: str = ""
@@ -647,17 +651,29 @@ class ResultadoChegada:
             raise ValueError("resultado de chegada sem nenhum sentido")
         if any(item.previsoes_ao_vivo for item in self.sentidos) and not self.api_consultada:
             raise ValueError("ETA ao vivo sem consulta à API")
+        if self.api_falhou and not self.api_consultada:
+            raise ValueError("falha de API sem tentativa de consulta")
         if self.veiculos_ativos is not None and self.veiculos_ativos < 0:
             raise ValueError("quantidade negativa de veículos")
 
     def como_payload(self) -> dict[str, object]:
         """Serializa o contrato sem transformar fatos em prosa."""
+        tem_eta = any(item.previsoes_ao_vivo for item in self.sentidos)
         return {
             "tipo": "chegada_onibus",
             "linha": self.linha,
             "parada": self.parada,
             "api_olho_vivo": {
                 "consultada": self.api_consultada,
+                "status": (
+                    "eta_disponivel"
+                    if tem_eta
+                    else "indisponivel"
+                    if self.api_falhou
+                    else "consultada_sem_eta"
+                    if self.api_consultada
+                    else "nao_consultada"
+                ),
                 "observado_em": self.observado_em,
                 "veiculos_ativos": self.veiculos_ativos,
                 "aviso": self.aviso_api or None,
@@ -735,25 +751,184 @@ class ResultadoChegada:
         itens: list[dict[str, object]] = []
         tem_eta = False
 
-        def chegadas_programadas(item: PassagensPorSentido) -> list[dict[str, object]]:
-            return [
-                {
+        def minutos_relogio(valor: object) -> int | None:
+            encontrados = re.findall(r"(\d{1,2}):(\d{2})", str(valor or ""))
+            if not encontrados:
+                return None
+            hora, minuto = (int(parte) for parte in encontrados[-1])
+            if hora > 23 or minuto > 59:
+                return None
+            return hora * 60 + minuto
+
+        referencia_min = minutos_relogio(self.observado_em)
+
+        def instante_iso(valor: str | None) -> datetime | None:
+            try:
+                instante = datetime.fromisoformat(str(valor))
+            except (TypeError, ValueError):
+                return None
+            # Instantes internos são aware. Um ISO legado sem offset não pode
+            # ser comparado diretamente com eles; ele cai no mesmo caminho
+            # seguro de relógio HH:MM abaixo.
+            return instante if instante.tzinfo is not None else None
+
+        def ordem_temporal(
+            horario: str,
+            instante: str | None,
+            ancora_iso: datetime | None,
+        ) -> float:
+            instante_valido = instante_iso(instante)
+            if instante_valido is not None:
+                return instante_valido.timestamp()
+            minutos = minutos_relogio(horario)
+            if minutos is None:
+                return math.inf
+            # Nunca misture minutos-do-dia com timestamps Unix. Se qualquer
+            # fonte trouxe um instante ISO, ancore os relógios legados na data
+            # mais próxima dele, inclusive na virada da meia-noite.
+            if ancora_iso is not None:
+                candidato = datetime.combine(
+                    ancora_iso.date(),
+                    time(minutos // 60, minutos % 60),
+                    tzinfo=ancora_iso.tzinfo,
+                )
+                if candidato - ancora_iso > timedelta(hours=12):
+                    candidato -= timedelta(days=1)
+                elif ancora_iso - candidato > timedelta(hours=12):
+                    candidato += timedelta(days=1)
+                return candidato.timestamp()
+
+            # Sem nenhum ISO (integrações antigas), ``observado_em`` ainda
+            # resolve a virada do dia sem expor essa conta à LLM.
+            if referencia_min is not None:
+                if minutos < referencia_min - 12 * 60:
+                    minutos += 24 * 60
+                elif minutos > referencia_min + 12 * 60:
+                    minutos -= 24 * 60
+            return float(minutos)
+
+        def chegadas_mescladas(
+            item: PassagensPorSentido,
+        ) -> list[dict[str, object]]:
+            instantes_conhecidos = [
+                instante_iso(previsao.instante)
+                for previsao in item.previsoes_ao_vivo
+            ] + [
+                instante_iso(instante)
+                for instante in item.instantes_programados
+            ] + [
+                instante_iso(previsao.instante)
+                for previsao in item.estimativas_programadas
+            ]
+            ancora_iso = min(
+                (
+                    instante
+                    for instante in instantes_conhecidos
+                    if instante is not None
+                ),
+                default=None,
+            )
+            candidatos: list[
+                tuple[float, int, int, dict[str, object], bool]
+            ] = []
+            indice = 0
+
+            for previsao in item.previsoes_ao_vivo:
+                publico: dict[str, object] = {
+                    "horario": previsao.horario,
+                    "minutos_ate_chegada": previsao.minutos_ate_chegada,
+                    "source": previsao.source,
+                    "confidence": previsao.confidence,
+                }
+                candidatos.append((
+                    ordem_temporal(
+                        previsao.horario, previsao.instante, ancora_iso
+                    ),
+                    3,
+                    indice,
+                    publico,
+                    True,
+                ))
+                indice += 1
+
+            for posicao, horario in enumerate(item.horarios_programados):
+                instante = (
+                    item.instantes_programados[posicao]
+                    if posicao < len(item.instantes_programados)
+                    else None
+                )
+                publico = {
                     "horario": horario,
                     "source": "scheduled",
                     "confidence": item.programacao_confidence,
                 }
-                for horario in item.horarios_programados[:3]
-            ] + [
-                {
+                candidatos.append((
+                    ordem_temporal(horario, instante, ancora_iso),
+                    2,
+                    indice,
+                    publico,
+                    False,
+                ))
+                indice += 1
+
+            for previsao in item.estimativas_programadas:
+                publico = {
                     "horario": previsao.horario,
                     "source": previsao.source,
                     "confidence": previsao.confidence,
-                    "intervalo_programado_min": previsao.intervalo_programado_min,
+                    "intervalo_programado_min":
+                        previsao.intervalo_programado_min,
                 }
-                for previsao in item.estimativas_programadas[:3]
+                candidatos.append((
+                    ordem_temporal(
+                        previsao.horario, previsao.instante, ancora_iso
+                    ),
+                    1,
+                    indice,
+                    publico,
+                    False,
+                ))
+                indice += 1
+
+            # Um ETA ao vivo substitui o baseline até o último veículo
+            # observado. Só usamos a programação para completar passagens
+            # posteriores, nunca para inserir um suposto ônibus antes dele.
+            ordens_live = [
+                ordem for ordem, _prioridade, _i, _item, ao_vivo in candidatos
+                if ao_vivo
             ]
+            limite_live = max(ordens_live) if ordens_live else None
+            if limite_live is not None:
+                candidatos = [
+                    candidato
+                    for candidato in candidatos
+                    if candidato[4] or candidato[0] > limite_live
+                ]
+
+            candidatos.sort(
+                key=lambda candidato: (
+                    candidato[0], -candidato[1], candidato[2]
+                )
+            )
+            resultado: list[dict[str, object]] = []
+            fontes_por_horario: dict[str, str] = {}
+            for _ordem, _prioridade, _i, chegada, ao_vivo in candidatos:
+                horario = str(chegada["horario"])
+                fonte_existente = fontes_por_horario.get(horario)
+                if fonte_existente is not None and not (
+                    ao_vivo and fonte_existente in {"live", "live_gps_estimate"}
+                ):
+                    continue
+                fontes_por_horario.setdefault(
+                    horario, str(chegada["source"])
+                )
+                resultado.append(chegada)
+                if len(resultado) == 3:
+                    break
+            return resultado
 
         for item in self.sentidos:
+            chegadas = chegadas_mescladas(item)
             if item.previsoes_ao_vivo:
                 tem_eta = True
 
@@ -767,15 +942,6 @@ class ResultadoChegada:
                     == {"live_gps_estimate"}
                 )
 
-                chegadas_ao_vivo = [
-                    {
-                        "horario": p.horario,
-                        "minutos_ate_chegada": p.minutos_ate_chegada,
-                        "source": p.source,
-                        "confidence": p.confidence,
-                    }
-                    for p in item.previsoes_ao_vivo[:3]
-                ]
                 publico: dict[str, object] = {
                     "linha": item.linha,
                     "sentido": item.sentido or None,
@@ -785,12 +951,8 @@ class ResultadoChegada:
                         if somente_gps_estimado
                         else "eta_ao_vivo"
                     ),
-                    "horarios": [p.horario for p in item.previsoes_ao_vivo[:3]],
-                    # O contrato conserva a mistura de fontes, mas cada
-                    # sentido continua publicando no máximo três chegadas.
-                    "chegadas": chegadas_ao_vivo + chegadas_programadas(item)[
-                        :max(0, 3 - len(chegadas_ao_vivo))
-                    ],
+                    "horarios": [str(chegada["horario"]) for chegada in chegadas],
+                    "chegadas": chegadas,
                     "acessibilidade": [
                         p.acessivel for p in item.previsoes_ao_vivo
                     ],
@@ -804,35 +966,43 @@ class ResultadoChegada:
                     "base_previsao": "indisponivel",
                     "horarios": [],
                 }
-                if referencia and referencia[0] == "horario":
+                if chegadas and chegadas[0].get("source") == "scheduled":
                     publico.update({
                         "base_previsao": "horario_programado",
-                        "horarios": list(item.horarios_programados[:3]),
-                        "chegadas": chegadas_programadas(item),
+                        "horarios": [
+                            str(chegada["horario"]) for chegada in chegadas
+                        ],
+                        "chegadas": chegadas,
                     })
-                elif item.estimativas_programadas:
-                    primeira = item.estimativas_programadas[0]
+                elif chegadas:
+                    intervalos = {
+                        int(chegada["intervalo_programado_min"])
+                        for chegada in chegadas
+                        if chegada.get("intervalo_programado_min") is not None
+                    }
 
-                    if primeira.intervalo_programado_min is None:
+                    if not intervalos:
                         publico.update({
                             "base_previsao": "horario_programado_estimado",
                             "horarios": [
-                                p.horario
-                                for p in item.estimativas_programadas[:3]
+                                str(chegada["horario"])
+                                for chegada in chegadas
                             ],
-                            "chegadas": chegadas_programadas(item),
+                            "chegadas": chegadas,
                         })
                     else:
                         publico.update({
                             "base_previsao": "frequencia_programada_estimada",
                             "horarios": [
-                                p.horario
-                                for p in item.estimativas_programadas[:3]
+                                str(chegada["horario"])
+                                for chegada in chegadas
                             ],
-                            "chegadas": chegadas_programadas(item),
-                            "intervalo_programado_min":
-                                primeira.intervalo_programado_min,
+                            "chegadas": chegadas,
                         })
+                        if len(intervalos) == 1:
+                            publico["intervalo_programado_min"] = next(
+                                iter(intervalos)
+                            )
                 elif referencia:
                     faixa = referencia[1]
                     assert isinstance(faixa, FaixaPassagemProgramada)
@@ -851,6 +1021,8 @@ class ResultadoChegada:
 
         if tem_eta:
             status_api = "eta_disponivel"
+        elif self.api_falhou:
+            status_api = "indisponivel"
         elif self.api_consultada:
             status_api = "consultada_sem_eta"
         else:
@@ -925,25 +1097,44 @@ def _proxima_referencia_programada(
             if passagens.instantes_programados
             else None
         )
+        instante_ordenavel = _instante_ordenavel(instante)
+        if math.isinf(instante_ordenavel):
+            minutos = re.findall(
+                r"(\d{1,2}):(\d{2})", passagens.horarios_programados[0]
+            )
+            instante_ordenavel = (
+                float(int(minutos[-1][0]) * 60 + int(minutos[-1][1]))
+                if minutos
+                else math.inf
+            )
         candidatos.append((
-            _instante_ordenavel(instante),
+            instante_ordenavel,
             "horario",
             passagens.horarios_programados[0],
         ))
-    if passagens.faixas_programadas:
+    if passagens.estimativas_programadas:
+        estimativa = passagens.estimativas_programadas[0]
+        instante_estimado = _instante_ordenavel(estimativa.instante)
+        if math.isinf(instante_estimado):
+            minutos = re.findall(
+                r"(\d{1,2}):(\d{2})", estimativa.horario
+            )
+            instante_estimado = (
+                float(int(minutos[-1][0]) * 60 + int(minutos[-1][1]))
+                if minutos
+                else math.inf
+            )
+        candidatos.append((
+            instante_estimado,
+            "estimativa",
+            estimativa,
+        ))
+    if not passagens.estimativas_programadas and passagens.faixas_programadas:
         faixa = passagens.faixas_programadas[0]
         candidatos.append((
             _instante_ordenavel(faixa.referencia_instante),
             "frequencia",
             faixa,
-        ))
-    # A estimativa é o próximo slot derivado da faixa. Sem instante técnico
-    # no contrato público, ela só concorre na ausência de grade explícita.
-    if not passagens.horarios_programados and passagens.estimativas_programadas:
-        candidatos.append((
-            -math.inf,
-            "estimativa",
-            passagens.estimativas_programadas[0],
         ))
     if not candidatos:
         return None
@@ -1039,16 +1230,21 @@ def _frases_referencia_programada(
     api_consultada: bool,
     prefixo_sentido: bool = False,
     veiculos_ativos: int | None = None,
+    api_falhou: bool = False,
 ) -> list[str]:
     referencia = _proxima_referencia_programada(passagens)
     descricao = _descricao_linha(passagens)
     inicio = f"Para {descricao}, o próximo ônibus" if prefixo_sentido else f"O próximo {descricao}"
-    if api_consultada and not prefixo_sentido:
+    if api_falhou and not prefixo_sentido:
+        prefixo_api = (
+            "A consulta em tempo real à SPTrans não respondeu agora. "
+        )
+    elif api_consultada and not prefixo_sentido:
         if veiculos_ativos:
             prefixo_api = (
-                f"A SPTrans mostra {veiculos_ativos} ônibus da linha em "
-                "circulação, mas não publicou uma previsão ao vivo para essa "
-                "parada agora. "
+                f"A SPTrans reportou posições de {veiculos_ativos} ônibus "
+                "nesse sentido, mas nenhuma produziu uma previsão segura para "
+                "essa parada agora. "
             )
         else:
             prefixo_api = (
@@ -1058,6 +1254,12 @@ def _frases_referencia_programada(
     else:
         prefixo_api = ""
     if referencia is None:
+        if api_falhou and not prefixo_sentido:
+            return [
+                "A consulta em tempo real à SPTrans não respondeu agora e "
+                f"não encontrei uma referência programada do {descricao} na "
+                f"parada **{passagens.parada}**."
+            ]
         if api_consultada:
             return [
                 f"A SPTrans não informou a chegada do {descricao} na parada "
@@ -1098,9 +1300,13 @@ def _frases_referencia_programada(
             for item in estimativas
         )
 
-        intervalo = estimativas[0].intervalo_programado_min
+        intervalos = tuple(dict.fromkeys(
+            item.intervalo_programado_min
+            for item in estimativas
+            if item.intervalo_programado_min is not None
+        ))
 
-        if intervalo is None:
+        if not intervalos:
             corpo = (
                 f"Pela programação oficial, as próximas passagens estimadas "
                 f"do {descricao} na parada **{passagens.parada}** são **"
@@ -1120,10 +1326,19 @@ def _frases_referencia_programada(
                 + "**."
             )
 
-            cautela = (
-                f"São slots estimados a partir do intervalo programado de "
-                f"**{intervalo} minutos**, não confirmações em tempo real."
-            )
+            if len(intervalos) == 1:
+                cautela = (
+                    f"São slots estimados a partir do intervalo programado de "
+                    f"**{intervalos[0]} minutos**, não confirmações em tempo real."
+                )
+            else:
+                intervalos_texto = _juntar_horarios(tuple(
+                    f"{intervalo} minutos" for intervalo in intervalos
+                ))
+                cautela = (
+                    "São slots estimados em faixas cuja frequência muda entre "
+                    f"**{intervalos_texto}**; não são confirmações em tempo real."
+                )
 
         if prefixo_sentido:
             return [
@@ -1269,33 +1484,93 @@ def renderizar_chegada(
     sentidos_com_eta = [
         item for item in resultado.sentidos if item.previsoes_ao_vivo
     ]
+    sentidos_sem_eta = [
+        item for item in resultado.sentidos if not item.previsoes_ao_vivo
+    ]
     partes: list[str] = []
+    vistas_sentidos = resultado.public_view().get("sentidos", [])
 
-    # ETA real sempre vence a programação. Não mostramos os dois relógios na
-    # mesma resposta padrão porque isso induz o aluno a compará-los como iguais.
+    def complemento_programado(indice: int) -> str:
+        if indice >= len(vistas_sentidos):
+            return ""
+        vista = vistas_sentidos[indice]
+        if not isinstance(vista, dict):
+            return ""
+        chegadas = vista.get("chegadas", [])
+        if not isinstance(chegadas, list):
+            return ""
+        programadas = [
+            chegada for chegada in chegadas
+            if isinstance(chegada, dict)
+            and chegada.get("source") in {"scheduled", "scheduled_estimate"}
+        ]
+        if not programadas:
+            return ""
+        horarios = tuple(
+            (
+                "~" if chegada.get("source") == "scheduled_estimate" else ""
+            ) + str(chegada.get("horario") or "")
+            for chegada in programadas
+            if chegada.get("horario")
+        )
+        if not horarios:
+            return ""
+        return (
+            "Depois dela, a programação indica "
+            f"**{_juntar_horarios(horarios)}**; "
+            "esses horários não são previsões ao vivo."
+        )
+
+    # ETA real sempre vence a programação. Referências programadas só completam
+    # passagens posteriores e aparecem explicitamente como não-live.
     if sentidos_com_eta:
         if len(sentidos_com_eta) == 1:
-            partes.extend(_frases_chegada_ao_vivo(sentidos_com_eta[0]))
+            sentido = sentidos_com_eta[0]
+            partes.extend(_frases_chegada_ao_vivo(sentido))
+            indice = resultado.sentidos.index(sentido)
+            complemento = complemento_programado(indice)
+            if complemento:
+                partes.append(complemento)
         else:
             partes.append(
                 f"A **{resultado.linha}** tem previsão ao vivo em mais de um "
                 f"sentido na parada **{resultado.parada}**:"
             )
-            partes.extend(
-                "- " + _frases_chegada_ao_vivo(item)[0]
-                for item in sentidos_com_eta
+            for item in sentidos_com_eta:
+                indice = resultado.sentidos.index(item)
+                complemento = complemento_programado(indice)
+                frase = _frases_chegada_ao_vivo(item)[0]
+                partes.append(
+                    "- " + " ".join(filter(None, (frase, complemento)))
+                )
+        if sentidos_sem_eta:
+            partes.append(
+                "Nos demais sentidos, não há ETA ao vivo:"
             )
+            for item in sentidos_sem_eta:
+                frases = _frases_referencia_programada(
+                    item,
+                    api_consultada=False,
+                    prefixo_sentido=True,
+                )
+                partes.append("- " + " ".join(frases))
     elif len(resultado.sentidos) == 1:
         partes.extend(_frases_referencia_programada(
             resultado.sentidos[0],
             api_consultada=resultado.api_consultada,
             veiculos_ativos=resultado.veiculos_ativos,
+            api_falhou=resultado.api_falhou,
         ))
     else:
-        if resultado.api_consultada and resultado.veiculos_ativos:
+        if resultado.api_falhou:
             estado_api = (
-                f"A SPTrans mostra {resultado.veiculos_ativos} ônibus da linha "
-                "em circulação, mas não publicou uma previsão ao vivo agora; "
+                "A consulta em tempo real à SPTrans não respondeu agora; "
+            )
+        elif resultado.api_consultada and resultado.veiculos_ativos:
+            estado_api = (
+                f"A SPTrans reportou posições de {resultado.veiculos_ativos} "
+                "ônibus nesse sentido, mas nenhuma produziu uma previsão "
+                "segura agora; "
             )
         elif resultado.api_consultada:
             estado_api = "A SPTrans não publicou uma previsão ao vivo agora; "

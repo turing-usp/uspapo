@@ -93,7 +93,10 @@ def _posicoes_linha(sessao: requests.Session, codigo_linha: int) -> dict[str, An
 
 def destino_da_linha(linha: dict[str, Any]) -> str:
     """Destino operacional conforme o sentido documentado pela SPTrans."""
-    destino = linha.get("ts") if linha.get("sl") == 1 else linha.get("tp")
+    # ``sl=1`` opera do terminal principal para o secundário e usa o letreiro
+    # ``tp``; ``sl=2`` faz o percurso inverso e usa ``ts``. Trocar os campos
+    # seleciona justamente o código de linha do sentido oposto.
+    destino = linha.get("tp") if linha.get("sl") == 1 else linha.get("ts")
     return str(destino or "")
 
 

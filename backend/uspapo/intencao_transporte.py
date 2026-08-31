@@ -258,9 +258,11 @@ def analisar_intencao_transporte(
     def finalizar(intencao: IntencaoTransporte) -> IntencaoTransporte:
         return _aplicar_restricao_temporal(intencao, texto, hoje)
 
-    marcador_proximo = bool(re.search(r"\bproxim[oa]\b", texto))
+    marcador_proximo = bool(re.search(r"\bproxim(?:o|a|os|as)\b", texto))
     proximo_e_periodo = bool(re.search(
-        r"\bproxim[oa]\s+(?:fim|final|sabado|domingo)\b", texto
+        r"\bproxim(?:o|a|os|as)\s+"
+        r"(?:fim|final|fins|finais|sabado|sabados|domingo|domingos)\b",
+        texto,
     ))
     horario_explicito = _horario_explicito(texto)
     restricao_horaria = horario_explicito is not None or bool(re.search(
@@ -268,6 +270,11 @@ def analisar_intencao_transporte(
         r"meia\s*-?\s*noite|madrugada|manha|tarde|noite)\b",
         texto,
     ))
+    pergunta_tempo_de_chegada = bool(
+        re.search(r"\b(?:quanto falta|daqui a quanto tempo)\b", texto)
+        and re.search(r"\b(?:chega|chegar|passa|passar|vem|vindo)\b", texto)
+        and re.search(r"\b(?:\d{4}|onibus|circular|busp|linha)\b", texto)
+    )
     pede_chegada = bool(
         re.search(
             r"\b(quando|chega|chegara|previsao|previsoes|horario|horarios|"
@@ -275,6 +282,7 @@ def analisar_intencao_transporte(
             texto,
         )
         or (marcador_proximo and not proximo_e_periodo)
+        or pergunta_tempo_de_chegada
         # "Tem a linha X depois da meia-noite?" pede programação em uma
         # janela, não apenas a existência da linha na parada.
         or restricao_horaria

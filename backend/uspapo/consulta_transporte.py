@@ -197,7 +197,9 @@ def interpretar_consulta_transporte(
     alternatives = bool(termos & {"alternativa", "alternativas", "opcao", "opcoes", "outro", "outra"})
     confidence = bool(re.search(r"\bconfi(?:anca|avel)\b", texto))
     details = bool(re.search(r"\b(?:por que|porque|detalhes|fonte|dados)\b", texto))
-    more_arrivals = bool(re.search(r"\b(?:outro|outra|depois|segundo|proximos)\b", texto))
+    more_arrivals = bool(re.search(
+        r"\b(?:outro|outra|depois|segundo|proximos|proximas)\b", texto
+    ))
     service_window = bool(re.search(
         r"\b(?:primeiro|ultimo|ultima|opera|operacao|ate que horas|ate quando|"
         r"comeca(?:r)?(?:\s+a)?\s+(?:rodar|circular|operar))\b",

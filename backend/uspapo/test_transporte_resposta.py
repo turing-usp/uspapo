@@ -246,8 +246,8 @@ class TestChegadaResposta(unittest.TestCase):
             veiculos=2,
         ))
 
-        self.assertIn("mostra 2 ônibus", texto)
-        self.assertIn("não publicou uma previsão ao vivo", texto)
+        self.assertIn("reportou posições de 2 ônibus", texto)
+        self.assertIn("nenhuma produziu uma previsão segura", texto)
         self.assertIn("por volta de **11:36**", texto)
         self.assertLessEqual(
             len(re.findall(r"[.!?](?:\s|$)", texto.replace("Cid.", "Cid"))),
@@ -303,6 +303,11 @@ class TestChegadaResposta(unittest.TestCase):
                 ("13:00", "scheduled_estimate"),
             ],
         )
+        texto = renderizar_chegada(resultado)
+        self.assertIn("12:39", texto)
+        self.assertIn("~12:45", texto)
+        self.assertIn("~13:00", texto)
+        self.assertIn("programação", texto)
         self.assertEqual(chegadas[0]["confidence"], "high")
         self.assertEqual(chegadas[1]["confidence"], "scheduled")
 
