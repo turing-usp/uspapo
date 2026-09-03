@@ -23,6 +23,10 @@ export default function NovaSenha() {
     if (jatrocou.current) return;
     jatrocou.current = true;
     const code = new URLSearchParams(window.location.search).get('code');
+    /* Sem código na URL a página segue o fluxo normal de sessão: este set
+       fecha o carregamento de propósito, e o ref acima já garante que o
+       efeito roda uma vez só. */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!code) return setPronto(true);   // já tem sessão, ou link inválido
 
     criarCliente()

@@ -45,7 +45,9 @@ import {
   formatUserId,
   rotuloDia,
 } from '@/components/analytics/primitivos';
-import RevisaoFeedback, { type FeedbackAnalytics } from '@/components/analytics/RevisaoFeedback';
+/* Só o tipo: a central de revisão é renderizada pela página /admin/feedback,
+   não por aqui. */
+import { type FeedbackAnalytics } from '@/components/analytics/RevisaoFeedback';
 import { tokenDaSessao } from '@/lib/supabase';
 
 interface BaldeTokens {
@@ -136,6 +138,9 @@ export default function AdminAnalyticsPage() {
   }, []);
 
   useEffect(() => {
+    /* Busca inicial de propósito: a tela nasce vazia e só o backend tem o
+       dado; o setState acontece no retorno da rede, dentro do fetch. */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAnalytics();
   }, [fetchAnalytics]);
 

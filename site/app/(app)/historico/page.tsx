@@ -2,7 +2,9 @@
 "use client";
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
-import { listarConversas, apagarConversa, alternarFavorita, renomearConversa, gerarTitulo, buscarConversas, type Conversa } from "@/lib/conversas";
+/* Sem gerarTitulo: o título das conversas nasce no chat; o histórico só
+   lista, busca, renomeia, favorita e apaga. */
+import { listarConversas, apagarConversa, alternarFavorita, renomearConversa, buscarConversas, type Conversa } from "@/lib/conversas";
 import { LIMITES } from "@/lib/limites";
 import { MenuConversa } from "@/components/MenuConversa";
 
