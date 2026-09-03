@@ -18,6 +18,26 @@ export function validarCadastro(senha: string, confirmacao: string) {
   return null;
 }
 
+/* Tabela única (code -> mensagem pt-BR) dos erros de autenticação do Supabase,
+   compartilhada pelas telas de login e cadastro. O argumento `padrao` cobre os
+   códigos não listados e é quem dá o contexto da chamada ("email/senha",
+   "Google", "cadastro"); assim nenhum code cai na tela como message crua em
+   inglês. `rede_indisponivel` é o code sintético de semRejeicaoDeRede, abaixo. */
+const MENSAGENS_DE_ERRO_AUTENTICACAO: Record<string, string> = {
+  email_not_confirmed:
+    'Falta confirmar seu email. Abra o link que enviamos para ativar a conta.',
+  rede_indisponivel:
+    'Sem conexão com o servidor. Verifique sua rede e tente novamente.',
+};
+
+export function traduzirErroAutenticacao(
+  erro: { code?: string } | null | undefined,
+  padrao: string
+): string {
+  const mensagem = erro ? MENSAGENS_DE_ERRO_AUTENTICACAO[erro.code ?? ''] : undefined;
+  return mensagem ?? padrao;
+}
+
 /* O supabase-js LANÇA AuthRetryableFetchError quando a rede falha, em vez de
    resolver com { error }. Sem este catch a rejeição escaparia dos handlers de
    tela (que esperam o shape { data, error }); convertemos a falha para o mesmo

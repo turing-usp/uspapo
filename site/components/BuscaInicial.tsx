@@ -23,6 +23,10 @@ export default function BuscaInicial({ perguntasFrequentes }: { perguntasFrequen
   );
 
   useEffect(() => {
+    /* O sorteio vive aqui de propósito: fora do render a hidratação quebra
+       (ver o comentário acima do estado), então o set direto no efeito é o
+       lugar certo. */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setVisiveis(sortear(perguntasFrequentes, QUANTAS_EXIBIR));
   }, [perguntasFrequentes]);
 

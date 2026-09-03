@@ -49,14 +49,19 @@ export default function AdminFeedbackPage() {
       }
       setData(json.data);
       setLastUpdated(new Date());
-    } catch (err: any) {
-      setError(err.message || 'Erro inesperado');
+    } catch (err: unknown) {
+      /* unknown em vez de any: o catch pode receber qualquer coisa, e só o
+         Error carrega mensagem confiável. */
+      setError(err instanceof Error ? err.message : 'Erro inesperado');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    /* Busca inicial de propósito: sem ela a central nasce vazia; o setState
+       acontece no retorno da rede, dentro do fetch. */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchFeedbackData();
   }, []);
 

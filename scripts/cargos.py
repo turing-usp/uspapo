@@ -33,9 +33,15 @@ def _cliente():
 
 
 def _todos_perfis(sb):
-    """Busca todas as linhas da tabela Perfis."""
-    res = sb.table("Perfis").select("id, email, nome, uspapo_role").execute()
+    """Busca todas as linhas da tabela Perfis (a coluna email nao existe na tabela)."""
+    res = sb.table("Perfis").select("id, nome, uspapo_role").execute()
     return res.data or []
+
+
+def _emails_por_id(sb):
+    """Busca os emails dos usuarios no auth.users (schema auth, via service key) e devolve um mapa id -> email."""
+    res = sb.schema("auth").table("users").select("id, email").execute()
+    return {u.get("id"): u.get("email") for u in (res.data or []) if u.get("id")}
 
 
 # ── Subcomando: listar ────────────────────────────────────────────────
@@ -43,6 +49,11 @@ def _todos_perfis(sb):
 def cmd_listar():
     sb = _cliente()
     perfis = _todos_perfis(sb)
+    emails = _emails_por_id(sb)
+
+    # Preenche o email de cada perfil a partir do auth.users, mapeado por id
+    for p in perfis:
+        p["email"] = emails.get(p.get("id"))
 
     por_cargo = {}
     sem_cargo = []
@@ -86,8 +97,16 @@ def cmd_definir(email: str, cargo: str):
     sb = _cliente()
     email_clean = email.strip().lower()
 
-    # Atualiza na tabela Perfis
-    res = sb.table("Perfis").update({"uspapo_role": valor_role}).eq("email", email_clean).execute()
+    # Localiza o id do usuario no auth.users pela coluna email (a tabela Perfis nao tem essa coluna)
+    emails_auth = _emails_por_id(sb)
+    ids = [uid for uid, e in emails_auth.items() if (e or "").strip().lower() == email_clean]
+
+    if not ids:
+        print(f"[FALHA] {email_clean} nao foi encontrado na tabela Perfis.")
+        return
+
+    # Atualiza na tabela Perfis pelo id do usuario
+    res = sb.table("Perfis").update({"uspapo_role": valor_role}).in_("id", ids).execute()
 
     if res.data:
         print(f"[OK] {email_clean} -> {cargo}")
@@ -106,13 +125,21 @@ def cmd_lote(cargo: str, emails: list[str]):
     valor_role = None if cargo == "remover" else cargo
     sb = _cliente()
 
+    # Busca os emails do auth.users uma unica vez e mapeia por id
+    emails_auth = _emails_por_id(sb)
+
     ok, falhas = 0, 0
     for email in emails:
         email_clean = email.strip().lower()
         if not email_clean:
             continue
         try:
-            res = sb.table("Perfis").update({"uspapo_role": valor_role}).eq("email", email_clean).execute()
+            ids = [uid for uid, e in emails_auth.items() if (e or "").strip().lower() == email_clean]
+            if not ids:
+                print(f"[FALHA] {email_clean} -- conta nao encontrada na tabela Perfis")
+                falhas += 1
+                continue
+            res = sb.table("Perfis").update({"uspapo_role": valor_role}).in_("id", ids).execute()
             if res.data:
                 print(f"[OK] {email_clean} -> {cargo}")
                 ok += 1

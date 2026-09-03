@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import TuringLogo from '../../turing-logo.svg'
-import { validarCadastro, cadastrar, entrarComGoogle } from '@/lib/auth';
+import { validarCadastro, cadastrar, entrarComGoogle, traduzirErroAutenticacao } from '@/lib/auth';
 import { checarSenha } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { useSessao } from '@/lib/useSessao';
@@ -39,17 +39,11 @@ export default function RegisterPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    isUspStudent: false,
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    if (type === 'checkbox') {
-      const checked = (e.target as HTMLInputElement).checked;
-      setFormData((prev) => ({ ...prev, [name]: checked }));
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-    }
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -63,7 +57,13 @@ export default function RegisterPage() {
     const { error } = await cadastrar(formData.fullName, formData.email, formData.password);
     setCarregando(false);
 
-    error ? setErro(error.message) : setEnviado(true);
+    /* Mensagens em pt-BR pela tabela compartilhada de lib/auth.ts — antes o
+       cadastro mostrava error.message cru em inglês aqui. */
+    if (error) {
+      setErro(traduzirErroAutenticacao(error, 'Não foi possível criar a conta. Tente novamente.'));
+    } else {
+      setEnviado(true);
+    }
   };
 
   const handleGoogleLogin = async () => {
@@ -71,7 +71,9 @@ export default function RegisterPage() {
     setCarregando(true);
     const { error } = await entrarComGoogle();
     if (error) {
-      setErro('Erro ao conectar com o Google.');
+      /* Rede fora do ar cai no code sintético 'rede_indisponivel' (lib/auth.ts).
+         Antes o Google daqui ignorava esse code. */
+      setErro(traduzirErroAutenticacao(error, 'Erro ao conectar com o Google.'));
       setCarregando(false);
     }
   };
@@ -154,14 +156,6 @@ export default function RegisterPage() {
                     className="w-full pl-12 pr-4 py-3 rounded-full border-0 bg-transparent text-[1rem] text-foreground caret-brand placeholder:text-muted-foreground focus:outline-none"
                   />
                 </div>
-
-                {formData.isUspStudent && (
-                  <p className="px-2 text-xs text-faint-foreground" aria-live="polite">
-                    {formData.email.trim().toLowerCase().endsWith('@usp.br')
-                      ? 'Email USP confirmado — seu vínculo será registrado.'
-                      : 'Este email não é institucional. Use @usp.br para registrar o vínculo.'}
-                  </p>
-                )}
 
                 {/* INPUT 4: Senha */}
                 <div className="glass glass-field rounded-full relative w-full">
@@ -263,25 +257,6 @@ export default function RegisterPage() {
                 {formData.confirmPassword && formData.password !== formData.confirmPassword && (
                   <p className="px-2 text-xs text-danger">As senhas não coincidem.</p>
                 )}
-
-                {/* RADIO / SELEÇÃO: Sou aluno da USP */}
-                <div className="flex items-center gap-3 my-1 px-2">
-                  <label className="relative flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="isUspStudent"
-                      checked={formData.isUspStudent}
-                      onChange={handleChange}
-                      className="sr-only peer"
-                    />
-                    <div className="w-5 h-5 rounded-full border-2 border-brand flex items-center justify-center transition-all peer-checked:bg-transparent">
-                      <div className={`w-2.5 h-2.5 rounded-full bg-brand transition-opacity duration-150 ${formData.isUspStudent ? 'opacity-100' : 'opacity-0'}`} />
-                    </div>
-                    <span className="ml-3 text-sm text-muted-foreground select-none">
-                      Sou aluno da USP
-                    </span>
-                  </label>
-                </div>
 
                 {erro && <p className="px-2 text-xs text-danger" role="alert">{erro}</p>}
 

@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import TuringLogo from '../../turing-logo.svg';
-import { entrar, entrarComGoogle } from '@/lib/auth';
+import { entrar, entrarComGoogle, traduzirErroAutenticacao } from '@/lib/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {Suspense} from "react";
 import { useSessao } from '@/lib/useSessao';
@@ -59,14 +59,10 @@ function LoginForm() {
     if (error) {
       /* Conta criada mas email não confirmado é o erro mais comum aqui, e
          chamar isso de "senha incorreta" manda a pessoa para a recuperação de
-         senha quando a resposta estava na caixa de entrada dela. */
-      setErro(
-        error.code === 'email_not_confirmed'
-          ? 'Falta confirmar seu email. Abra o link que enviamos para ativar a conta.'
-          : error.code === 'rede_indisponivel'
-            ? 'Sem conexão com o servidor. Verifique sua rede e tente novamente.'
-            : 'Email ou senha incorretos.'
-      );
+         senha quando a resposta estava na caixa de entrada dela — tudo mapeado
+         em traduzirErroAutenticacao (lib/auth.ts), que também cobre a falha de
+         rede (code sintético 'rede_indisponivel'). */
+      setErro(traduzirErroAutenticacao(error, 'Email ou senha incorretos.'));
       return;
     }
 
@@ -82,11 +78,9 @@ function LoginForm() {
     setCarregando(true);
     const { error } = await entrarComGoogle();
     if (error) {
-      setErro(
-        error.code === 'rede_indisponivel'
-          ? 'Sem conexão com o servidor. Verifique sua rede e tente novamente.'
-          : 'Erro ao conectar com o Google.'
-      );
+      /* Rede fora do ar cai no code sintético 'rede_indisponivel' (lib/auth.ts).
+         Antes o Google daqui ignorava esse code e mostrava a mensagem crua. */
+      setErro(traduzirErroAutenticacao(error, 'Erro ao conectar com o Google.'));
       setCarregando(false);
     }
   };
