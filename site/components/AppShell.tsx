@@ -46,15 +46,22 @@ function PortariaSessao({ children }: { children: React.ReactNode }) {
   const caminho = usePathname();
   const busca = useSearchParams().toString();
 
-  /* Rotas públicas: a portaria não pode cobrir a própria tela de login.
+  /* Rotas públicas: a portaria não pode cobrir as telas do deslogado.
      Sem isto, o deslogado em /login ia para /login?destino=<a própria URL> —
      e como a URL atual JÁ é o /login, cada redirect re-codificava o
      ?destino= com uma URL que já continha o destino anterior: a query
      crescia ~30 chars por volta, os headers estouravam (431) e a navegação
      client-side nunca concluía (a tela ficava presa na bola do esqueleto).
      /auth/callback é o mesmo caso: o token chega na query, então a tela
-     precisa renderizar mesmo sem sessão. */
-  const rotaPublica = caminho === '/login' || caminho === '/auth/callback';
+     precisa renderizar mesmo sem sessão. /cadastro, /esqueci-a-senha e
+     /nova-senha pertencem ao fluxo autônomo do deslogado: redirecioná-las
+     para /login quebraria o fluxo que elas existem para abrir. */
+  const rotaPublica =
+    caminho === '/login' ||
+    caminho === '/auth/callback' ||
+    caminho === '/cadastro' ||
+    caminho === '/esqueci-a-senha' ||
+    caminho === '/nova-senha';
 
   useEffect(() => {
     /* Com `falha` o esqueleto vira diagnóstico (mensagem + retry): o
@@ -72,9 +79,9 @@ function PortariaSessao({ children }: { children: React.ReactNode }) {
     router.replace(`/login?destino=${encodeURIComponent(destino)}`);
   }, [carregando, usuario, falha, rotaPublica, caminho, busca, router]);
 
-  /* Em rota pública o children (tela de login/callback) SEMPRE renderiza,
-     mesmo sem usuário ou com falha de rede: o login exibe a própria
-     mensagem de rede. */
+  /* Em rota pública o children (tela de login, callback, cadastro ou
+     senha) SEMPRE renderiza, mesmo sem usuário ou com falha de rede:
+     o login exibe a própria mensagem de rede. */
   if (carregando || (!usuario && !rotaPublica))
     return <EsqueletoSessao falha={falha} aoTentarNovamente={tentarNovamente} />;
 
