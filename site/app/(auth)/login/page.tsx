@@ -63,7 +63,9 @@ function LoginForm() {
       setErro(
         error.code === 'email_not_confirmed'
           ? 'Falta confirmar seu email. Abra o link que enviamos para ativar a conta.'
-          : 'Email ou senha incorretos.'
+          : error.code === 'rede_indisponivel'
+            ? 'Sem conexão com o servidor. Verifique sua rede e tente novamente.'
+            : 'Email ou senha incorretos.'
       );
       return;
     }
@@ -80,7 +82,11 @@ function LoginForm() {
     setCarregando(true);
     const { error } = await entrarComGoogle();
     if (error) {
-      setErro('Erro ao conectar com o Google.');
+      setErro(
+        error.code === 'rede_indisponivel'
+          ? 'Sem conexão com o servidor. Verifique sua rede e tente novamente.'
+          : 'Erro ao conectar com o Google.'
+      );
       setCarregando(false);
     }
   };

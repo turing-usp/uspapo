@@ -16,16 +16,14 @@ O desenvolvimento continua via `server.url` (live-reload, seção
 oficial do Capacitor sinaliza `server.url` como **não recomendada para
 produção** — o dev aceita isso por causa do live-reload. Na produção o
 conteúdo segue o padrão recomendado: o `out/` estático embutido no APK
-(`webDir: 'out'`). **Pendência de código conhecida:** o
-`capacitor.config.ts` ainda deriva `server.url` de um fallback para
-`http://10.0.2.2:3000` quando `CAPACITOR_URL` está ausente — e
-`app:sync:prod` não define `CAPACITOR_URL` — então o sync de produção
-**também** grava a URL de dev (confirmado no `capacitor.config.json`
-sincronizado em `assets/`). Com `server.url` presente, a WebView carrega a
-URL **em vez** do `webDir` embutido — em aparelho físico a URL não existe
-e o app pode falhar ao carregar. A correção é de código (remover o
-fallback ou condicionar `server.url` ao dev) e exige novo `app:sync:prod`
-+ build + assinatura antes de distribuir (seção "Limitações").
+(`webDir: 'out'`). O fallback que derivava `server.url` de
+`http://10.0.2.2:3000` quando `CAPACITOR_URL` estava ausente foi
+**removido** no commit `69168e6`:
+`server.url` só entra no config quando `CAPACITOR_URL` está definido
+(`app:sync:dev` define; `app:sync:prod` **não** define), e o sync de
+produção grava `server: {}` (confirmado no `capacitor.config.json`
+sincronizado em `site/android/app/src/main/assets/`). Com a chave ausente a
+WebView carrega o `webDir` embutido — o conteúdo que o release distribui.
 
 ### Por que a Estratégia A foi rejeitada — e como os bloqueios foram resolvidos
 
@@ -152,9 +150,13 @@ npx cap run android  # compila, instala e abre; --live-reload recarrega o app
 O keystore mora em `site/keystore/uspapo-release.keystore`, é **gitignored**
 (`*.keystore`/`*.jks` na seção "Capacitor / Android" do `.gitignore`) e o
 app nunca mais pode assinar com outro — **nunca commitar** o arquivo. As
-senhas ficam no `android.buildOptions` do `site/capacitor.config.ts` por
-design da doc do projeto (o `cap build android` e o Capacitor Cloud as
-lêm dali).
+senhas ficam declaradas em **dois** lugares versionados, com o mesmo valor
+por design da doc do projeto: o `android.buildOptions` de
+`site/capacitor.config.ts` (lido pelo `cap build android`/Capacitor Cloud) e
+o `signingConfigs.release` de `site/android/app/build.gradle` (lido pelo
+Gradle, que assina o APK e o AAB na hora do build — o CLI do Capacitor 8
+não assina AAB: ele invoca `apksigner`, que não suporta o formato de
+bundle).
 
 ```bash
 keytool -genkey -v -keystore keystore/uspapo-release.keystore \
@@ -181,41 +183,75 @@ android: {
 
 ### Build
 
-Fluxo de release, a partir de `site/`:
+O app embute as `NEXT_PUBLIC_*` no bundle em build — o release só fica
+correto com as **vars de produção** exportadas no shell antes do
+`app:sync:prod`:
 
 ```bash
-npm run build:app      # NEXT_EXPORT=1 NEXT_PUBLIC_COOKIE_DOMAIN= next build → out/
+export NEXT_PUBLIC_SUPABASE_URL=https://zgvbnmovongrigjoviyu.supabase.co
+export NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_ZYlNqNjeRpqRV6pkKzta7A_6QjfYcl2
+export NEXT_PUBLIC_API_URL=https://uspapo-53zh.onrender.com
+```
+
+A anon key `sb_publishable_…` é pública por design (RLS protege os dados)
+— ok embuti-la no bundle. **Como obtê-las:** o deploy web
+(`https://uspapo.turingusp.com`) embute as mesmas vars no bundle público —
+abrir o site no navegador e procurar os três valores nos JS da página
+(devtools → Fontes/Rede) entrega o ambiente de produção; os valores
+correspondentes ficam documentados em `site/.env.example` (seção "Build do
+app").
+
+**Guard de env (fail-fast):** o `build:app` roda `node
+scripts/valida-env-app.mjs` antes do `next build` e **falha** (exit 1, com
+a variável, a origem do valor ruim e a correção) se qualquer uma das três
+estiver ausente, vazia, placeholder (`vvv`, `xxx…`, `changeme`, `todo`,
+`placeholder`) ou — nas duas URLs — não-`https://` ou apontando para
+`localhost`/`127.0.0.1`/`10.0.2.2`. Sem exportar as vars de produção (ou
+com as de dev no `.env`), o build do app não roda. A chave aceita JWT
+(`eyJ…`) ou publishable (`sb_publishable_…`); `NEXT_PUBLIC_COOKIE_DOMAIN`
+não é checada — vazia é o valor certo do app. Precedência dos valores:
+shell > `site/.env.local` > `site/.env`.
+
+Fluxo de release, a partir de `site/` (com as vars acima no shell):
+
+```bash
+npm run build:app      # node scripts/valida-env-app.mjs + NEXT_EXPORT=1 NEXT_PUBLIC_COOKIE_DOMAIN= next build → out/
 npm run app:sync:prod  # roda o build:app e faz cap sync android (copia out/ p/ os assets)
 cd android
-JAVA_HOME=<...>/toolchain/jdk21 ./gradlew assembleRelease  # app-release-signed.apk (side-load)
-JAVA_HOME=<...>/toolchain/jdk21 ./gradlew bundleRelease    # app-release-signed.aab (Play Store)
+JAVA_HOME=<...>/toolchain/jdk21 ./gradlew assembleRelease bundleRelease
+# saem assinados: app-release.apk (apk/release/) e app-release.aab (bundle/release/)
+# nomes canônicos para distribuição (o fluxo anterior usava app-release-signed.*):
+mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/app-release-signed.apk
+mv app/build/outputs/bundle/release/app-release.aab app/build/outputs/bundle/release/app-release-signed.aab
 ```
 
 - **JDK 21 é obrigatória** via `JAVA_HOME` — o JDK 25 quebra o `./gradlew`.
-- **AAB** para a Play Store, **APK** para side-load (`releaseType: 'apk'`).
-  Com `signingType: 'apksigner'` o CLI assina; se o CLI não assinar,
-  assinar manualmente com `apksigner sign --min-sdk-version 24`
-  (`minSdkVersion 24` em `site/android/variables.gradle`).
-- **`versionCode` 1 / `versionName "1.0.0"** (em `site/android/app/build.gradle`)
-  é a primeira release — os artefatos já foram gerados:
-  `app-release-signed.apk` + `app-release-signed.aab` em
-  `site/android/app/build/outputs/`. A Play Store exige um `versionCode`
-  maior que o da versão anterior em cada release seguinte (bump em
-  `site/android/app/build.gradle`).
+- **Assinatura:** o `signingConfigs.release` do `site/android/app/build.gradle`
+  assina no Gradle (v1 no AAB; v1+v2+v3 no APK). Para o rollout de instalação
+  rápida da Play, passar o APK final pelo `apksigner sign` (gera o `.idsig`
+  v4) — `apksigner` do build-tools da SDK, `--ks-key-alias uspapo`.
+- **AAB** para a Play Store, **APK** para side-load. (O `cap build android`
+  não é usado: o APK dele espera a saída `-unsigned` do Gradle, que não
+  existe com o `signingConfig` configurado, e o AAB dele falha porque o
+  `apksigner` não assina bundle.)
+- Versão: o versionName é 0.0.1 (placeholder) e o versionCode fica em 2 —
+  o projeto não faz bump a cada release; o APK novo instala por cima do
+  1.0.0/1.0.1 já no aparelho sem desinstalar. Se a 1.0.0 (versionCode 1,
+  env de dev) for publicada na Play Store, o primeiro upload exigirá um
+  versionCode maior que o dela.
 
 ## Limitações
 
 - **Atualizar o app exige novo APK** (Estratégia A): a interface embutida só
   muda com o fluxo de release — redeploy do site não atualiza o app.
-- **Artefato atual leva `server.url` de dev embutida (correção de código
-  pendente):** o `app:sync:prod` grava `server.url: http://10.0.2.2:3000`
-  (e `androidScheme: http`) no `capacitor.config.json` que vai dentro do
-  APK — fallback do `capacitor.config.ts` quando `CAPACITOR_URL` está
-  ausente. Com `server.url` presente a WebView ignora o `out/` embutido e
-  tenta a URL: no emulador só funciona com o `next dev` no ar; em aparelho
-  físico a URL não existe e o app carrega em branco. Corrigir no
-  `capacitor.config.ts`, refazer `app:sync:prod`, rebuild e re-assinatura —
-  a release não deve ser distribuída antes disso.
+- **A 1.0.0 (versionCode 1) saiu com env de dev embutida — NÃO
+  distribuir:** o build da 1.0.0 rodou sem as vars de produção, então o
+  bundle embutido aponta para `127.0.0.1:54321` (Supabase dev) e
+  `localhost:5000` (API dev) — inalcançáveis no aparelho: o app não
+  carrega e não funciona. O build **0.0.1 (versionCode 2)** sai com env
+  de produção embutida (seção "Release"); a distribuição é dele. A 1.0.0
+  instalada em aparelho só é corrigida por esse novo build — redeploy web
+  não atualiza o app.
 - **Analytics admin indisponível no app:** no export a rota
   `/api/admin/analytics` devolve 404 estático e as telas admin tratam a
   resposta como indisponível; no deploy web a rota segue dinâmica.
@@ -232,3 +268,15 @@ JAVA_HOME=<...>/toolchain/jdk21 ./gradlew bundleRelease    # app-release-signed.
 - **A sessão Supabase do app é isolada da do browser:** a WebView tem
   storage próprio, então o login feito no app não propaga para o browser
   (nem o contrário), mesmo no mesmo aparelho.
+- **Gerenciadores de senha tratam o app como outro domínio:** o app roda
+  na origem `https://localhost` (host fixo do servidor de assets do
+  Capacitor), então o Bitwarden e afins não casam a senha salva de
+  `uspapo.turingusp.com` com o formulário do login do app e oferecem
+  criar uma entrada nova "localhost". A correção é no gerenciador, sem
+  código: na entrada de login existente, adicionar `localhost` como URI
+  adicional (Bitwarden: editar item → URIs → adicionar `localhost`) — o
+  autofill no app passa a oferecer a senha real; descartar a entrada
+  "localhost" nova, se criada. A alternativa de rodar o app na origem do
+  domínio real foi descartada: a allowlist de redirects do Supabase
+  registra `https://localhost/auth/callback`, os cookies de sessão são
+  por origem e o host é fixo no Capacitor.
