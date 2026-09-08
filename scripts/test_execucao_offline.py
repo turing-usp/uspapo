@@ -64,6 +64,11 @@ class TestBarreiraOffline(unittest.TestCase):
     def test_abertura_relativa_nao_pode_ocultar_dir_fd(self):
         self.bloquear("open", ("arquivo.json", "w", os.O_WRONLY))
 
+    def test_nul_e_outros_destinos_relativos_continuam_bloqueados(self):
+        for caminho in ("nul", "NUL", "./nul", "arquivo.json", "data/index/cota_embeddings.json"):
+            with self.subTest(caminho=caminho):
+                self.bloquear("open", (caminho, "w", os.O_WRONLY))
+
     def test_arquivos_de_ambiente_sao_bloqueados_na_leitura(self):
         for nome in (".env", ".env.local", ".env.example", ".ENV"):
             with self.subTest(nome=nome):
@@ -160,6 +165,80 @@ class TestBarreiraOffline(unittest.TestCase):
         mensagem = self.bloquear("subprocess.Popen", (marcador,))
         self.assertNotIn(marcador, mensagem)
         self.assertNotIn(marcador, " ".join(self.violacoes))
+
+    def test_stack_registrada_preserva_origem_mais_antiga_que_doze_frames(self):
+        def origem_antiga():
+            intermediaria(24)
+
+        def intermediaria(profundidade):
+            if profundidade:
+                intermediaria(profundidade - 1)
+            else:
+                self.auditar("os.truncate", (str(self.fora), 0))
+
+        with self.assertRaises(offline.ViolacaoOffline) as captura:
+            origem_antiga()
+        self.assertEqual(len(self.violacoes), 1)
+        diagnostico = self.violacoes[0]
+        self.assertEqual(str(captura.exception), diagnostico)
+        self.assertIn("in origem_antiga", diagnostico)
+        self.assertGreaterEqual(diagnostico.count("in intermediaria"), 25)
+
+    def test_stack_exibe_metadados_sem_codigo_fonte_ou_valores_locais(self):
+        marcador = "dado-sensivel-sintetico-da-stack"
+        quadros = [
+            offline.traceback.FrameSummary(
+                "origem_sintetica.py", 41, "origem_sintetica",
+                lookup_line=False, line=f"token = '{marcador}'",
+                locals={"token": marcador},
+            ),
+            offline.traceback.FrameSummary(
+                "barreira_sintetica.py", 60, "negar", lookup_line=False,
+            ),
+        ]
+        with patch.object(offline.traceback, "extract_stack", return_value=quadros) as extrair:
+            mensagem = self.bloquear("subprocess.Popen", (marcador,))
+        extrair.assert_called_once_with()
+        self.assertIn('File "origem_sintetica.py", line 41, in origem_sintetica', mensagem)
+        self.assertNotIn(marcador, mensagem)
+        self.assertNotIn(marcador, self.violacoes[0])
+
+    def test_stack_original_sobrevive_stoptest_com_violacao_capturada_ou_propagada(self):
+        for capturar in (False, True):
+            with self.subTest(capturar=capturar):
+                with patch.object(offline.sys, "addaudithook") as instalar:
+                    violacoes = offline.instalar_barreira(self.temporaria)
+                auditar = instalar.call_args.args[0]
+                executados = []
+
+                def origem_do_bloqueio():
+                    auditar("open", ("arquivo-sintetico.json", "w", os.O_WRONLY))
+
+                class CasoSintetico(unittest.TestCase):
+                    def test_a_bloqueado(self):
+                        executados.append("primeiro")
+                        if capturar:
+                            with self.assertRaises(offline.ViolacaoOffline):
+                                origem_do_bloqueio()
+                        else:
+                            origem_do_bloqueio()
+
+                    def test_b_nao_deve_comecar(self):
+                        executados.append("segundo")
+
+                resultado = offline.ResultadoOffline(io.StringIO(), True, 0, violacoes=violacoes)
+                suite = unittest.defaultTestLoader.loadTestsFromTestCase(CasoSintetico)
+                primeiro = next(iter(suite)).id()
+                with self.assertRaises(offline.ViolacaoOffline):
+                    suite.run(resultado)
+                self.assertEqual(executados, ["primeiro"])
+                self.assertEqual(resultado.concluidos, [])
+                self.assertEqual(resultado.em_execucao, primeiro)
+                self.assertEqual(len(violacoes), 1)
+                self.assertIn("in origem_do_bloqueio", violacoes[0])
+                self.assertIn("in test_a_bloqueado", violacoes[0])
+                self.assertIn("open: abertura para escrita exige caminho absoluto", violacoes[0])
+                self.assertEqual(offline.codigo_de_saida(resultado, violacoes), 3)
 
     def test_violacao_capturada_ainda_exige_saida_com_falha(self):
         self.bloquear("os.truncate", (str(self.fora), 0))

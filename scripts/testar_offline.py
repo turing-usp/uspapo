@@ -49,16 +49,20 @@ def instalar_barreira(pasta_temporaria: Path) -> list[str]:
     permitida = os.path.normcase(os.path.realpath(pasta_temporaria))
     violacoes: list[str] = []
 
-    def negar(evento, motivo):
+    def negar(evento, motivo, *, caminho=None):
         # Registra ANTES de levantar: capturar BaseException não torna a
-        # execução aprovada. Nenhum argumento potencialmente sensível é salvo.
+        # execução aprovada. Registra o caminho do open em diagnóstico, mas
+        # nunca argumentos de rede/processos, código-fonte ou valores locais.
         descricao = f"{evento}: {motivo}"
-        violacoes.append(descricao)
-        origem = " > ".join(
-            f"{Path(quadro.filename).name}:{quadro.lineno}:{quadro.name}"
-            for quadro in traceback.extract_stack(limit=12)[:-1]
+        if caminho is not None:
+            descricao += f"; caminho={os.fsdecode(caminho)!r}"
+        origem = "\n".join(
+            f'  File "{quadro.filename}", line {quadro.lineno}, in {quadro.name}'
+            for quadro in traceback.extract_stack()[:-1]
         )
-        raise ViolacaoOffline(f"{descricao}\n{origem}")
+        diagnostico = f"{descricao}\nStack completa (sem código-fonte ou valores locais):\n{origem}"
+        violacoes.append(diagnostico)
+        raise ViolacaoOffline(diagnostico)
 
     def conferir_escrita(evento, caminho, dir_fd=None):
         if isinstance(caminho, int):
@@ -110,7 +114,7 @@ def instalar_barreira(pasta_temporaria: Path) -> list[str]:
                 # O evento open omite o dir_fd de os.open. Exigir caminho
                 # absoluto evita validar contra o cwd e escrever via outro fd.
                 if not isinstance(caminho, int) and not os.path.isabs(caminho):
-                    negar(evento, "abertura para escrita exige caminho absoluto")
+                    negar(evento, "abertura para escrita exige caminho absoluto", caminho=caminho)
                 conferir_escrita(evento, caminho)
         elif evento in {"os.remove", "os.rmdir"}:
             conferir_escrita(evento, argumentos[0], argumentos[1])
