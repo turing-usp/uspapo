@@ -132,7 +132,8 @@ class TestParsingGTFS(unittest.TestCase):
                 for nome, conteudo in arquivos.items():
                     arquivo.writestr(nome, conteudo)
 
-            gtfs.gerar(entrada, saida)
+            with patch.object(gtfs, "_carregar_planoper", return_value=({}, [])):
+                gtfs.gerar(entrada, saida)
             documento = json.loads(saida.read_text(encoding="utf-8"))
 
         frequencia = documento["linhas"]["8012"][0]["viagens"][0][
