@@ -15,7 +15,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from uspapo import roteamento
+from uspapo import documentos_locais, roteamento
 
 
 class TestCaminhoDocumental(unittest.TestCase):
@@ -36,8 +36,8 @@ class TestDocumentosLocais(unittest.TestCase):
         self.patches = ExitStack()
         self.addCleanup(self.patches.close)
         self.catalogo = lru_cache(maxsize=1)(self.cache_original.__wrapped__)
-        self.patches.enter_context(patch.object(roteamento, "PASTA_PROCESSADOS", str(self.pasta)))
-        self.patches.enter_context(patch.object(roteamento, "catalogo_titulos", self.catalogo))
+        self.patches.enter_context(patch.object(documentos_locais, "PASTA_PROCESSADOS", str(self.pasta)))
+        self.patches.enter_context(patch.object(documentos_locais, "catalogo_titulos", self.catalogo))
 
     def _confirmar_cache_original_preservado(self):
         self.assertIs(roteamento.catalogo_titulos, self.cache_original)
@@ -106,12 +106,12 @@ class TestDocumentosLocais(unittest.TestCase):
                 raise PermissionError("falha de leitura simulada")
             return builtins.open(caminho, *args, **kwargs)
 
-        with patch.object(roteamento, "open", side_effect=abrir, create=True):
+        with patch.object(documentos_locais, "open", side_effect=abrir, create=True):
             self.assertEqual(set(self.catalogo()), {"aurora"})
 
     def test_corpus_ausente_retorna_vazio_e_cacheia_o_resultado(self):
         ausente = self.pasta / "ainda-ausente"
-        with patch.object(roteamento, "PASTA_PROCESSADOS", str(ausente)):
+        with patch.object(documentos_locais, "PASTA_PROCESSADOS", str(ausente)):
             vazio = self.catalogo()
             self.assertEqual(vazio, {})
             ausente.mkdir()

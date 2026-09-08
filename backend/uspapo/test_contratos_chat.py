@@ -118,7 +118,7 @@ class TestT5PreRoteamento(unittest.TestCase):
         ]
         for catalogo in ({}, {"memorias": candidatos}):
             with self.subTest(catalogo=catalogo):
-                with patch("uspapo.roteamento.catalogo_titulos", return_value=catalogo):
+                with patch("uspapo.documentos_locais.catalogo_titulos", return_value=catalogo):
                     self.assertIsNone(roteamento.preconsultar(
                         self.registro, "O que é Memórias?"
                     ))
