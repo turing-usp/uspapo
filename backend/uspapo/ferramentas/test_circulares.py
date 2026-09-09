@@ -801,10 +801,10 @@ class TestCirculares(unittest.TestCase):
         self.assertEqual(resposta.dados_publicos["tempo"]["espera"]["source"], "live")
 
     @patch(
-        "uspapo.ferramentas.circulares.cache",
+        "uspapo.transporte.previsoes.cache",
         side_effect=lambda _chave, _ttl, produzir: produzir(),
     )
-    @patch("uspapo.ferramentas.circulares.requests.Session")
+    @patch("uspapo.transporte.previsoes.requests.Session")
     def test_previsao_resolve_linha_parada_e_horarios(
         self, criar_sessao, _cache
     ):
@@ -832,10 +832,10 @@ class TestCirculares(unittest.TestCase):
         self.assertEqual(sessao.consultas[-1][1], {"codigoLinha": 35812})
 
     @patch(
-        "uspapo.ferramentas.circulares.cache",
+        "uspapo.transporte.previsoes.cache",
         side_effect=lambda _chave, _ttl, produzir: produzir(),
     )
-    @patch("uspapo.ferramentas.circulares.requests.Session")
+    @patch("uspapo.transporte.previsoes.requests.Session")
     def test_previsao_nunca_cai_no_sentido_oposto(
         self, criar_sessao, _cache
     ):
@@ -911,9 +911,9 @@ class TestCirculares(unittest.TestCase):
         )
         self.assertEqual(fontes, [circulares.FONTE_API])
 
-    @patch("uspapo.ferramentas.circulares._programacao_gtfs")
-    @patch("uspapo.ferramentas.circulares.cache", side_effect=lambda _c, _t, produzir: produzir())
-    @patch("uspapo.ferramentas.circulares.requests.Session")
+    @patch("uspapo.transporte.previsoes._programacao_gtfs")
+    @patch("uspapo.transporte.previsoes.cache", side_effect=lambda _c, _t, produzir: produzir())
+    @patch("uspapo.transporte.previsoes.requests.Session")
     def test_api_sem_previsao_combina_gtfs_com_veiculos(
         self, criar_sessao, _cache, programacao
     ):
@@ -959,13 +959,13 @@ class TestCirculares(unittest.TestCase):
         sessao = SessaoChegadasControlada(linhas, previsoes, posicoes)
         referencia = datetime(2026, 8, 20, 10, 0, tzinfo=circulares.FUSO_SP)
         with (
-            patch("uspapo.ferramentas.circulares.requests.Session", return_value=sessao),
-            patch("uspapo.ferramentas.circulares._programacao_gtfs", return_value=programacao),
+            patch("uspapo.transporte.previsoes.requests.Session", return_value=sessao),
+            patch("uspapo.transporte.previsoes._programacao_gtfs", return_value=programacao),
             patch("uspapo.ferramentas.circulares._instante_referencia_sptrans", return_value=referencia),
             patch("uspapo.transporte.previsoes._instante_referencia_sptrans", return_value=referencia),
             patch("uspapo.transporte.previsoes._agora_sptrans", return_value=referencia),
             patch(
-                "uspapo.ferramentas.circulares.cache",
+                "uspapo.transporte.previsoes.cache",
                 side_effect=lambda _c, _t, produzir: produzir(),
             ),
         ):
@@ -1142,11 +1142,11 @@ class TestCirculares(unittest.TestCase):
         )
         with (
             patch(
-                "uspapo.ferramentas.circulares.requests.Session",
+                "uspapo.transporte.previsoes.requests.Session",
                 return_value=sessao,
             ),
             patch(
-                "uspapo.ferramentas.circulares._programacao_gtfs",
+                "uspapo.transporte.previsoes._programacao_gtfs",
                 return_value=self._programacao_ao_vivo(
                     "120010357", "Cid. Universitária"
                 ),
@@ -1163,7 +1163,7 @@ class TestCirculares(unittest.TestCase):
                 return_value=referencia,
             ),
             patch(
-                "uspapo.ferramentas.circulares.cache",
+                "uspapo.transporte.previsoes.cache",
                 side_effect=lambda _c, _t, produzir: produzir(),
             ),
         ):

@@ -231,7 +231,7 @@ class _CasoTransporte(unittest.TestCase):
 
     def usar_sessao(self, sessao):
         self.contextos.enter_context(patch.object(
-            circulares.requests, "Session", return_value=sessao,
+            previsoes.requests, "Session", return_value=sessao,
         ))
 
 
