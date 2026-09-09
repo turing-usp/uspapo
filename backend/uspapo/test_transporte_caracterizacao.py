@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from uspapo import ferramentas, gtfs_sptrans, olhovivo
 from uspapo.ferramentas import RespostaFerramenta
-from uspapo.transporte import consultas_circulares as circulares, programacao
+from uspapo.transporte import consultas_circulares as circulares, planejamento, programacao
 
 
 AGORA = datetime(2026, 8, 14, 10, 0, tzinfo=circulares.FUSO_SP)
@@ -185,6 +185,9 @@ class _CasoTransporte(unittest.TestCase):
         self.contextos.enter_context(patch.object(
             programacao, "_catalogo_gtfs", side_effect=lambda: deepcopy(self.catalogo),
         ))
+        self.contextos.enter_context(patch.object(
+            planejamento, "_catalogo_gtfs", side_effect=lambda: deepcopy(self.catalogo),
+        ))
         self.contextos.enter_context(patch.object(ferramentas, "_CACHE", {}))
         self.monotonic = self.contextos.enter_context(patch.object(
             ferramentas.time, "monotonic", return_value=1000.0,
@@ -216,10 +219,10 @@ class _CasoTransporte(unittest.TestCase):
             return 0.0 if parada["id"] == alvo else 1000.0
 
         self.contextos.enter_context(patch.object(
-            circulares, "_coordenada_ponto", side_effect=coordenada,
+            planejamento, "_coordenada_ponto", side_effect=coordenada,
         ))
         self.contextos.enter_context(patch.object(
-            circulares, "_distancia_parada_gtfs", side_effect=distancia,
+            planejamento, "_distancia_parada_gtfs", side_effect=distancia,
         ))
 
     def usar_sessao(self, sessao):

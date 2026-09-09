@@ -11,7 +11,7 @@ from datetime import datetime
 import unittest
 from unittest.mock import patch
 
-from uspapo.transporte import consultas_circulares as circulares, programacao
+from uspapo.transporte import consultas_circulares as circulares, planejamento, programacao
 SABADO = datetime(2026, 8, 15, 13, 0, tzinfo=circulares.FUSO_SP)
 QUARTA = datetime(2026, 8, 19, 13, 0, tzinfo=circulares.FUSO_SP)
 DOMINGO = datetime(2026, 8, 23, 12, 0, tzinfo=circulares.FUSO_SP)
@@ -259,10 +259,10 @@ class TestRegressoesPlanejamento(unittest.TestCase):
             )
 
         with (
-            patch.object(circulares, "_catalogo_gtfs", return_value=catalogo),
-            patch.object(circulares, "_coordenada_ponto", side_effect=coordenada),
-            patch.object(circulares, "_distancia_parada_gtfs", side_effect=distancia),
-            patch.object(circulares, "_espera_media_gtfs", side_effect=espera),
+            patch.object(planejamento, "_catalogo_gtfs", return_value=catalogo),
+            patch.object(planejamento, "_coordenada_ponto", side_effect=coordenada),
+            patch.object(planejamento, "_distancia_parada_gtfs", side_effect=distancia),
+            patch.object(planejamento, "_espera_media_gtfs", side_effect=espera),
         ):
             plano = circulares._planejar_trajeto_gtfs(
                 "origem",
@@ -300,11 +300,11 @@ class TestRegressoesPlanejamento(unittest.TestCase):
             return 20 if parada["id"] in nomes else 1_000
 
         with (
-            patch.object(circulares, "_catalogo_gtfs", return_value=catalogo),
-            patch.object(circulares, "_coordenada_ponto", side_effect=coordenada),
-            patch.object(circulares, "_distancia_parada_gtfs", side_effect=distancia),
-            patch.object(circulares, "horario_gtfs_confiavel", return_value=True),
-            patch.object(circulares, "parada_atendida_na_data", return_value=True),
+            patch.object(planejamento, "_catalogo_gtfs", return_value=catalogo),
+            patch.object(planejamento, "_coordenada_ponto", side_effect=coordenada),
+            patch.object(planejamento, "_distancia_parada_gtfs", side_effect=distancia),
+            patch.object(planejamento, "horario_gtfs_confiavel", return_value=True),
+            patch.object(planejamento, "parada_atendida_na_data", return_value=True),
         ):
             plano = circulares._planejar_trajeto_gtfs("origem", "destino", QUARTA, "onibus")
 
@@ -336,11 +336,11 @@ class TestRegressoesPlanejamento(unittest.TestCase):
 
         instante = datetime(2026, 8, 20, 0, 5, tzinfo=circulares.FUSO_SP)
         with (
-            patch.object(circulares, "_catalogo_gtfs", return_value=catalogo),
-            patch.object(circulares, "_coordenada_ponto", side_effect=coordenada),
-            patch.object(circulares, "_distancia_parada_gtfs", side_effect=distancia),
-            patch.object(circulares, "horario_gtfs_confiavel", return_value=True),
-            patch.object(circulares, "parada_atendida_na_data", return_value=True),
+            patch.object(planejamento, "_catalogo_gtfs", return_value=catalogo),
+            patch.object(planejamento, "_coordenada_ponto", side_effect=coordenada),
+            patch.object(planejamento, "_distancia_parada_gtfs", side_effect=distancia),
+            patch.object(planejamento, "horario_gtfs_confiavel", return_value=True),
+            patch.object(planejamento, "parada_atendida_na_data", return_value=True),
         ):
             plano = circulares._planejar_trajeto_gtfs("origem", "destino", instante, "onibus")
 
