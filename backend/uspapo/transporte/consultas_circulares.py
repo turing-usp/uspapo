@@ -3600,7 +3600,7 @@ def _consultar_circulares_calcular(
         # Tool calls do modelo também podem chegar aqui sem a parada. Reuse a
         # mesma regra conservadora da pré-consulta, sem extrair locais das
         # respostas do bot.
-        from uspapo.roteamento import _ponto_recente_associado
+        from uspapo.consulta_transporte import _ponto_recente_associado
 
         ponto_contextual = _ponto_recente_associado(termo_linha, _historico)
         if ponto_contextual:
@@ -4473,7 +4473,7 @@ def consultar_circulares(
         and _pergunta_pede_atendimento_de_linha(_pergunta)
         and _historico
     ):
-        from uspapo.roteamento import _ponto_recente_associado
+        from uspapo.consulta_transporte import _ponto_recente_associado
 
         ponto_contextual = _ponto_recente_associado(
             str(linha_contextual), _historico,
