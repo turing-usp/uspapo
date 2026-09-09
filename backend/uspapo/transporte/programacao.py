@@ -1066,4 +1066,3 @@ def _espera_media_gtfs(
         (proxima - pronto_para_embarcar).total_seconds() / 60,
         None,
     )
-
