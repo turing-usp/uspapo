@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from uspapo import ferramentas, gtfs_sptrans, olhovivo
 from uspapo.ferramentas import RespostaFerramenta
-from uspapo.transporte import consultas_circulares as circulares
+from uspapo.transporte import consultas_circulares as circulares, programacao
 
 
 AGORA = datetime(2026, 8, 14, 10, 0, tzinfo=circulares.FUSO_SP)
@@ -178,8 +178,12 @@ class _CasoTransporte(unittest.TestCase):
         self.addCleanup(self.contextos.close)
         self.contextos.enter_context(patch.dict("os.environ", {"SPTRANS_TOKEN": ""}))
         self.contextos.enter_context(patch.object(circulares, "datetime", _DatetimeFixo))
+        self.contextos.enter_context(patch.object(programacao, "datetime", _DatetimeFixo))
         self.contextos.enter_context(patch.object(
             circulares, "_catalogo_gtfs", side_effect=lambda: deepcopy(self.catalogo),
+        ))
+        self.contextos.enter_context(patch.object(
+            programacao, "_catalogo_gtfs", side_effect=lambda: deepcopy(self.catalogo),
         ))
         self.contextos.enter_context(patch.object(ferramentas, "_CACHE", {}))
         self.monotonic = self.contextos.enter_context(patch.object(

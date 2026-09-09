@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 
 from uspapo.ferramentas import circulares
 from uspapo.locais_usp import CATALOGO_LOCAIS, coordenada_local
+from uspapo.transporte import programacao
 
 
 class SessaoSPTransFalsa:
@@ -200,9 +201,10 @@ class TestCirculares(unittest.TestCase):
 
     def test_resposta_exibe_janela_programada_sem_fingir_eta_ao_vivo(self):
         agora = self._agora_dia_util()
-        with patch(
-            "uspapo.ferramentas.circulares.datetime"
-        ) as datetime_mock:
+        with (
+            patch("uspapo.ferramentas.circulares.datetime") as datetime_mock,
+            patch.object(programacao, "datetime", new=datetime_mock),
+        ):
             datetime_mock.now.return_value = agora
             datetime_mock.fromisoformat.side_effect = datetime.fromisoformat
             datetime_mock.combine.side_effect = datetime.combine
@@ -282,7 +284,7 @@ class TestCirculares(unittest.TestCase):
         }
 
         with patch(
-            "uspapo.ferramentas.circulares._catalogo_gtfs",
+            "uspapo.transporte.programacao._catalogo_gtfs",
             return_value=catalogo,
         ):
             resultado = circulares._programacao_gtfs("9999", "Biênio", agora)
@@ -312,7 +314,7 @@ class TestCirculares(unittest.TestCase):
                 }],
             }]},
         }
-        with patch.object(circulares, "_catalogo_gtfs", return_value=catalogo):
+        with patch.object(programacao, "_catalogo_gtfs", return_value=catalogo):
             resultado = circulares._programacao_gtfs("F", "Ponto", agora)
 
         self.assertEqual(resultado["horarios"], [])
@@ -350,8 +352,8 @@ class TestCirculares(unittest.TestCase):
             }]},
         }
         with (
-            patch.object(circulares, "_catalogo_gtfs", return_value=catalogo),
-            patch.object(circulares, "horario_gtfs_confiavel", return_value=False),
+            patch.object(programacao, "_catalogo_gtfs", return_value=catalogo),
+            patch.object(programacao, "horario_gtfs_confiavel", return_value=False),
         ):
             resultado = circulares._programacao_gtfs("F", "Ponto", agora)
 
@@ -453,7 +455,7 @@ class TestCirculares(unittest.TestCase):
         }
 
         with patch(
-            "uspapo.ferramentas.circulares._catalogo_gtfs",
+            "uspapo.transporte.programacao._catalogo_gtfs",
             return_value=catalogo,
         ):
             resultado = circulares._programacao_gtfs("9999", "Biênio", agora)
@@ -494,7 +496,7 @@ class TestCirculares(unittest.TestCase):
 
     def test_snapshot_gtfs_vencido_e_exposto_na_resposta(self):
         with patch(
-            "uspapo.ferramentas.circulares._catalogo_gtfs",
+            "uspapo.transporte.programacao._catalogo_gtfs",
             return_value={"gerado_em": "2026-08-01T12:00:00+00:00"},
         ):
             nota = circulares._nota_atualizacao_gtfs(
@@ -1204,7 +1206,10 @@ class TestCirculares(unittest.TestCase):
             {"destino": "TERMINAL A", "paradas": [{"id": "a", "nome": "Ponto X", "latitude": -23.5, "longitude": -46.7}]},
             {"destino": "TERMINAL B", "paradas": [{"id": "b", "nome": "Ponto X", "latitude": -23.5, "longitude": -46.7}]},
         ]}]}}
-        with patch("uspapo.ferramentas.circulares._catalogo_gtfs", return_value=catalogo):
+        with (
+            patch("uspapo.ferramentas.circulares._catalogo_gtfs", return_value=catalogo),
+            patch.object(programacao, "_catalogo_gtfs", return_value=catalogo),
+        ):
             self.assertTrue(circulares._plataformas_gtfs_ambíguas(
                 "8084", "Ponto X", sentido_esperado=None,
                 parada_id_esperada=None,

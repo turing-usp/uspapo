@@ -95,6 +95,7 @@ class TestRestricoesTemporaisTransporte(unittest.TestCase):
                 circulares, "_planejar_trajeto_gtfs", return_value=plano,
             ) as planejar,
             patch("uspapo.transporte.consultas_circulares.datetime") as datetime_mock,
+            patch("uspapo.transporte.programacao.datetime", new=datetime_mock),
         ):
             datetime_mock.now.return_value = DOMINGO
             datetime_mock.combine.side_effect = datetime.combine
@@ -227,6 +228,7 @@ class TestRestricoesTemporaisTransporte(unittest.TestCase):
         )
         with (
             patch("uspapo.transporte.consultas_circulares.datetime") as datetime_mock,
+            patch("uspapo.transporte.programacao.datetime", new=datetime_mock),
             patch.dict(os.environ, {"SPTRANS_TOKEN": ""}),
         ):
             datetime_mock.now.return_value = DOMINGO

@@ -11,7 +11,7 @@ from datetime import datetime
 import unittest
 from unittest.mock import patch
 
-from uspapo.transporte import consultas_circulares as circulares
+from uspapo.transporte import consultas_circulares as circulares, programacao
 SABADO = datetime(2026, 8, 15, 13, 0, tzinfo=circulares.FUSO_SP)
 QUARTA = datetime(2026, 8, 19, 13, 0, tzinfo=circulares.FUSO_SP)
 DOMINGO = datetime(2026, 8, 23, 12, 0, tzinfo=circulares.FUSO_SP)
@@ -40,7 +40,8 @@ class TestRegressoesPlanejamento(unittest.TestCase):
             "veiculos": [{"t": "13:10", "a": True}],
         }
         with (
-            patch.object(circulares, "datetime", _datetime_congelado(SABADO)),
+            patch.object(circulares, "datetime", _datetime_congelado(SABADO)) as relogio,
+            patch.object(programacao, "datetime", new=relogio),
             patch.dict("os.environ", {"SPTRANS_TOKEN": "token-teste"}),
             patch.object(
                 circulares,
@@ -153,7 +154,8 @@ class TestRegressoesPlanejamento(unittest.TestCase):
             with (
                 patch.object(
                     circulares, "datetime", _datetime_congelado(agora)
-                ),
+                ) as relogio,
+                patch.object(programacao, "datetime", new=relogio),
                 patch.dict("os.environ", {"SPTRANS_TOKEN": ""}),
             ):
                 resposta = circulares.consultar_circulares(
@@ -349,7 +351,8 @@ class TestRegressoesPlanejamento(unittest.TestCase):
     def test_rota_sem_grade_confiavel_nao_declara_caminhada_mais_rapida(self):
         pergunta = "Qual o melhor jeito de ir do metrô até o Biênio agora?"
         with (
-            patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)),
+            patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)) as relogio,
+            patch.object(programacao, "datetime", new=relogio),
             patch.dict("os.environ", {"SPTRANS_TOKEN": ""}),
         ):
             plano = circulares._planejar_trajeto_gtfs(
@@ -378,7 +381,8 @@ class TestRegressoesPlanejamento(unittest.TestCase):
             "veiculos": [{"t": "12:10"}],
         }
         with (
-            patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)),
+            patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)) as relogio,
+            patch.object(programacao, "datetime", new=relogio),
             patch.dict("os.environ", {"SPTRANS_TOKEN": "token-teste"}),
             patch.object(circulares, "_obter_previsao_sptrans", return_value=previsao),
             patch.object(circulares, "cache", side_effect=lambda _k, _t, produzir: produzir()),
@@ -403,7 +407,8 @@ class TestRegressoesPlanejamento(unittest.TestCase):
             return {"tipo": "programacao", "api_consultada": True}
 
         with (
-            patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)),
+            patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)) as relogio,
+            patch.object(programacao, "datetime", new=relogio),
             patch.dict("os.environ", {"SPTRANS_TOKEN": "token-teste"}),
             patch.object(circulares, "_obter_previsao_sptrans", side_effect=previsao),
             patch.object(circulares, "cache", side_effect=lambda _k, _t, produzir: produzir()),
@@ -420,7 +425,10 @@ class TestRegressoesPlanejamento(unittest.TestCase):
         primeiro_turno = "Qual o melhor jeito de ir do metrô até o Biênio agora?"
         segundo_turno = "Mas e a linha 8012? Ela não passa lá hoje?"
         historico = [{"pergunta": primeiro_turno, "resposta": "resposta anterior"}]
-        with patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)):
+        with (
+            patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)) as relogio,
+            patch.object(programacao, "datetime", new=relogio),
+        ):
             resposta = circulares.consultar_circulares(
                 linha="8012", _pergunta=segundo_turno, _historico=historico,
             )
@@ -434,7 +442,10 @@ class TestRegressoesPlanejamento(unittest.TestCase):
         self.assertEqual(consulta["entities"]["stop"], "bienio")
 
     def test_atendimento_direto_distingue_servico_de_presenca_no_itinerario(self):
-        with patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)):
+        with (
+            patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)) as relogio,
+            patch.object(programacao, "datetime", new=relogio),
+        ):
             ativo = circulares.consultar_circulares(
                 linha="8012", destino_ou_ponto="bienio",
                 _pergunta="A 8012 passa no Biênio hoje?",
@@ -449,7 +460,10 @@ class TestRegressoesPlanejamento(unittest.TestCase):
         self.assertIn("inclui a parada", inativo.texto)
 
     def test_pergunta_de_atendimento_sem_parada_pede_esclarecimento_e_itinerario_permanece(self):
-        with patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)):
+        with (
+            patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)) as relogio,
+            patch.object(programacao, "datetime", new=relogio),
+        ):
             sem_contexto = circulares.consultar_circulares(
                 _pergunta="Ela passa lá hoje?",
             )
