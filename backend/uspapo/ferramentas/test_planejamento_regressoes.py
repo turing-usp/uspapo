@@ -11,7 +11,7 @@ from datetime import datetime
 import unittest
 from unittest.mock import patch
 
-from uspapo.transporte import consultas_circulares as circulares, planejamento, programacao
+from uspapo.transporte import previsoes, consultas_circulares as circulares, planejamento, programacao
 SABADO = datetime(2026, 8, 15, 13, 0, tzinfo=circulares.FUSO_SP)
 QUARTA = datetime(2026, 8, 19, 13, 0, tzinfo=circulares.FUSO_SP)
 DOMINGO = datetime(2026, 8, 23, 12, 0, tzinfo=circulares.FUSO_SP)
@@ -42,6 +42,7 @@ class TestRegressoesPlanejamento(unittest.TestCase):
         with (
             patch.object(circulares, "datetime", _datetime_congelado(SABADO)) as relogio,
             patch.object(programacao, "datetime", new=relogio),
+            patch.object(previsoes, "datetime", new=relogio),
             patch.dict("os.environ", {"SPTRANS_TOKEN": "token-teste"}),
             patch.object(
                 circulares,
@@ -62,7 +63,7 @@ class TestRegressoesPlanejamento(unittest.TestCase):
 
     def test_eta_atrasado_nao_vira_espera_de_um_dia(self):
         with patch.object(
-            circulares,
+            previsoes,
             "_instante_referencia_sptrans",
             return_value=datetime(
                 2026, 8, 15, 11, 40, tzinfo=circulares.FUSO_SP
@@ -81,7 +82,7 @@ class TestRegressoesPlanejamento(unittest.TestCase):
 
     def test_eta_pode_cruzar_meia_noite_sem_ser_descartado(self):
         with patch.object(
-            circulares,
+            previsoes,
             "_instante_referencia_sptrans",
             return_value=datetime(
                 2026, 8, 15, 23, 59, tzinfo=circulares.FUSO_SP
@@ -105,6 +106,10 @@ class TestRegressoesPlanejamento(unittest.TestCase):
         )
         with patch.object(
             circulares,
+            "_instante_referencia_sptrans",
+            return_value=referencia,
+        ), patch.object(
+            previsoes,
             "_instante_referencia_sptrans",
             return_value=referencia,
         ):
@@ -156,6 +161,7 @@ class TestRegressoesPlanejamento(unittest.TestCase):
                     circulares, "datetime", _datetime_congelado(agora)
                 ) as relogio,
                 patch.object(programacao, "datetime", new=relogio),
+                patch.object(previsoes, "datetime", new=relogio),
                 patch.dict("os.environ", {"SPTRANS_TOKEN": ""}),
             ):
                 resposta = circulares.consultar_circulares(
@@ -353,6 +359,7 @@ class TestRegressoesPlanejamento(unittest.TestCase):
         with (
             patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)) as relogio,
             patch.object(programacao, "datetime", new=relogio),
+            patch.object(previsoes, "datetime", new=relogio),
             patch.dict("os.environ", {"SPTRANS_TOKEN": ""}),
         ):
             plano = circulares._planejar_trajeto_gtfs(
@@ -383,10 +390,12 @@ class TestRegressoesPlanejamento(unittest.TestCase):
         with (
             patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)) as relogio,
             patch.object(programacao, "datetime", new=relogio),
+            patch.object(previsoes, "datetime", new=relogio),
             patch.dict("os.environ", {"SPTRANS_TOKEN": "token-teste"}),
             patch.object(circulares, "_obter_previsao_sptrans", return_value=previsao),
             patch.object(circulares, "cache", side_effect=lambda _k, _t, produzir: produzir()),
             patch.object(circulares, "_instante_referencia_sptrans", return_value=DOMINGO),
+            patch.object(previsoes, "_instante_referencia_sptrans", return_value=DOMINGO),
         ):
             resposta = circulares.consultar_circulares(
                 origem="metro_butanta", destino_ou_ponto="bienio", _pergunta=pergunta,
@@ -409,10 +418,12 @@ class TestRegressoesPlanejamento(unittest.TestCase):
         with (
             patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)) as relogio,
             patch.object(programacao, "datetime", new=relogio),
+            patch.object(previsoes, "datetime", new=relogio),
             patch.dict("os.environ", {"SPTRANS_TOKEN": "token-teste"}),
             patch.object(circulares, "_obter_previsao_sptrans", side_effect=previsao),
             patch.object(circulares, "cache", side_effect=lambda _k, _t, produzir: produzir()),
             patch.object(circulares, "_instante_referencia_sptrans", return_value=DOMINGO),
+            patch.object(previsoes, "_instante_referencia_sptrans", return_value=DOMINGO),
         ):
             resposta = circulares.consultar_circulares(
                 origem="metro_butanta", destino_ou_ponto="bienio", _pergunta=pergunta,
@@ -428,6 +439,7 @@ class TestRegressoesPlanejamento(unittest.TestCase):
         with (
             patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)) as relogio,
             patch.object(programacao, "datetime", new=relogio),
+            patch.object(previsoes, "datetime", new=relogio),
         ):
             resposta = circulares.consultar_circulares(
                 linha="8012", _pergunta=segundo_turno, _historico=historico,
@@ -445,6 +457,7 @@ class TestRegressoesPlanejamento(unittest.TestCase):
         with (
             patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)) as relogio,
             patch.object(programacao, "datetime", new=relogio),
+            patch.object(previsoes, "datetime", new=relogio),
         ):
             ativo = circulares.consultar_circulares(
                 linha="8012", destino_ou_ponto="bienio",
@@ -463,6 +476,7 @@ class TestRegressoesPlanejamento(unittest.TestCase):
         with (
             patch.object(circulares, "datetime", _datetime_congelado(DOMINGO)) as relogio,
             patch.object(programacao, "datetime", new=relogio),
+            patch.object(previsoes, "datetime", new=relogio),
         ):
             sem_contexto = circulares.consultar_circulares(
                 _pergunta="Ela passa lá hoje?",

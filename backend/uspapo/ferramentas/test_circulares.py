@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 from uspapo.ferramentas import circulares
 from uspapo.locais_usp import CATALOGO_LOCAIS, coordenada_local
-from uspapo.transporte import programacao
+from uspapo.transporte import programacao, previsoes
 
 
 class SessaoSPTransFalsa:
@@ -204,6 +204,7 @@ class TestCirculares(unittest.TestCase):
         with (
             patch("uspapo.ferramentas.circulares.datetime") as datetime_mock,
             patch.object(programacao, "datetime", new=datetime_mock),
+            patch.object(previsoes, "datetime", new=datetime_mock),
         ):
             datetime_mock.now.return_value = agora
             datetime_mock.fromisoformat.side_effect = datetime.fromisoformat
@@ -698,7 +699,7 @@ class TestCirculares(unittest.TestCase):
             "veiculos": [{"t": "12:03"}, {"t": "12:10"}],
         }
         with patch(
-            "uspapo.ferramentas.circulares._instante_referencia_sptrans",
+            "uspapo.transporte.previsoes._instante_referencia_sptrans",
             return_value=referencia,
         ):
             espera = circulares._espera_ao_vivo(previsao, 46.24)
@@ -732,6 +733,9 @@ class TestCirculares(unittest.TestCase):
             ),
             patch(
                 "uspapo.ferramentas.circulares._instante_referencia_sptrans",
+                return_value=agora,
+            ), patch(
+                "uspapo.transporte.previsoes._instante_referencia_sptrans",
                 return_value=agora,
             ),
             patch(
@@ -785,6 +789,7 @@ class TestCirculares(unittest.TestCase):
             patch("uspapo.ferramentas.circulares._planejar_trajeto_gtfs", return_value=plano),
             patch("uspapo.ferramentas.circulares._obter_previsao_sptrans", side_effect=previsao),
             patch("uspapo.ferramentas.circulares._instante_referencia_sptrans", return_value=agora),
+            patch("uspapo.transporte.previsoes._instante_referencia_sptrans", return_value=agora),
             patch("uspapo.ferramentas.circulares.cache", side_effect=lambda _c, _t, produzir: produzir()),
         ):
             resposta = circulares.consultar_circulares(
@@ -810,7 +815,7 @@ class TestCirculares(unittest.TestCase):
             2026, 8, 20, 21, 0, tzinfo=circulares.FUSO_SP
         )
         with patch(
-            "uspapo.ferramentas.circulares._agora_sptrans",
+            "uspapo.transporte.previsoes._agora_sptrans",
             return_value=instante_api,
         ):
             resultado = circulares._obter_previsao_sptrans(
@@ -924,7 +929,7 @@ class TestCirculares(unittest.TestCase):
             2026, 8, 20, 11, 30, tzinfo=circulares.FUSO_SP
         )
         with patch(
-            "uspapo.ferramentas.circulares._agora_sptrans",
+            "uspapo.transporte.previsoes._agora_sptrans",
             return_value=instante_api,
         ):
             resultado = circulares._obter_previsao_sptrans(
@@ -957,7 +962,8 @@ class TestCirculares(unittest.TestCase):
             patch("uspapo.ferramentas.circulares.requests.Session", return_value=sessao),
             patch("uspapo.ferramentas.circulares._programacao_gtfs", return_value=programacao),
             patch("uspapo.ferramentas.circulares._instante_referencia_sptrans", return_value=referencia),
-            patch("uspapo.ferramentas.circulares._agora_sptrans", return_value=referencia),
+            patch("uspapo.transporte.previsoes._instante_referencia_sptrans", return_value=referencia),
+            patch("uspapo.transporte.previsoes._agora_sptrans", return_value=referencia),
             patch(
                 "uspapo.ferramentas.circulares.cache",
                 side_effect=lambda _c, _t, produzir: produzir(),
@@ -1014,7 +1020,7 @@ class TestCirculares(unittest.TestCase):
             {"p": "medium", "t": "10:07", "ta": "09:57", "py": -23.5, "px": -46.7},
         ]
         with patch(
-            "uspapo.ferramentas.circulares._instante_referencia_sptrans",
+            "uspapo.transporte.previsoes._instante_referencia_sptrans",
             return_value=referencia,
         ):
             resultado = circulares._veiculos_ao_vivo_ordenados(veiculos, "10:00")
@@ -1148,9 +1154,12 @@ class TestCirculares(unittest.TestCase):
             patch(
                 "uspapo.ferramentas.circulares._instante_referencia_sptrans",
                 return_value=referencia,
+            ), patch(
+                "uspapo.transporte.previsoes._instante_referencia_sptrans",
+                return_value=referencia,
             ),
             patch(
-                "uspapo.ferramentas.circulares._agora_sptrans",
+                "uspapo.transporte.previsoes._agora_sptrans",
                 return_value=referencia,
             ),
             patch(
@@ -1207,7 +1216,7 @@ class TestCirculares(unittest.TestCase):
             {"destino": "TERMINAL B", "paradas": [{"id": "b", "nome": "Ponto X", "latitude": -23.5, "longitude": -46.7}]},
         ]}]}}
         with (
-            patch("uspapo.ferramentas.circulares._catalogo_gtfs", return_value=catalogo),
+            patch("uspapo.transporte.previsoes._catalogo_gtfs", return_value=catalogo),
             patch.object(programacao, "_catalogo_gtfs", return_value=catalogo),
         ):
             self.assertTrue(circulares._plataformas_gtfs_ambíguas(

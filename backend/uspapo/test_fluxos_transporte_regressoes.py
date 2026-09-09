@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from uspapo.ferramentas import Registro
-from uspapo.transporte import consultas_circulares as circulares, programacao
+from uspapo.transporte import consultas_circulares as circulares, programacao, previsoes
 from uspapo.roteamento import preconsultar
 
 
@@ -29,11 +29,14 @@ class TestFluxosTransporteRegressoes(unittest.TestCase):
         self._sem_token = patch.dict("os.environ", {"SPTRANS_TOKEN": ""})
         self._relogio = patch.object(circulares, "datetime", DatetimeCongelado)
         self._relogio_programacao = patch.object(programacao, "datetime", DatetimeCongelado)
+        self._relogio_previsoes = patch.object(previsoes, "datetime", DatetimeCongelado)
         self._sem_token.start()
         self._relogio.start()
         self._relogio_programacao.start()
+        self._relogio_previsoes.start()
 
     def tearDown(self):
+        self._relogio_previsoes.stop()
         self._relogio_programacao.stop()
         self._relogio.stop()
         self._sem_token.stop()

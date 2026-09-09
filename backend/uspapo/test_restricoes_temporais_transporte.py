@@ -174,7 +174,7 @@ class TestRestricoesTemporaisTransporte(unittest.TestCase):
             {"p": "antes", "t": "23:59", "ta": "23:55", "py": -23.5, "px": -46.7},
             {"p": "dentro", "t": "00:10", "ta": "23:55", "py": -23.5, "px": -46.7},
         ]
-        with patch("uspapo.transporte.consultas_circulares.datetime") as datetime_mock:
+        with patch("uspapo.transporte.previsoes.datetime") as datetime_mock:
             datetime_mock.now.return_value = datetime(
                 2026, 8, 23, 23, 55, tzinfo=FUSO_SP,
             )
