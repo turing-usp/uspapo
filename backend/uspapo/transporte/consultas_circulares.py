@@ -129,62 +129,6 @@ TIMEOUT = 10
 CABECALHOS = {"User-Agent": "USPapo/1.0 (chatbot de alunos da USP)"}
 
 
-def _mesmo_nome(pedido: str, alvo: str) -> bool:
-    """Equivalência lexical explicável, sem o falso positivo por prefixo.
-
-    ``casa`` é intencionalmente permissiva e serve bem para busca. Para
-    identidade de parada, porém, ela fazia "Poli" casar com "Academia de
-    Polícia", "FAU" com "Faustolo" e "IP" com "Ipiranga". Exigir o casamento
-    nos dois sentidos conserva variações de caixa/acentos/conectivos, mas não
-    aceita que sobrem palavras semanticamente importantes em apenas um lado.
-    """
-    return casa(pedido, alvo) and casa(alvo, pedido)
-
-
-def _autenticar_sptrans(session: requests.Session, token: str) -> bool:
-    """Autentica a sessão do requests com o token da SPTrans."""
-    try:
-        res = session.post(
-            f"{BASE_URL}/Login/Autenticar?token={token}",
-            headers=CABECALHOS,
-            timeout=TIMEOUT,
-        )
-        return res.status_code == 200 and res.json() is True
-    except Exception as err:
-        # Exceções de requests podem incluir a URL completa, e o token da
-        # Olho Vivo é enviado na query string. Nunca grave essa URL nos logs.
-        print(
-            "[circulares] Falha na autenticacao SPTrans: "
-            f"{type(err).__name__}"
-        )
-        return False
-
-
-def _get_json(
-    session: requests.Session, caminho: str, **parametros: Any
-) -> Any:
-    resposta = session.get(
-        f"{BASE_URL}/{caminho}",
-        params=parametros,
-        headers=CABECALHOS,
-        timeout=TIMEOUT,
-    )
-    resposta.raise_for_status()
-    return resposta.json()
-
-
-def _linhas_sptrans(session: requests.Session, numero: str) -> list[dict[str, Any]]:
-    """Resolve os códigos por sentido; eles podem mudar e não devem ser fixos."""
-    dados = _get_json(session, "Linha/Buscar", termosBusca=numero)
-    if not isinstance(dados, list):
-        return []
-    alvo = normalizar(numero).split("-")[0]
-    return [
-        item for item in dados
-        if isinstance(item, dict) and normalizar(item.get("lt", "")) == alvo
-    ]
-
-
 def _distancia_aproximada(parada: dict[str, Any], coordenada: tuple[float, float]) -> float:
     """Distância local aproximada em metros, suficiente para ordenar paradas."""
     lat, lon = coordenada
@@ -225,52 +169,6 @@ def _ordenar_paradas(
             if _distancia_aproximada(parada, coordenada) <= RAIO_ACESSO_M
         ]
     return []
-
-
-@lru_cache(maxsize=1)
-def _catalogo_gtfs() -> dict[str, Any]:
-    """Carrega o pequeno recorte oficial gerado por atualizar_gtfs_sptrans.py."""
-    try:
-        with ARQUIVO_GTFS.open(encoding="utf-8") as arquivo:
-            dados = json.load(arquivo)
-        return dados if isinstance(dados, dict) else {}
-    except (OSError, json.JSONDecodeError) as err:
-        print(f"[circulares] Nao foi possivel ler o recorte GTFS: {err}")
-        return {}
-
-
-def _servico_ativo(catalogo: dict[str, Any], servico: str, dia: date) -> bool:
-    data_gtfs = dia.strftime("%Y%m%d")
-    excecao = (
-        catalogo.get("excecoes_calendario", {})
-        .get(servico, {})
-        .get(data_gtfs)
-    )
-    if excecao is not None:
-        # GTFS: 1 adiciona o serviço naquela data; 2 o remove.
-        return int(excecao) == 1
-
-    calendario = catalogo.get("calendarios", {}).get(servico)
-    if not isinstance(calendario, dict):
-        return False
-    dias = calendario.get("dias", [])
-    return (
-        calendario.get("inicio", "99999999") <= data_gtfs
-        <= calendario.get("fim", "00000000")
-        and len(dias) == 7
-        and bool(dias[dia.weekday()])
-    )
-
-
-def _distancia_parada_gtfs(
-    parada: dict[str, Any], coordenada: tuple[float, float]
-) -> float:
-    lat, lon = coordenada
-    py = float(parada.get("latitude", 0))
-    px = float(parada.get("longitude", 0))
-    dy = (py - lat) * 111_320
-    dx = (px - lon) * 111_320 * math.cos(math.radians(lat))
-    return math.hypot(dx, dy)
 
 
 def _tipo_dia_planoper(dia: date) -> int:
@@ -650,32 +548,6 @@ def _resultado_chegada_publico(
         aviso_api=str(previsao.get("aviso_api") or ""),
     )
 
-
-def _previsoes_linha(
-    session: requests.Session, codigo_linha: int
-) -> dict[str, Any]:
-    """Previsões e paradas da linha, inclusive fora dos corredores.
-
-    O catálogo `/Parada/*` da SPTrans documenta cobertura apenas dos corredores
-    e pode devolver lista vazia dentro da USP. `/Previsao/Linha` é a fonte
-    apropriada: traz todas as paradas monitoradas da linha e seus horários.
-    """
-    dados = _get_json(session, "Previsao/Linha", codigoLinha=codigo_linha)
-    return dados if isinstance(dados, dict) else {}
-
-
-def _posicoes_linha(session: requests.Session, codigo_linha: int) -> dict[str, Any]:
-    dados = _get_json(session, "Posicao/Linha", codigoLinha=codigo_linha)
-    return dados if isinstance(dados, dict) else {}
-
-
-def _destino_linha_sptrans(linha: dict[str, Any]) -> str:
-    """Destino operacional conforme o sentido documentado pela SPTrans."""
-    # ``sl=1`` segue em direção a ``tp``; ``sl=2`` usa ``ts``. Esses nomes
-    # parecem terminais de origem, mas a documentação da Linha/Buscar os
-    # define como os letreiros descritivos dos respectivos sentidos.
-    destino = linha.get("tp") if linha.get("sl") == 1 else linha.get("ts")
-    return str(destino or "")
 
 # A modularização que já existia na main continua sendo a autoridade para as
 # responsabilidades compartilhadas e estáveis: leitura do recorte, calendário,
