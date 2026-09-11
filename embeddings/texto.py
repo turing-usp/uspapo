@@ -139,22 +139,6 @@ def contar_palavras(texto: str) -> int:
     return len(re.findall(r"[A-Za-zÀ-ÿ0-9]+", texto))
 
 
-def eh_lixo(paragrafo: str) -> bool:
-    """Parágrafo que não carrega informação nenhuma.
-
-    Pega o `----------------------------------------` que o site do IQ repete
-    164 vezes, célula de tabela só com número, e o item de menu solto.
-    """
-    limpo = paragrafo.strip()
-    if not limpo:
-        return True
-    if not _RE_LETRA.search(limpo):
-        return True
-    if len(set(limpo)) <= 3:
-        return True
-    return False
-
-
 def normalizar_bloco(texto: str) -> str:
     """Chave de agrupamento para detectar boilerplate.
 
