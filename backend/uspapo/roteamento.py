@@ -11,26 +11,16 @@ from __future__ import annotations
 from uspapo.documentos_locais import (
     RAIZ,
     PASTA_PROCESSADOS,
-    PALAVRAS_PERGUNTA,
-    TIPOS_DE_ENTIDADE,
-    _termo_principal,
     catalogo_titulos,
     pagina_por_titulo,
 )
 from uspapo.consulta_transporte import (
     interpretar_consulta_transporte,
-    PADRAO_LINHA,
-    TERMOS_ONIBUS,
-    TERMOS_TRAJETO,
-    TERMOS_CHEGADA,
     MAX_TURNOS_CONTEXTO_PONTO,
-    PADROES_PONTO,
-    SUFIXO_PONTO,
     _pediu_detalhes_transporte,
     pedido_trajeto,
     pedido_circular,
     _pediu_chegada,
-    _linhas_mencionadas,
     _ponto_recente_associado,
     _continuacao_de_esclarecimento,
 )
