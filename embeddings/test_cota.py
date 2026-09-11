@@ -28,8 +28,11 @@ class TestOrcamento(unittest.TestCase):
         self.arquivo = os.path.join(self.pasta.name, "cota_embeddings.json")
         self._patch = patch.object(cota, "ARQUIVO", self.arquivo)
         self._patch.start()
+        self._patch_index = patch.object(cota.cfg, "PASTA_INDEX", self.pasta.name)
+        self._patch_index.start()
 
     def tearDown(self):
+        self._patch_index.stop()
         self._patch.stop()
         self.pasta.cleanup()
 
@@ -72,6 +75,23 @@ class TestOrcamento(unittest.TestCase):
         self.assertFalse(cota.cabe(metade)[0])
         self.assertEqual(cota.carregar()["tokens"], metade)
         self.assertEqual(cota.carregar()["lotes"], 1)
+
+    def test_persistencia_usa_apenas_pasta_temporaria(self):
+        with (
+            patch.object(cota.os, "makedirs", wraps=os.makedirs) as criar_pasta,
+            patch("builtins.open", wraps=open) as abrir,
+            patch.object(cota.os, "replace", wraps=os.replace) as substituir,
+        ):
+            cota.salvar({"mes": "2000-01", "tokens": 123, "lotes": 1})
+
+        criar_pasta.assert_called_once_with(self.pasta.name, exist_ok=True)
+        abrir.assert_called_once_with(self.arquivo + ".tmp", "w", encoding="utf-8")
+        substituir.assert_called_once_with(self.arquivo + ".tmp", self.arquivo)
+        self.assertEqual(os.listdir(self.pasta.name), ["cota_embeddings.json"])
+        with open(self.arquivo, encoding="utf-8") as arquivo:
+            self.assertEqual(
+                json.load(arquivo), {"mes": "2000-01", "tokens": 123, "lotes": 1}
+            )
 
     def test_mes_novo_zera_o_contador(self):
         cota.registrar(1_000_000)

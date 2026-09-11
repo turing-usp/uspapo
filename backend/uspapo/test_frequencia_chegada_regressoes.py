@@ -2,7 +2,7 @@ from datetime import date, datetime
 import unittest
 from unittest.mock import patch
 
-from uspapo.transporte import consultas_circulares as circulares
+from uspapo.transporte import consultas_circulares as circulares, programacao
 
 
 class FrequenciaChegadaRegressoesTest(unittest.TestCase):
@@ -44,14 +44,14 @@ class FrequenciaChegadaRegressoesTest(unittest.TestCase):
     def _programacao(self, frequencias, agora, **kwargs):
         with (
             patch.object(
-                circulares, "_catalogo_gtfs",
+                programacao, "_catalogo_gtfs",
                 return_value=self._catalogo(frequencias),
             ),
             patch.object(
-                circulares, "horario_gtfs_confiavel", return_value=True,
+                programacao, "horario_gtfs_confiavel", return_value=True,
             ),
             patch.object(
-                circulares, "parada_atendida_na_data", return_value=True,
+                programacao, "parada_atendida_na_data", return_value=True,
             ),
         ):
             return circulares._programacao_gtfs(
@@ -189,9 +189,9 @@ class FrequenciaChegadaRegressoesTest(unittest.TestCase):
         ]
         agora = datetime(2026, 8, 26, 12, 50, tzinfo=circulares.FUSO_SP)
         with (
-            patch.object(circulares, "_catalogo_gtfs", return_value=catalogo),
-            patch.object(circulares, "horario_gtfs_confiavel", return_value=True),
-            patch.object(circulares, "parada_atendida_na_data", return_value=True),
+            patch.object(programacao, "_catalogo_gtfs", return_value=catalogo),
+            patch.object(programacao, "horario_gtfs_confiavel", return_value=True),
+            patch.object(programacao, "parada_atendida_na_data", return_value=True),
         ):
             resultado = circulares._programacao_gtfs(
                 "9998", "Ponto de teste", agora

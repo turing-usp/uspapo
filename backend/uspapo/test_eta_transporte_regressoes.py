@@ -4,7 +4,7 @@ from datetime import datetime
 import unittest
 from unittest.mock import patch
 
-from uspapo.transporte import consultas_circulares as circulares
+from uspapo.transporte import previsoes, consultas_circulares as circulares
 from uspapo.transporte_resposta import (
     PassagensPorSentido,
     PrevisaoChegada,
@@ -62,15 +62,15 @@ class RegressaoEtaGpsCircularTests(unittest.TestCase):
         }
 
         with (
-            patch.object(circulares, "_instante_referencia_sptrans", return_value=referencia),
-            patch.object(circulares, "_shape_da_viagem", return_value=shape),
+            patch.object(previsoes, "_instante_referencia_sptrans", return_value=referencia),
+            patch.object(previsoes, "_shape_da_viagem", return_value=shape),
             patch.object(
-                circulares,
+                previsoes,
                 "_paradas_projetadas_na_viagem",
                 return_value=paradas_projetadas,
             ),
             patch.object(
-                circulares,
+                previsoes,
                 "_projetar_ponto_no_shape",
                 side_effect=(
                     {"shape_m": 50.0, "distancia_m": 3.0},
@@ -125,9 +125,9 @@ class RegressaoEtaGpsCircularTests(unittest.TestCase):
         }
 
         with (
-            patch.object(circulares, "_instante_referencia_sptrans",
+            patch.object(previsoes, "_instante_referencia_sptrans",
                          return_value=referencia),
-            patch.object(circulares, "_shape_da_viagem", return_value=shape),
+            patch.object(previsoes, "_shape_da_viagem", return_value=shape),
         ):
             resultado = circulares._eta_derivado_de_gps(
                 viagem, "alvo", veiculo, "13:00"
@@ -385,19 +385,20 @@ class RegressaoComplementoProgramadoTests(unittest.TestCase):
 
         with (
             patch.object(
-                circulares, "_programacao_gtfs",
+                previsoes, "_programacao_gtfs",
                 side_effect=(inicial, posterior),
             ) as calcular_programacao,
-            patch.object(circulares, "_plataformas_gtfs_ambíguas",
+            patch.object(previsoes, "_plataformas_gtfs_ambíguas",
                          return_value=False),
-            patch.object(circulares, "_autenticar_sptrans", return_value=True),
-            patch.object(circulares, "_linhas_sptrans", return_value=[linha_api]),
-            patch.object(circulares, "_previsoes_linha",
+            patch.object(previsoes, "_autenticar_sptrans", return_value=True),
+            patch.object(previsoes, "_linhas_sptrans", return_value=[linha_api]),
+            patch.object(previsoes, "_previsoes_linha",
                          return_value=previsao_api),
             patch.object(circulares, "_instante_referencia_sptrans",
+                         return_value=referencia), patch.object(previsoes, "_instante_referencia_sptrans",
                          return_value=referencia),
-            patch.object(circulares, "_agora_sptrans", return_value=referencia),
-            patch.object(circulares, "cache",
+            patch.object(previsoes, "_agora_sptrans", return_value=referencia),
+            patch.object(previsoes, "cache",
                          side_effect=lambda _c, _t, produzir: produzir()),
         ):
             previsao = circulares._obter_previsao_sptrans(
@@ -439,7 +440,7 @@ class RegressaoDedupeVeiculosTests(unittest.TestCase):
             },
         ]
 
-        with patch.object(circulares, "_agora_sptrans", return_value=agora):
+        with patch.object(previsoes, "_agora_sptrans", return_value=agora):
             self.assertFalse(circulares._referencia_api_recente("11:00"))
             self.assertFalse(circulares._referencia_api_recente(None))
 
@@ -453,22 +454,22 @@ class RegressaoDedupeVeiculosTests(unittest.TestCase):
             "tp": "Destino", "ts": "Origem",
         }
         with (
-            patch.object(circulares, "_programacao_gtfs",
+            patch.object(previsoes, "_programacao_gtfs",
                          return_value=programacao),
-            patch.object(circulares, "_plataformas_gtfs_ambíguas",
+            patch.object(previsoes, "_plataformas_gtfs_ambíguas",
                          return_value=False),
-            patch.object(circulares, "_autenticar_sptrans", return_value=True),
-            patch.object(circulares, "_linhas_sptrans",
+            patch.object(previsoes, "_autenticar_sptrans", return_value=True),
+            patch.object(previsoes, "_linhas_sptrans",
                          return_value=[linha_api]),
-            patch.object(circulares, "_previsoes_linha", return_value={
+            patch.object(previsoes, "_previsoes_linha", return_value={
                 "hr": "11:00",
                 "ps": [{"cp": "stop-bienio", "vs": veiculos}],
             }),
-            patch.object(circulares, "_posicoes_linha", return_value={
+            patch.object(previsoes, "_posicoes_linha", return_value={
                 "hr": "11:00", "vs": veiculos,
             }),
-            patch.object(circulares, "_agora_sptrans", return_value=agora),
-            patch.object(circulares, "cache",
+            patch.object(previsoes, "_agora_sptrans", return_value=agora),
+            patch.object(previsoes, "cache",
                          side_effect=lambda _c, _t, produzir: produzir()),
         ):
             resultado = circulares._obter_previsao_sptrans(
@@ -499,11 +500,11 @@ class RegressaoDedupeVeiculosTests(unittest.TestCase):
         ]
 
         with patch.object(
-            circulares,
+            previsoes,
             "_instante_referencia_sptrans",
             return_value=referencia,
         ), patch.object(
-            circulares,
+            previsoes,
             "_agora_sptrans",
             return_value=referencia,
         ):
