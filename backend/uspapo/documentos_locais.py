@@ -52,6 +52,9 @@ def pagina_por_titulo(pergunta: str) -> dict[str, str] | None:
     termo = _termo_principal(pergunta)
     if not termo:
         return None
+    # A unicidade de uma página não torna uma pergunta conceitual institucional.
+    if termo == "memoria" and PALAVRAS_PERGUNTA.intersection(palavras(pergunta)):
+        return None
     catalogo = catalogo_titulos()
     candidatos = catalogo.get(normalizar(termo), [])
     if not candidatos:

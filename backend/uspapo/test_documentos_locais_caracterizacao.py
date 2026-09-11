@@ -135,6 +135,27 @@ class TestDocumentosLocais(unittest.TestCase):
             with self.subTest(pergunta=pergunta):
                 self.assertEqual(roteamento.pagina_por_titulo(pergunta), esperado)
 
+    def test_pergunta_conceitual_independe_da_quantidade_de_paginas_homonimas(self):
+        for quantidade in (0, 1, 2):
+            self.gravar("memoria.json", [
+                self.pagina("Memória", f"https://corpus.invalid/memoria/{indice}")
+                for indice in range(quantidade)
+            ])
+            self.catalogo.cache_clear()
+            for pergunta in ("O que é memória?", "O QUE É MEMORIA?", "Explique memória"):
+                with self.subTest(quantidade=quantidade, pergunta=pergunta):
+                    self.assertIsNone(roteamento.pagina_por_titulo(pergunta))
+
+    def test_memoria_com_referencia_institucional_preserva_correspondencia(self):
+        self.gravar("memoria.json", [self.pagina("Memória")])
+        esperado = {
+            "titulo": "Memória", "url": "https://corpus.invalid/aurora",
+            "texto": "Corpo inicial.",
+        }
+        for pergunta in ("Memória", "Explique o projeto Memória", "O que é a iniciativa Memória?"):
+            with self.subTest(pergunta=pergunta):
+                self.assertEqual(roteamento.pagina_por_titulo(pergunta), esperado)
+
     def test_tipo_de_entidade_so_e_removido_quando_nao_ha_candidato_exato(self):
         self.gravar("projetos.json", [
             self.pagina("Projeto Aurora", "https://corpus.invalid/projeto"),
