@@ -8,9 +8,7 @@ uma estimativa ao vivo.
 """
 
 from dataclasses import replace
-from datetime import datetime, time, timedelta, timezone
-from functools import lru_cache
-import json
+from datetime import datetime, timedelta, timezone
 import math
 import os
 import re
@@ -20,15 +18,11 @@ from typing import Any
 import requests
 
 from uspapo import gtfs_sptrans, olhovivo
-from uspapo.ferramentas import RespostaFerramenta, Registro, cache, casa, normalizar
+from uspapo.ferramentas import RespostaFerramenta, Registro, cache, normalizar
 from uspapo.locais_usp import (
-    CATALOGO_LOCAIS,
-    coordenada_local,
     dados_local,
-    resolver_local,
 )
 from uspapo.intencao_transporte import (
-    RestricaoTemporal,
     analisar_intencao_transporte,
 )
 from uspapo.consulta_transporte import (
@@ -39,8 +33,6 @@ from uspapo.consulta_transporte import (
 from uspapo.operacao_sptrans import (
     aviso_programacao_incompleta,
     fontes_operacionais,
-    horario_gtfs_confiavel,
-    parada_atendida_na_data,
 )
 from uspapo.transporte_resposta import (
     AlternativaPublica,
@@ -55,76 +47,45 @@ from uspapo.transporte_resposta import (
     renderizar_chegada,
     renderizar_trajeto,
 )
-from uspapo.transporte.geometria import (
-    distancia_local_coordenadas_m as _distancia_local_coordenadas_m,
-    paradas_projetadas_na_viagem as _paradas_projetadas_na_viagem,
-    projetar_ponto_no_shape as _projetar_ponto_no_shape,
-)
 from uspapo.transporte.previsoes import (
     TTL_AO_VIVO,
-    TTL_LINHAS,
     _obter_previsao_sptrans,
-    IDADE_TA_ALTA_S,
-    IDADE_TA_MEDIA_S,
-    IDADE_TA_MAXIMA_S,
-    ADIANTAMENTO_TA_MAXIMO_S,
-    MAX_DISTANCIA_GPS_SHAPE_M,
-    MAX_ERRO_PARADA_SHAPE_M,
-    TOLERANCIA_ORDEM_SHAPE_M,
-    CPS_OLHO_VIVO_POR_STOP_GTFS,
-    _linha_corresponde_ao_sentido_gtfs,
-    _cps_olho_vivo_do_stop_gtfs,
     _paradas_olho_vivo_do_stop_gtfs,
-    _agora_sptrans,
     _instante_referencia_sptrans,
     _referencia_api_recente,
     _melhor_eta_ao_vivo,
     _espera_ao_vivo,
     _segundos_ate_eta_sptrans,
-    _instante_atualizacao_sptrans,
-    _gps_valido,
     _classificar_confianca_chegada,
-    _shape_da_viagem,
     _eta_derivado_de_gps,
-    _contextos_ao_vivo_do_gtfs,
-    _viagens_gtfs_do_contexto,
     _plataformas_gtfs_ambíguas,
     _veiculos_ao_vivo_ordenados,
 )
 from uspapo.transporte.planejamento import (
-    MARGEM_INCERTEZA_CAMINHADA_S,
     _chave_ranking_rota,
     _planejar_trajeto_gtfs,
 )
 from uspapo.transporte.programacao import (
     FUSO_SP,
     RAIO_ACESSO_M,
-    MAX_IDADE_GTFS_DIAS,
     _sentido_explicito_da_pergunta,
     _coordenada_ponto,
     _nota_atualizacao_gtfs,
     _aviso_gtfs_se_necessario,
-    _slots_estimados_frequencia,
-    _partidas_planoper_da_viagem,
     _programacao_gtfs,
     _resumo_gtfs,
     _atendimento_linha_na_parada_gtfs,
     _linhas_por_ponto_gtfs,
-    _chave_local,
-    _proxima_passagem_gtfs,
     _espera_media_gtfs,
 )
 
-BASE_URL = "https://api.olhovivo.sptrans.com.br/v2.1"
 FONTE_API = "https://www.sptrans.com.br/desenvolvedores/api-do-olho-vivo-guia-de-referencia/documentacao-api/"
 FONTE_GTFS = "https://www.sptrans.com.br/desenvolvedores/"
 FONTE_PLANOPER = (
     "https://www.sptrans.com.br/itinerarios/"
 )
 ARQUIVO_GTFS = Path(__file__).resolve().parents[1] / "dados_sptrans.json"
-TIMEOUT = 10
 
-CABECALHOS = {"User-Agent": "USPapo/1.0 (chatbot de alunos da USP)"}
 
 
 def _distancia_aproximada(parada: dict[str, Any], coordenada: tuple[float, float]) -> float:
