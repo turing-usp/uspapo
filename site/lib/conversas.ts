@@ -232,13 +232,6 @@ export async function alternarFavorita(id: string): Promise<boolean> {
   return !error;
 }
 
-export async function contarNaoFavoritas(): Promise<number> {
-  const { count } = await criarCliente()
-    .from("conversas").select("*", { count: "exact", head: true })
-    .eq("favorita", false);
-  return count ?? 0;
-}
-
 export async function renomearConversa(id: string, novoTitulo: string): Promise<void> {
   const titulo = novoTitulo.trim();
   if (!titulo) return;
