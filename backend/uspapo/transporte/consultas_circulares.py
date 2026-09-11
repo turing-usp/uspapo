@@ -8,7 +8,7 @@ uma estimativa ao vivo.
 """
 
 from dataclasses import replace
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from functools import lru_cache
 import json
 import math
@@ -60,7 +60,6 @@ from uspapo.transporte.geometria import (
     paradas_projetadas_na_viagem as _paradas_projetadas_na_viagem,
     projetar_ponto_no_shape as _projetar_ponto_no_shape,
 )
-from uspapo.transporte import planoper as _planoper
 from uspapo.transporte.previsoes import (
     TTL_AO_VIVO,
     TTL_LINHAS,
@@ -101,7 +100,6 @@ from uspapo.transporte.programacao import (
     FUSO_SP,
     RAIO_ACESSO_M,
     MAX_IDADE_GTFS_DIAS,
-    _normalizar_sentido_operacional,
     _sentido_explicito_da_pergunta,
     _coordenada_ponto,
     _nota_atualizacao_gtfs,
@@ -169,22 +167,6 @@ def _ordenar_paradas(
             if _distancia_aproximada(parada, coordenada) <= RAIO_ACESSO_M
         ]
     return []
-
-
-def _tipo_dia_planoper(dia: date) -> int:
-    """PlanOper: 1=dia útil, 0=sábado, 2=domingo."""
-    return _planoper.tipo_dia(dia)
-
-
-def _sentido_planoper_da_viagem(
-    rota: dict[str, Any],
-    viagem: dict[str, Any],
-    tipo_dia: int,
-) -> str | None:
-    """Associa uma viagem GTFS à ida/volta PlanOper sem heurística permissiva."""
-    return _planoper.sentido_da_viagem(
-        rota, viagem, tipo_dia, _normalizar_sentido_operacional,
-    )
 
 
 def _pergunta_pede_atendimento_de_linha(pergunta: str | None) -> bool:
