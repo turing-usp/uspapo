@@ -9,7 +9,10 @@ on:
   # Semanal, segunda-feira: scraping e reindexação. Cada parágrafo alterado
   # vira um embedding pago, e a cota do plano é mensal — rodar isso todo dia
   # gastava a cota inteira antes do fim do mês.
-  - cron: '30 5 * * 1'
+  # CUTOVER (approved): weekly round paused — the new pipeline in
+  # turing-usp/USPapo-Backend owns the Pinecone index until runbook step 10.
+  # Restore this line if a new round fails before step 10.
+  # - cron: '30 5 * * 1'
   workflow_dispatch: # Cria um botão no GitHub para você rodar manualmente quando quiser
     inputs:
       forcar_migracao:
